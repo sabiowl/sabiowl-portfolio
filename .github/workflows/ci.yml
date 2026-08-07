@@ -1,0 +1,259 @@
+# 【FEAT-469 (2026-07-03)】CI 自動テスト pipeline (GitHub Actions)
+#
+# PR + push (develop) 時に Backend / Flutter テストを自動実行。
+# Phase 1 (deprecated): flutter analyze は continue-on-error: true (baseline 13-15 issues)
+# Phase 2 (現行、2026-07-25 昇格): 全 job strict、fatal 化。
+#   - backend: python manage.py test api (全 pass 前提、@expectedFailure/@skip で暫定管理)
+#   - flutter analyze: --no-fatal-infos で info のみ許容 (warnings/errors は fatal)
+#   - flutter test: strict (全 pass 前提)
+#
+# 合計見積: 5-8 分 (backend-test + flutter-test 並列、各 job 15 分 timeout)
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+jobs:
+  # ── Backend Django テスト ─────────────────────────────────────
+  backend-test:
+    name: Backend Tests (Django)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # 【2026-07-25 P3 #1-d】ハング検知 (通常 3-4 分)
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: sabiowl_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 【2026-08-06】Python バージョンは backend/runtime.txt を単一の真実値とする。
+      #
+      # 旧: python-version: '3.12' をハードコード。
+      # コメントは「Django 6.0 は Python 3.12+ 必須」= **下限**の話で正しいが、
+      # 本番 (Render は backend/runtime.txt を読む) は 3.14.3 で動いており、
+      # CI だけが 2 マイナーバージョン古い状態だった。
+      #
+      # これが問題なのは、3.13/3.14 固有の非互換が **CI を素通りする**ため:
+      #   - PEP 594 で 3.13 が削除した標準ライブラリ (cgi / telnetlib 等) の import
+      #   - PEP 649 (3.14) の遅延アノテーション評価 — 実行時に型ヒントを覗く
+      #     ライブラリ (Django / DRF) の挙動が変わりうる
+      #   - cp314 wheel が無い依存の**ソースビルド失敗**
+      # いずれも CI が green のまま Render のビルド or 本番 500 で初めて表面化する。
+      #
+      # 実際、3 番目はこの変更直後に顕在化した。`Pillow>=10.0,<11.0` は cp314
+      # wheel を持たずソースビルドに落ちるが、本番 Render は libjpeg ヘッダを
+      # 持つので通り、ubuntu runner には無いので落ちた。CI が 3.12 のままなら
+      # 「本番だけが 46MB を毎回コンパイルしている」ことに気づけなかった。
+      # → requirements.txt の Pillow を 12.3 へ引き上げて解消 (2026-08-06)。
+      #
+      # ハードコードし直すと再びズレるので、runtime.txt から導出する。
+      - name: Resolve Python version from runtime.txt
+        id: pyver
+        run: |
+          version="$(sed 's/^python-//' backend/runtime.txt | tr -d '[:space:]')"
+          if [ -z "$version" ]; then
+            echo "::error::backend/runtime.txt からバージョンを取り出せませんでした" >&2
+            exit 1
+          fi
+          echo "本番 (Render) と同じ Python $version を使います"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.pyver.outputs.version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          # 【2026-08-06】キーに Python バージョンを含める。
+          # ダウンロードされる wheel は interpreter tag ごとに別物 (cp312 と cp314)。
+          # バージョンを含めないと、別 tag のキャッシュを引き当てて無駄になる。
+          # cp314 wheel を持たない依存がソースビルドされた場合、その成果物も
+          # ~/.cache/pip/wheels に tag 別で置かれるため、同じ理由でキーに必要。
+          key: ${{ runner.os }}-py${{ steps.pyver.outputs.version }}-pip-${{ hashFiles('backend/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-py${{ steps.pyver.outputs.version }}-pip-
+
+      # 【2026-08-06】requirements-dev.txt を使う (中で requirements.txt を -r している)。
+      # 本番 Render は requirements.txt だけを入れるので、計測ツールは本番に入らない。
+      - name: pip install
+        run: pip install -r backend/requirements-dev.txt
+
+      # 【2026-07-25 P3 #1-d】strict pass 前提 (1-c で 121→0 broken に到達済)。
+      # 残 spec 判定待ちの 1 件は @unittest.expectedFailure (BUG-141) で管理、
+      # spec 変更が完了したら decorator 解除して strict 契約を維持。
+      #
+      # 【2026-08-06】coverage 計測を追加。テスト実行そのものは変わらない
+      # (coverage run が manage.py を包むだけ) ので、strict pass 契約はそのまま。
+      - name: Django tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/sabiowl_test
+          SECRET_KEY: ci-only-not-for-production-do-not-use
+          DEBUG: 'False'
+          ALLOWED_HOSTS: localhost,127.0.0.1
+          DB_SSL_MODE: disable          # CI の PostgreSQL は SSL なし
+          ADMIN_MFA_REQUIRED: 'False'   # CI では MFA 不要
+          SECURE_SSL_REDIRECT: 'False'  # CI: テストクライアントは HTTP のみ (本番 Render は proxy で HTTPS 終端)
+        run: python -m coverage run manage.py test api --verbosity=2
+
+      # 【2026-08-06】カバレッジの可視化 + 下限の固定。
+      #
+      # `if: always()` にしないのは意図的 —— テストが落ちた時点でカバレッジは
+      # 意味を持たない (途中で止まった分だけ低く出て、原因を見誤らせる)。
+      #
+      # 下限を「現状 - 少し」に置く ratchet 方式にしている。到達点を誇るための
+      # 数字ではなく、**下がったら気づくための**数字として運用する。
+      - name: Coverage report
+        working-directory: backend
+        run: |
+          total="$(python -m coverage report --format=total)"
+          echo "Backend カバレッジ: ${total}%"
+
+          # 一旦変数に受けてから head に渡す。`coverage report | head` を直接書くと
+          # head が先にパイプを閉じて coverage が SIGPIPE で死に、pipefail が
+          # 有効な環境で step ごと落ちる (現状の既定 shell は `bash -e` で
+          # pipefail 無しだが、shell: bash を足した瞬間に壊れる書き方は避ける)。
+          report="$(python -m coverage report --sort=cover)"
+
+          {
+            echo "## Backend カバレッジ: ${total}%"
+            echo
+            echo "<details><summary>カバー率の低いモジュール</summary>"
+            echo
+            echo '```'
+            echo "$report" | head -30
+            echo '```'
+            echo
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          python -m coverage xml
+
+          # 閾値を割ったらここで落ちる。
+          #
+          # 72 の根拠: CI 実測 73.64% (701 tests / PostgreSQL、2026-08-07)。
+          # 導入時は「CI で一度も測っていない」ため 70 に置いていたが、実測が
+          # 出たので 1.64pt 下まで締めた。余裕を残したままだと「下がっても
+          # 気づかない帯」がそのぶん残る。
+          #
+          # なお同時刻のローカル (SQLite) 実測は 73.55% で、差は 0.09pt。
+          # backend 差で数字が動くことを警戒していたが、実際はほぼ同一だった。
+          #
+          # 引き上げるときは実測を確認してから。テストを増やさずに数字だけ
+          # 追うと、このガードは意味を失う。
+          python -m coverage report --fail-under=72
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 14
+          # テストが落ちた回は coverage.xml が無い。既定の warn でも step は
+          # 通るが、ログに毎回警告が出るのは邪魔なので明示的に無視する。
+          if-no-files-found: ignore
+
+  # ── Flutter テスト + lint ─────────────────────────────────────
+  flutter-test:
+    name: Flutter Tests & Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # 【2026-07-25 P3 #1-d】ハング検知 (通常 4-5 分)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.3'
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        working-directory: mobile
+        run: flutter pub get
+
+      # 【FEAT-472】生例外リーク検出 (pre-commit grep hooks)
+      - name: pre-commit lint check
+        run: |
+          pip install pre-commit
+          pre-commit run --all-files
+
+      # 【2026-07-25 P3 #1-d】Phase 2 昇格: continue-on-error 撤廃 + --no-fatal-infos。
+      # info (style hint、23 件 baseline) は許容、warning / error は fatal 化。
+      # 将来 info もゼロに到達したら --fatal-infos (default) に切替可能。
+      - name: flutter analyze
+        working-directory: mobile
+        run: flutter analyze --no-fatal-infos
+
+      # 【2026-08-06】--coverage を追加。coverage/lcov.info が生成される。
+      - name: flutter test
+        working-directory: mobile
+        run: flutter test --coverage
+
+      # 【2026-08-06】lcov を追加ツールなしで集計する。
+      #   LF = そのファイルの実行可能行数 / LH = そのうち実行された行数
+      #
+      # ⚠ backend の coverage と厳密には同じ意味ではない。
+      # `flutter test --coverage` は、テスト実行中に一度も読み込まれなかった
+      # ライブラリを lcov.info に書かない = **分母から消える**ため、数字がやや
+      # 高めに出る。ただし実測 (2026-08-06) では lib/ 304 ファイル中 276 が
+      # 載っており、欠落は 28 (約 9%、どのテストからも到達しない widget が中心)。
+      # 歪みは小さいが、ゼロではない。
+      #
+      # 分母を揃えるには全 lib を import するダミーファイルを生成する手があるが、
+      # 生成物を CI で作る複雑さに見合わないと判断した。
+      #
+      # また Flutter 側は backend と違い **fail-under を設けない**。実測 14.21% で、
+      # 意味のある下限を置ける水準にまだ無い。まず傾向を見えるようにする段階。
+      - name: Flutter coverage summary
+        working-directory: mobile
+        run: |
+          read -r hit found <<< "$(awk -F: '
+            /^LH:/ {h += $2}
+            /^LF:/ {f += $2}
+            END    {print h, f}
+          ' coverage/lcov.info)"
+
+          if [ "${found:-0}" -eq 0 ]; then
+            echo "::warning::lcov.info から行数を集計できませんでした"
+            exit 0
+          fi
+
+          pct="$(awk -v h="$hit" -v f="$found" 'BEGIN {printf "%.2f", h * 100 / f}')"
+          files="$(grep -c '^SF:' coverage/lcov.info)"
+          echo "Flutter カバレッジ: ${pct}%  (${hit}/${found} 行 / ${files} ファイル)"
+
+          {
+            echo "## Flutter カバレッジ: ${pct}%"
+            echo
+            echo "計測対象 ${files} ファイル / ${hit} 行 実行 (実行可能 ${found} 行)"
+            echo
+            echo "> どのテストからも import されないファイルは lcov に現れないため、"
+            echo "> 分母に含まれない。backend の数字とは直接比較できない。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Flutter coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: mobile/coverage/lcov.info
+          retention-days: 14
+          if-no-files-found: ignore

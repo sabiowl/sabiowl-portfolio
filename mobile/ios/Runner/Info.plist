@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 【2026-07-25】App Store で「言語: 英語」表示になる問題への対応。
+	     $(DEVELOPMENT_LANGUAGE) は project.pbxproj の developmentRegion を参照するが、
+	     ビルド環境の変数解決に依存するリスクを回避するため `ja` を直接明示。
+	     project.pbxproj も developmentRegion = ja に更新済 (2 重防御)。 -->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ja</string>
+	<!-- 【2026-07-25】アプリがサポートする言語を明示 (日本語のみ、v1.1 で
+	     英語追加時に `<string>en</string>` を追加)。CFBundleDevelopmentRegion と
+	     整合し、App Store 表示の primary language を Japanese に確定させる。 -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ja</string>
+	</array>
+	<key>CFBundleDisplayName</key>
+	<string>Sabiowl</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Sabiowl</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<!-- 【2026-07-08 hotfix】App Store 却下 (build 43, submission dc00ccb6...) 対応。
+	     iPad Air (M3) レビュー時に「Unable to proceed」= MaintenanceOverlay 表示状態
+	     の screenshot が届き、reviewer は landscape 保持で iPad を操作していたことが
+	     判明。原因は下記 2 点:
+
+	     1. UISupportedInterfaceOrientations に landscape 2 種を宣言していたため、
+	        iPad で SystemChrome.setPreferredOrientations([portraitUp]) (main.dart)
+	        の Flutter 側強制が iPad OS の Info.plist 宣言に負ける仕様。iPad は
+	        Info.plist が最終真実値のため、landscape 描画状態で app 起動 → portrait
+	        設計 UI が余白だらけに見え、「壊れている」印象を強化。
+
+	     2. UIRequiresFullScreen 未宣言のため、iPad Split View / Slide Over / Stage
+	        Manager が有効化される可能性。Sabiowl はスマホ portrait で最適化された
+	        UI で、Multitasking での縮小・分割時に layout 崩壊するリスクあり。
+
+	     iPad も portrait 固定 + フルスクリーン専用に統一する。iPhone (iOS) には影響
+	     なし (元々 portrait でしか使わない設計)。 -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<!-- iPad 専用 orientation 宣言。~ipad サフィックスがある場合、iPad は本 array を
+	     優先参照する。iPhone とは独立に portrait のみに絞る。 -->
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<!-- iPad Split View / Slide Over / Stage Manager を無効化。フルスクリーン専用と
+	     宣言することで、App Store 審査でも Split View 中の描画不良を指摘されない。 -->
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- 【Google Sign In】OAuth callback URL scheme.
+	     Google サインイン完了後、Google サーバーから以下の scheme でアプリに
+	     戻ってくる。Info.plist に未登録だと iOS が戻り先を解決できず crash する
+	     (Android は google-services.json で代替されるため不要)。
+	     値は mobile/ios/Runner/GoogleService-Info.plist の REVERSED_CLIENT_ID と
+	     完全一致させる。Firebase project (sabiowl) を再生成した場合は再度更新が必要。 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.419704949065-eticip7o7r3lo4jtb1oqv6750v1j4f7n</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- 【FEAT-290】Google Sign In SDK の client ID。
+	     GoogleService-Info.plist が Xcode target の Copy Bundle Resources に
+	     登録されていれば GIDSignIn が自動検出するが、本リポジトリでは pbxproj
+	     未登録のため auto-detect が失敗し、`GoogleSignIn().signIn()` 呼び出し時に
+	     ネイティブ層で SIGABRT (Sabiowl iOS 全 3 経路で確定クラッシュ)。
+	     Info.plist に明示宣言することで GIDSignIn が config 解決できるようになる。
+	     値は GoogleService-Info.plist の CLIENT_ID と完全一致させる。-->
+	<key>GIDClientID</key>
+	<string>419704949065-eticip7o7r3lo4jtb1oqv6750v1j4f7n.apps.googleusercontent.com</string>
+
+	<!-- 【FEAT-499 (2026-07-26)】フリーメモ音声入力 β 向け権限。
+	     SEC-11（2026-05-15）で削除した NSMicrophoneUsageDescription /
+	     NSSpeechRecognitionUsageDescription を再追加。
+	     App Store 審査文言: Apple ガイドライン「具体的な必要性説明」要件を満たしつつ
+	     Sabi 口調（穏やか + 🪶 マーカー）を維持。 -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声で「浮かんだこと」を書き留めるために、音声認識を使わせていただきます 🪶</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>音声入力を受け取るためにマイクを使わせていただきます 🪶</string>
+
+	<!-- 【FEAT-366 (2026-05-27)】お問い合わせ画面でスクリーンショット添付するため、
+	     iOS の写真ライブラリへのアクセスを要求。AppStore 審査要件 = 本キー未設定だと
+	     image_picker.pickMultiImage() 呼び出し時に確定 crash、ストア提出 rejected。
+	     文面は CLAUDE.md「サビ口調」を意識せず、Apple ガイドラインに沿った素直な目的説明
+	     (「お問い合わせの添付」用途を明示)。-->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>お問い合わせの際にスクリーンショットを添付するため、写真ライブラリへのアクセスを許可してください。</string>
+</dict>
+</plist>

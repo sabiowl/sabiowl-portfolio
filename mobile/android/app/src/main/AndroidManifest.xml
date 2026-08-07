@@ -1,0 +1,67 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ネットワーク通信に必要 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- プッシュ通知（Android 13+） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- 【新規 (2026-06-26)】バトル必殺技演出の波形ハプティクス用。
+         VibrationEffect.createWaveform / createOneShot で振幅 + 持続を制御 -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- 【FEAT-226】SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM は inexactAllowWhileIdle 化に
+         伴い不要となったため削除。Doze を尊重することで深夜帯のバッテリー消費を抑制。 -->
+    <!-- 【FEAT-499 (2026-07-26)】音声入力 β 再導入に伴い RECORD_AUDIO を復活。
+         SEC-11（2026-05-15）で SabiNavigate 廃止時に削除したが、フリーメモ音声入力
+         で speech_to_text を再導入（Android: Google Speech Recognition Service 経由）。 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <application
+        android:label="@string/app_name"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- 【FEAT-499 (2026-07-26)】speech_to_text: Android 11+ (API 30+) パッケージ可視性制限への対応。
+             この宣言がないと SpeechRecognizer.isRecognitionAvailable() が false を返すか、
+             startListening() が音声認識サービスを発見できず即座に失敗する。
+             Galaxy S22 (Android 12) で「音声認識を起動できない」問題の根本原因。 -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
+    </queries>
+</manifest>

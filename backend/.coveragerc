@@ -1,0 +1,37 @@
+# coverage.py 設定 (2026-08-06 導入)
+#
+# CI で「テストがどこを通っていないか」を可視化するための計測設定。
+# 計測は `coverage run manage.py test api` で行う (.github/workflows/ci.yml)。
+
+[run]
+source = api, config
+branch = True
+
+omit =
+    # 自動生成 + 一度きりの実行物。テスト実行時に必ず通るので、含めると
+    # カバレッジが実態より高く出る (201 ファイルが常時 100% 側に乗る)。
+    */migrations/*
+    # テストコード自身のカバレッジは意味を持たない
+    */tests/*
+    api/test_*.py
+    # 仮想環境 / キャッシュ
+    */venv/*
+    */__pycache__/*
+    manage.py
+    */wsgi.py
+    */asgi.py
+
+[report]
+# 部分的に実行された分岐も表示する
+show_missing = True
+skip_covered = False
+precision = 2
+
+exclude_also =
+    # 型チェック専用の import はランタイムで実行されない
+    if TYPE_CHECKING:
+    # 抽象メソッド / プロトコル定義
+    raise NotImplementedError
+    @(abc\.)?abstractmethod
+    # 防御的な到達不能分岐
+    if __name__ == .__main__.:

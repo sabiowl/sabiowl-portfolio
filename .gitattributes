@@ -1,0 +1,57 @@
+# 改行コードの正規化 (2026-08-02、FEAT-489 Phase 2E の verify で導入)
+#
+# ## なぜ必要か
+#
+# 本リポジトリは Windows 開発 + `core.autocrlf=false` で運用してきたため、
+# エディタ / ツールが書いた改行がそのまま commit され、LF と CRLF が混在していた
+# (2026-08-02 時点で mobile/lib 配下は LF 261 / CRLF 34)。
+#
+# 実害として、FEAT-489 Phase 2E で 13 ファイルが LF → CRLF に変換され、
+# 本来 ~200 行の変更が 2,957 insertions / 2,250 deletions に膨張した:
+#   - `git blame` が全行をその commit に付け替え、既存ロジックの由来を追えなくなる
+#   - develop → release の merge で全ファイル衝突を起こしうる (prod デプロイ経路)
+#
+# ## 方針
+#
+# **リポジトリ内は LF に統一**する (Flutter / Django ともに LF が標準、CI も Linux)。
+# 作業ディレクトリ側の改行はエディタに委ねる (`eol=lf` は checkout 時も LF にする)。
+# Windows の Git Bash / PowerShell / VS Code はいずれも LF を問題なく扱える。
+
+* text=auto eol=lf
+
+# ── 明示的にテキスト扱いするもの ────────────────────────────────────────
+*.dart      text eol=lf
+*.py        text eol=lf
+*.md        text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.json      text eol=lf
+*.arb       text eol=lf
+*.sh        text eol=lf
+*.gradle    text eol=lf
+*.kts       text eol=lf
+
+# ── Windows 側で CRLF が必要なもの ──────────────────────────────────────
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# ── バイナリ (改行変換をかけない) ───────────────────────────────────────
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.webp      binary
+*.ico       binary
+*.ttf       binary
+*.otf       binary
+*.woff      binary
+*.woff2     binary
+*.mp3       binary
+*.wav       binary
+*.zip       binary
+*.jks       binary
+*.keystore  binary
+*.p8        binary
+*.p12       binary
+*.pdf       binary

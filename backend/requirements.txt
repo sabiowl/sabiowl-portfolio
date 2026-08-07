@@ -1,0 +1,58 @@
+# 【FEAT-365 (2026-05-27)】Django 6.0 + Python 3.14 公式サポート組み合わせに更新。
+# 旧 4.2 LTS は Python 3.8-3.12 までサポート、Render 本番 Python 3.14.3 と「二重非サポート」
+# 状態だったため、Python 3.14 を要件する Django 6.0 (Requires-Python >= 3.12) に upgrade。
+# ローカル Python 3.12 + Django 6.0.5 で 145 件全テスト PASS 実証済 (2026-05-27)。
+# 次の LTS は Django 6.2 (2027-04 リリース予定)、それまでは 6.0.x で運用。
+django>=6.0,<6.1
+djangorestframework>=3.16,<3.17
+# PostgreSQL driver
+psycopg2-binary>=2.9,<3.0
+# Load environment variables from .env file
+python-dotenv>=1.0,<2.0
+# Static file serving with compression (for production)
+whitenoise>=6.6,<7.0
+# WSGI server for production
+gunicorn>=21.2,<23.0
+# Firebase Admin SDK (FCM push notifications)
+firebase-admin==6.5.0
+# 【SEC-11】anthropic は SabiNavigate(LLM 対話型ナビゲーション) 廃止
+# （2026-05-15）に伴い撤去。月次数万円のコスト削減効果。
+# YAML dialogue file loader
+PyYAML>=6.0,<7.0
+# FEAT-200: PostHog Identity Deletion API クライアント
+requests>=2.31,<3.0
+# 【FEAT-395 (2026-05-31)】Resend HTTP API SDK (お問い合わせメール送信用)
+# 旧: smtplib (SMTP via smtp.resend.com:587) は Render 環境で接続 timeout 多発
+# (BUG-40/43/49/51 系の延長、本日 FEAT-394 Neon 移行後の検証で再現)
+# 新: HTTPS 経由の Resend HTTP API で構造的解消 (Render egress は HTTPS 自由)
+resend>=2.0,<3.0
+# 【2026-06-27】Announcement の画像アップロード機能 (ImageField の依存)。
+# 本番 Render は ephemeral filesystem のため、頻繁な画像更新があれば v1.1+
+# で S3 等の external storage に migrate。現状は MEDIA_ROOT で運用。
+#
+# 【2026-08-06】>=10.0,<11.0 から引き上げ。理由は 2 つ。
+#
+# 1. cp314 wheel が無かった
+#    Pillow 10.4.0 の wheel は cp313 までで、Python 3.14 では sdift (46MB) を
+#    落として C コンパイルに落ちる。本番 Render は libjpeg ヘッダを持つので
+#    通っていたが、GitHub の ubuntu runner には無く CI が落ちた:
+#      "The headers or library files could not be found for jpeg"
+#    cp314 wheel を持つ最小版は 11.3.0。
+#
+# 2. 10.4.0 に既知脆弱性が 30 件超あり、大半は 12.2 / 12.3 でしか直っていない
+#    (Image.paste()/crop() のヒープ書き込み、ImageCmsTransform.apply() の
+#     境界外書き込み、PSD/PDF/FITS/TGA パーサ由来の DoS 等)。
+#    そのため 11.3 ではなく 12.3 を下限にする。
+#
+# 影響範囲は狭い: コードに `from PIL import` は 1 件も無く、Pillow を通るのは
+# Announcement.image (ImageField) の検証だけ。これは Django admin 専用 + MFA 保護。
+# お問い合わせ添付 (views/health.py) はサイズと content-type のみで検証しており
+# Pillow を通らない。
+Pillow>=12.3,<13.0
+# 【FEAT-470 (2026-07-03)】Sentry エラー監視 (Backend 5xx + 未捕捉例外集約)
+# DSN は SENTRY_DSN_BACKEND 環境変数で注入 (未設定 or DEBUG=True 時は init しない)
+sentry-sdk[django]>=2.0,<3.0
+# 【FEAT-477 (2026-07-03)】Feature Flag システム (段階リリース / A/B テスト基盤)
+# waffle は waffle/migrations/ 配下に自前 migration を持つため api/migrations/ への変更不要。
+# Django 6.0 対応: 4.x 系は Django 3.2-5.0 サポート表記だが 6.0 でも動作確認済み (2026-07-03)。
+django-waffle>=4.0,<5.0

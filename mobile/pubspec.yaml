@@ -1,0 +1,302 @@
+name: sabiowl
+description: "Sabiowl - Habit tracking RPG app"  # OPS-01
+publish_to: 'none'
+
+version: 1.0.5+6
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # BUG-28: GlobalMaterialLocalizations 等を提供。BUG-27 で supportedLocales を
+  # ja_JP のみに絞ったため、AppBar が MaterialLocalizations を解決できず
+  # assertion エラーになっていた。Flutter SDK 同梱なので追加 DL 不要。
+  flutter_localizations:
+    sdk: flutter
+
+  # UI
+  cupertino_icons: ^1.0.8
+
+  # 状態管理
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # ナビゲーション
+  go_router: ^14.8.1
+
+  # API通信
+  dio: ^5.8.0+1
+
+  # データモデル
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+  # ローカルストレージ
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.3.5
+
+  # 【FEAT-426】Google カレンダー予定本文のローカル保存 (設計 Y ハイブリッド)
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+
+  # 通知権限（ソフトプロンプト用）
+  permission_handler: ^11.3.1
+
+  # ローカル通知スケジュール用タイムゾーン
+  # flutter_timezone は削除（BUG-06: Kotlin V1 API 非互換のためビルド失敗）。
+  # 通知スケジュールは tz.TZDateTime.utc(...) で UTC 絶対時刻ベースに変更済み。
+  timezone: ^0.9.4
+
+  # Firebase / FCM / Auth
+  firebase_core: ^3.13.0
+  firebase_messaging: ^15.2.5
+  flutter_local_notifications: ^18.0.0
+  firebase_auth: ^5.5.0
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
+
+  # カレンダー（Phase 4）
+  table_calendar: ^3.1.3
+
+  # 【FEAT-227】lottie は実コードで未参照だったため削除（バンドルサイズ削減）。
+  # 将来 Lottie 演出が必要になったら再追加すること。
+
+  # チャート（P2-3: 30 日積み上げ折れ線グラフ）
+  fl_chart: ^0.70.0
+
+  # 暗号ハッシュ（H-04: Apple Sign-in の nonce SHA-256 計算）
+  # firebase_auth 経由で transitive 解決されていたが、直接使用するため明示宣言
+  crypto: ^3.0.6
+
+  # 【FEAT-249】health: ^12.0.0 はヘルスケア連携死コード削除に伴い撤去。
+  # 復活させる場合は最新版を取得し直すこと（API が古くなっている可能性大）。
+
+  # 【FEAT-499 (2026-07-26)】speech_to_text を再導入。SEC-11（2026-05-15）で
+  # SabiNavigate 廃止に伴い撤去したが、フリーメモ音声入力 β（FEAT-499）で再導入。
+  # 将来 FEAT-492（Habit/ToDo/Event 3 画面版、v1.1）でも共有予定。
+  speech_to_text: ^7.0.0
+
+  # 【FEAT-227】video_player は実コードで未参照だったため削除（バンドルサイズ削減）。
+  # ワールドフレームは WebP 静止画 + AnimatedScale で表現する設計に統一済み。
+
+  # FEAT-200: PostHog プロダクトアナリティクス（リリース前から計測開始）
+  # PostHog Cloud (EU) ホスト、セッションリプレイ無効、PlayerProfile.id のみ送信
+  # API キーは --dart-define=POSTHOG_API_KEY=... で注入（リポジトリにコミットしない）
+  posthog_flutter: ^4.0.0
+
+  # 【FEAT-470 (2026-07-03)】Sentry クラッシュ監視 (Flutter クラッシュ + 未捕捉例外集約)
+  # DSN は --dart-define=SENTRY_DSN_FLUTTER=https://... で注入 (未設定時は no-op)
+  # beforeSend でユーザー識別情報を除去 (プライバシーポリシー整合)
+  sentry_flutter: ^8.0.0
+
+  # FEAT-436: RevenueCat 経由の IAP (v1.0.1 hot fix、iOS 先行)
+  # 買い切りダイヤパック 2 種 (120 円/120 個、600 円/660 個) を販売。
+  # iOS: Apple StoreKit を RevenueCat 経由で抽象化、Android は v1.0.2 で対応。
+  # API キーは --dart-define=REVENUECAT_PUBLIC_API_KEY_IOS=appl_xxx で注入
+  # (詳細: doc/instructions/FEAT-436_phase1_setup_guide.md §H)。
+  #
+  # 【FEAT-436 hotfix (2026-06-17)】当初 ^8.0.0 で着手したが flutter pub get で
+  # freezed_annotation 衝突 (purchases_flutter ^8 は freezed_annotation ^2.0.1
+  # 依存、Sabiowl 既存依存は freezed_annotation ^3.0.0) が発生。
+  # purchases_flutter >=4.0.0-beta.1 <9.0.0-beta.3 が ^2.0.1 ロックのため、
+  # ^10.3.0 へ上げて freezed_annotation ^3.0.0 互換版に揃える。
+  purchases_flutter: ^10.3.0
+
+  # FEAT-202: ローディングスケルトン（読み込み中の温度統一）
+  # Shimmer アニメーションで本物のスケルトンを描画。スピナー画面の置換に使う。
+  shimmer: ^3.0.0
+
+  # FEAT-271: 外部 URL を OS 標準ブラウザで開く（プライバシーポリシー / 利用規約 /
+  # リリースノートの Web 版へ）。GitHub Pages 公開版
+  # (https://sabiowl.github.io/sabiowl-home-pages/) への遷移などに使用。
+  # 【BUG-121 (2026-06-14)】sabiowl-legal-pages → sabiowl-home-pages に統合 (案 A 完全移行)。
+  # 【2026-06-27】GitHub Pages 配信元 user を subaru7105 → sabiowl 組織に変更。
+  url_launcher: ^6.3.0
+
+  # 【FEAT-485 (2026-07-08)】使い方・ヘルプ画面用 WebView。
+  # 「アプリ内 WebView」で sabiowl-home-pages の help ページを表示する経路。
+  # 既存の url_launcher (外部ブラウザ) は FAQ / 法務文書等の「一度読めば済む」情報
+  # 向けに残置し、「繰り返し参照する使い方」だけ WebView で内部遷移させる設計:
+  # - 外部ブラウザ (Safari/Chrome) に飛ぶと user が Sabiowl に戻る動線が失われる
+  # - 使い方は困った時に何度でも見たい参照系情報 → context 保持が重要
+  # - AppBar の戻るボタンで元の画面に即座に戻れる
+  # JavaScript 有効化必須 (YouTube 動画埋め込みを想定)。
+  webview_flutter: ^4.10.0
+
+  # 【FEAT-366 (2026-05-27)】お問い合わせ画面でのスクリーンショット添付用。
+  # image_picker は iOS の HEIC を自動的に JPEG/PNG に変換するため (Q2 案 Z)、
+  # Backend 側は JPEG/PNG/WebP のみ受け入れで運用可能。pickMultiImage で 5 枚一括選択 +
+  # 個別追加 + 削除を実現。
+  # iOS Info.plist の NSPhotoLibraryUsageDescription 必須 (ストア審査要件)。
+  image_picker: ^1.1.0
+
+  # 【FEAT-366】Dio MultipartFile の contentType 指定で MediaType を直接参照するため。
+  # Dio は http_parser を transitive dep として持つが Flutter lint `depend_on_referenced_packages`
+  # は直接依存の明示を要求するため explicit add。MediaType('image', 'png') 形式で MIME 指定。
+  http_parser: ^4.0.2
+
+  # 【FEAT-289】Font Awesome の brand icons（Apple / Google / Twitter 等）。
+  # アカウント連携 UI で Apple ロゴ (U+F8FF) が iOS でも描画されない問題
+  # （カスタムフォント theme と Apple Private Use Area 文字の競合）を解消する
+  # ため、HIG 準拠の Apple silhouette icon を `FontAwesomeIcons.apple` で提供。
+  # ブランドアイコン用途のみで一般 Material Icons は使わない方針。
+  font_awesome_flutter: ^10.8.0
+
+  # 【FEAT-370 (2026-05-28)】BUG-70 構造解消: offline 検知用。
+  # `timelineAutoCreateProvider` が offline 時に POST をスキップする判定に使う
+  # （オフライン中の楽観 enqueue を排し、online 復帰時の二重 POST を構造的に防止）。
+  # iOS / Android / macOS / Windows / Linux / web 全プラットフォーム対応の de-facto
+  # standard。本リリース時点で v1.0 のスコープは iOS/Android のみだが、将来の
+  # desktop / web 展開を妨げない選択。
+  connectivity_plus: ^6.0.0
+
+  # 【FEAT-464 (2026-06-23)】アプリのバージョン情報取得 (PackageInfo.fromPlatform)。
+  # ホーム画面 endDrawer 内「バージョン情報」表示で使用。
+  # iOS / Android / Web / Desktop 対応の de-facto standard。
+  package_info_plus: ^8.0.0
+
+  # 【FEAT-476 (2026-07-03)】HTTP キャッシュ層: マスタデータを Hive でローカルキャッシュ。
+  # 対象 5 endpoint (characters/24h・enemies/24h・task-suggestions/12h・announcements/5min・challenges/5min)。
+  # CachePolicy.request (opt-in 設計) + per-service で CachePolicy.forceCache + maxStale 指定。
+  dio_cache_interceptor: ^3.5.0
+  dio_cache_interceptor_hive_store: ^3.2.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.5
+
+  # 【FEAT-489 Phase 1 (2026-07-29)】v1.1 英語圏 launch 向け i18n 基盤。
+  # `flutter gen-l10n` が ARB → Dart コード生成する際に intl を要求する。
+  # Phase 1 では arb ファイル空 skeleton + delegate 登録のみで、実 render は Phase 2 以降。
+  # BUG-27 (中文端末での漢字グリフ問題) 対策の Locale('ja', 'JP') 固定は Phase 1 では維持。
+  # バージョン: flutter_localizations が pin する 0.19.0 に揃える (Flutter 3.29.3 SDK 制約)。
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+
+  # コード生成
+  build_runner: ^2.4.14
+  freezed: ^3.0.0
+  json_serializable: ^6.9.0
+  riverpod_generator: ^2.6.3
+
+  # 静的解析
+  custom_lint: ^0.7.5
+  riverpod_lint: ^2.3.15
+
+  # アプリアイコン生成（Android / iOS 全サイズを 1 元画像から自動生成）
+  flutter_launcher_icons: ^0.14.1
+
+  # 【FEAT-426】LocalGoogleEventStore (sqflite) の単体テスト用。
+  # プラットフォームチャンネルなしで sqlite を動かす FFI 実装。
+  sqflite_common_ffi: ^2.3.4+4
+
+  # バトルタイマー系テストの決定論的実行 (stat_battle_link_test.dart 精神力連動等)。
+  # flutter_test は fakeAsync を re-export しないため明示宣言。1.3.2 は既存 transitive dep。
+  fake_async: ^1.3.2
+
+# ─────────────────────────────────────────────────────────────
+# アプリアイコン生成設定（dart run flutter_launcher_icons で実行）
+# 元画像: assets/images/sabi/sabi_dot_6464.png（眼鏡フクロウのドット絵）
+# ─────────────────────────────────────────────────────────────
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/sabi/sabi_dot_6464.png"
+  # Android 8.0+ アダプティブアイコン: 背景色は AppTheme.surface に合わせる
+  adaptive_icon_background: "#1E1E2E"
+  adaptive_icon_foreground: "assets/images/sabi/sabi_dot_6464.png"
+  # iOS は透過 PNG 不可（App Store 申請時の reject 防止）
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+
+  # 【FEAT-489 Phase 1 (2026-07-29)】v1.1 英語圏 launch 向け i18n 基盤。
+  # `generate: true` により `flutter pub get` 時に `flutter gen-l10n` が自動実行され、
+  # `lib/l10n/app_*.arb` から `AppLocalizations` クラスが自動生成される。
+  # 設定は l10n.yaml (プロジェクトルート) 参照。
+  generate: true
+
+  assets:
+    - assets/images/
+    - assets/animations/
+    # 【FEAT-388 (2026-05-30)】assets/animations/world/ は BUG-12b 暫定 bar.webp/glass.webp を
+    # dead asset として削除。新画像は assets/images/backgrounds/world/ に移行。
+    # バンドルサイズ削減のため pubspec.yaml から除去済み。
+
+    # 【FEAT-388 (2026-05-30)】WorldFrame 背景画像 8 枚 + 将来拡張用。
+    # bar.webp / glass.webp (BUG-12b 暫定) からの完全移行完了。
+    # 画像未配置時は Image.asset の errorBuilder が _WorldFramePlaceholder に自動フォールバック。
+    - assets/images/backgrounds/world/
+
+    # 【FEAT-295】バトルシステム MVP のスプライト配置先。
+    # PM 側で AI 加工版 (手法 A) または既存 PNG のリサイズ版 (手法 B) を
+    # `assets/images/battle/enemy_goblin.png` 等として配置する。
+    # 未配置時は errorBuilder で半透明プレースホルダが表示される。
+    - assets/images/battle/
+
+    # 【FEAT-305】ギルド受付 NPC リリア（正面 UI sprite）+ 将来の他 NPC 用。
+    # `assets/images/npc/lilia_64.png` を `GuildReceptionView` で参照。
+    # サブディレクトリは明示登録必須（assets/images/ では再帰展開されない）。
+    - assets/images/npc/
+
+    # 【FEAT-306】ギルド画面背景（木製カウンター + 紋章 + 棚 + 暖炉）。
+    # `assets/images/backgrounds/guild_reception.png` を Scaffold body Stack の
+    # 最下層で参照。未配置時は errorBuilder で AppTheme.surface 単色 fallback。
+    - assets/images/backgrounds/
+    # 【FEAT-381 hotfix (2026-05-29)】tier 別戦闘背景 (bg_zako/mid_boss/boss/hidden_boss)。
+    # Flutter はサブディレクトリを自動 bundle しないため明示登録が必須。
+    # 前回 FEAT-381 起票時に「pubspec.yaml 変更不要」と PM が誤判断、本 hotfix で訂正。
+    # MiniBattleArena (FEAT-381 拡張) + BattlePage (FEAT-381 既実装) 両画面で参照。
+    - assets/images/backgrounds/battle/
+
+    # ── キャラクター画像アセット ─────────────────────────────────
+    # 【FEAT-316】PixelLab 92×92 ドット絵 8 体に統一（faye_wear_glass は Backend
+    # Character マスター存在せず、Flutter のみの dead asset だったため archive 退避）。
+    # 旧 AI イラスト 9 体は `assets/images/characters/archive_ai_illustrations/` 退避。
+    # 【FEAT-428 hotfix 2026-06-12】新 5 体 (kyle/fia/irene/luna/aurum、migration
+    # 0128) を追加。character_asset.dart:_identifiers は更新済だったが本 declaration
+    # が抜けていたため、Image.asset() ロード失敗 → errorBuilder 経路で人型 silhouette
+    # が表示されていた (キャラ画面で報告)。
+    - assets/images/characters/character_zenon.webp
+    - assets/images/characters/character_aria.webp
+    - assets/images/characters/character_beatrix.webp
+    - assets/images/characters/character_faye.webp
+    - assets/images/characters/character_lucia.webp
+    - assets/images/characters/character_noir.webp
+    - assets/images/characters/character_cyan.webp
+    # 【BUG-104 (2026-06-14)】新キャラ「ルーン (黒魔導士)」追加 (migration 0138)
+    - assets/images/characters/character_rune.webp
+    - assets/images/characters/character_sol.webp
+    - assets/images/characters/character_kyle.webp
+    - assets/images/characters/character_fia.webp
+    - assets/images/characters/character_irene.webp
+    - assets/images/characters/character_luna.webp
+    - assets/images/characters/character_aurum.webp
+
+    # ── サビ表情アセット ──────────────────────────────────────────
+    # 【FEAT-316】旧 AI イラスト 10 種類（normal/smile/laugh/eyes_sparkling/
+    # inspiration/proudly/trouble/sleep/sad/surprise）を sabi_unified.png に統一。
+    # SabiEmotion enum は維持し、メッセージ分岐ロジックで感情表現を担う方針
+    # （画像での感情表現は廃止）。旧ファイルは `archive_ai_illustrations/` に退避。
+    - assets/images/sabi/sabi_unified.webp
+    # 【FEAT-243】サインイン画面ヘッダーで使用するドット絵フクロウ。
+    # 既にランチャーアイコン用に存在していたが、ランタイムバンドルに含まれていなかったため追記。
+    # 【FEAT-510】sabi_dot_6464.png は flutter_launcher_icons (ビルド時) 用に維持。
+    # ランタイム用は .webp に変換済み。
+    - assets/images/sabi/sabi_dot_6464.webp
+    # 【2026-06-27】ホーム画面 AppBar 左上のサビセリフトグルアイコン用シルエット。
+    - assets/images/sabi/sabi_silhouette.webp
+
+  # fonts: # Phase 0 で NotoSansJP を追加予定
+  #   - family: NotoSansJP
+  #     fonts:
+  #       - asset: assets/fonts/NotoSansJP-Regular.ttf
+  #       - asset: assets/fonts/NotoSansJP-Bold.ttf
+  #         weight: 700

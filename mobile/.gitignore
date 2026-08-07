@@ -1,0 +1,65 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# 機密
+doc/instructions_from_gemini/操作感修正.md
+doc/instructions_from_gemini/task_list.md
+doc/instructions_from_gemini/202607_task_list.md
+scripts/
+# 【2026-08-02】flutter gen-l10n の生成物は追跡しない。
+#
+# l10n.yaml が synthetic-package: false + output-dir: lib/l10n なので生成物が
+# ソースツリーに出るが、`flutter pub get` で **byte 一致で再生成される**
+# (PM 実測: 3 ファイルを削除 → pub get → git diff 空)。CI (.github/workflows/ci.yml)
+# も analyze / test の前に pub get を実行済み。
+#
+# 追跡をやめる理由: ARB 1 key の変更が 3 ファイル数十行の diff になり、
+# コードレビューの信号対雑音比が落ちる。FEAT-489 Phase 2F で native reviewer
+# から 1,438 key が返ってくる際、ARB の差分が 18,000 行の生成物に埋もれる。
+#
+# 真実値は app_ja.arb / app_en.arb。生成物を手で編集しないこと。
+/lib/l10n/app_localizations.dart
+/lib/l10n/app_localizations_*.dart

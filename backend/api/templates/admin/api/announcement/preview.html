@@ -1,0 +1,236 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }}</title>
+<style>
+  /* 【2026-06-27】Mobile popup UI を HTML で再現したプレビュー画面。
+     AppTheme.surface (#1E1E2E) を背景、AppTheme.primary (#7C6AF7) を accent
+     に使い、Mobile の announcement_popup_listener.dart と視覚を揃える。 */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0F1020;
+    color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    min-height: 100vh;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .preview-header {
+    width: 100%;
+    max-width: 480px;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: #2A2A3E;
+    border-left: 4px solid #7C6AF7;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #ccc;
+  }
+  .preview-header strong { color: #fff; }
+  .popup-card {
+    width: 100%;
+    max-width: 480px;
+    background: #1E1E2E;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  }
+  .popup-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .popup-title .icon { color: #7C6AF7; font-size: 22px; }
+  .popup-title h1 {
+    color: #fff;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0;
+    flex: 1;
+  }
+  .popup-image {
+    width: 100%;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .popup-body {
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .popup-meta {
+    color: rgba(255,255,255,0.38);
+    font-size: 11px;
+    margin-top: 16px;
+  }
+  .link-character {
+    background: rgba(124, 106, 247, 0.08);
+    border: 1px solid rgba(124, 106, 247, 0.3);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .link-character .badge-new {
+    background: rgba(255, 152, 0, 0.18);
+    border: 1px solid rgba(255, 152, 0, 0.6);
+    border-radius: 4px;
+    padding: 2px 6px;
+    color: #FF9800;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+  }
+  .link-character-info { flex: 1; }
+  .link-character-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .link-character-tagline {
+    color: rgba(255,255,255,0.7);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .actions {
+    width: 100%;
+    max-width: 480px;
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn-cancel {
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .btn-publish {
+    background: #7C6AF7;
+    color: #fff;
+  }
+  .btn-publish:hover { background: #6B5AE6; }
+  .status-banner {
+    width: 100%;
+    max-width: 480px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .status-active {
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    color: #81C784;
+  }
+  .status-draft {
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid rgba(255, 152, 0, 0.5);
+    color: #FFB74D;
+  }
+  .status-scheduled {
+    background: rgba(33, 150, 243, 0.12);
+    border: 1px solid rgba(33, 150, 243, 0.5);
+    color: #64B5F6;
+  }
+  .placeholder-text { color: rgba(255,255,255,0.3); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="preview-header">
+  <strong>📱 Mobile popup プレビュー</strong> &mdash; 実際のホーム画面で表示される見た目を確認できます。
+  内容が正しければ下部の「投稿する」ボタンで公開してください。
+</div>
+
+{# 現在のステータスバナー (admin context でフラグを計算済) #}
+{% if is_published_now %}
+  <div class="status-banner status-active">
+    ✅ 公開中: <strong>{{ announcement.published_at|date:"Y-m-d H:i" }}</strong> に公開されました
+  </div>
+{% elif is_scheduled %}
+  <div class="status-banner status-scheduled">
+    ⏰ 公開予約: <strong>{{ announcement.published_at|date:"Y-m-d H:i" }}</strong> に自動公開されます
+  </div>
+{% else %}
+  <div class="status-banner status-draft">
+    📝 下書き (is_active=False): 「投稿する」ボタンで即時公開できます
+  </div>
+{% endif %}
+
+{# Mobile popup UI 再現 #}
+<div class="popup-card">
+  <div class="popup-title">
+    <span class="icon">📣</span>
+    <h1>{{ announcement.title|default:"(タイトル未設定)" }}</h1>
+  </div>
+
+  {% if announcement.link_character %}
+    <div class="link-character">
+      <div class="link-character-info">
+        <div>
+          <span class="badge-new">NEW</span>
+          <strong style="color: #fff; margin-left: 6px;">
+            {{ announcement.link_character.name }}
+          </strong>
+        </div>
+        {% if announcement.link_character.tagline %}
+          <div class="link-character-tagline">
+            {{ announcement.link_character.tagline }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if announcement.image %}
+    <img src="{{ announcement.image.url }}" alt="お知らせ画像" class="popup-image">
+  {% endif %}
+
+  {% if announcement.body %}
+    <div class="popup-body">{{ announcement.body }}</div>
+  {% else %}
+    <div class="popup-body placeholder-text">(本文未設定)</div>
+  {% endif %}
+
+  <div class="popup-meta">
+    {{ announcement.published_at|date:"Y年n月j日" }}
+  </div>
+</div>
+
+<div class="actions">
+  <a href="{% url 'admin:api_announcement_change' announcement.pk %}" class="btn btn-cancel">
+    下書きに戻る
+  </a>
+  <form method="post" action="{% url 'admin:api_announcement_publish' announcement.pk %}"
+        style="display:inline;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-publish"
+            onclick="return confirm('「{{ announcement.title }}」を今すぐ公開しますか?\n\nis_active=True + published_at=now に更新されます。');">
+      投稿する
+    </button>
+  </form>
+</div>
+
+</body>
+</html>

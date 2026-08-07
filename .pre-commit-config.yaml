@@ -1,0 +1,70 @@
+# 【FEAT-472 (2026-07-03)】生例外リーク検出 lint フック
+#
+# 検出対象:
+#   Hook 1 (no-raw-exception-in-ui): Text("$e") 等の生例外を UI に直接展開するパターン
+#   Hook 2 (no-raw-error-tostring): $e.toString() / ${e.toString()} の UI 漏洩パターン
+#
+# 抑制: 意図的な例外表示が必要な箇所は行末に `// ignore: raw_exception` を付ける
+#
+# CI 統合: .github/workflows/ci.yml の flutter-test ジョブ内で
+#   `pip install pre-commit && pre-commit run --all-files` で実行される。
+#
+# ローカルセットアップ:
+#   pre-commit install                        # pre-commit ステージ (Hook 1/2)
+#   pre-commit install --hook-type commit-msg # commit-msg ステージ (Hook 3)
+repos:
+  - repo: local
+    hooks:
+      # ── Hook 1: Text ウィジェットへの生例外展開検出 ──────────────────
+      - id: no-raw-exception-in-ui
+        name: "No raw exception in UI Text (no-raw-exception-in-ui)"
+        language: system
+        entry: bash
+        args:
+          - -c
+          - |
+            # 【2026-07-26 fix】旧 regex `Text.*\$e` は word boundary 無しで
+            # `$expGain` `$error` `$element` 等の `e` 始まり変数まで false
+            # positive 検出していた (CI 赤化事例あり)。word boundary `\b` を
+            # 追加して `$e` 単独 or `$e.toString()` `$e)` `$e ` 等の catch (e)
+            # 生例外パターンのみを厳密検出する形に修正。
+            if grep -rEn 'Text.*\$e\b' mobile/lib/ --include='*.dart' | grep -v '// ignore: raw_exception'; then
+              echo ""
+              echo "ERROR: 生例外を Text() に直接渡すパターンを検出しました。"
+              echo "  NG 例: Text('\$e') / Text('エラー: \$e')"
+              echo "  OK 例: Text(errorMessage) / SnackBar 経由でサビ口調メッセージを表示"
+              echo "  抑制:  行末に // ignore: raw_exception を追加"
+              exit 1
+            fi
+        pass_filenames: false
+        types: [file]
+
+      # ── Hook 2: e.toString() の UI 直接漏洩検出 ──────────────────────
+      - id: no-raw-error-tostring
+        name: "No raw e.toString() in UI (no-raw-error-tostring)"
+        language: system
+        entry: bash
+        args:
+          - -c
+          - |
+            if grep -rEn '\$e\.toString|\$\{e\.toString' mobile/lib/ --include='*.dart' | grep -v '// ignore: raw_exception'; then
+              echo ""
+              echo "ERROR: \$e.toString() / \${e.toString()} の UI 直接漏洩パターンを検出しました。"
+              echo "  NG 例: Text(\$e.toString()) / SnackBar(content: Text(\${e.toString()}))"
+              echo "  OK 例: DioErrorHelper.toUserMessage(e) 等のユーザー向けメッセージ変換を使用"
+              echo "  抑制:  行末に // ignore: raw_exception を追加"
+              exit 1
+            fi
+        pass_filenames: false
+        types: [file]
+
+      # ── Hook 3: コミットメッセージの UTF-8 BOM 自動除去 ────────────────
+      # PowerShell 5.1 の Set-Content / Out-File は UTF-8 出力時に BOM を付ける
+      # (utf8NoBOM は 5.1 に存在しない)。`git commit -F <file>` 経由で件名先頭に
+      # 不可視文字 U+FEFF が混入するのを自動で取り除く。
+      # 有効化: pre-commit install --hook-type commit-msg
+      - id: strip-commit-msg-bom
+        name: "Strip UTF-8 BOM from commit message (strip-commit-msg-bom)"
+        language: system
+        entry: bash scripts/strip_commit_msg_bom.sh
+        stages: [commit-msg]

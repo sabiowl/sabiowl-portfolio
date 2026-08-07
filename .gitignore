@@ -1,0 +1,132 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# 仮想環境
+venv/
+.venv/
+env/
+
+# Django
+*.sqlite3
+/backend/staticfiles/
+/backend/media/
+
+# 環境変数（絶対にコミットしないこと）
+.env
+.env.local
+.env.production
+
+# Firebase / Google Cloud 秘密鍵（絶対にコミットしないこと）
+# 旧 com.restack.restack プロジェクト時代に
+# mobile/restack-app-firebase-adminsdk-fbsvc-*.json が誤コミットされた事例あり。
+# Render の FIREBASE_SERVICE_ACCOUNT_JSON 環境変数経由で使うこと。
+*-firebase-adminsdk-*.json
+*-service-account-*.json
+firebase-adminsdk*.json
+gcloud-service-key.json
+
+# Apple Developer 秘密鍵（.p8 ファイルは絶対にコミットしないこと）
+# APNs Auth Key / Sign in with Apple Key 等。Codemagic UI / App Store Connect
+# 経由でアップロードすること。
+*.p8
+AuthKey_*.p8
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flutter
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/*.iml
+# 【FEAT-366 hotfix 2026-05-27】mobile/pubspec.lock の除外を撤廃。
+# Flutter 公式は Application プロジェクトでは pubspec.lock の commit を推奨
+# (https://dart.dev/tools/pub/glossary#lockfile)。Sabiowl は Application のため
+# commit して再現性のあるビルド + CI/CD 信頼性 + サプライチェーン攻撃対策を確保。
+# Render は backend/ のみ deploy するため pubspec.lock の commit による影響なし。
+
+# claude
+.claude/worktrees/
+
+# PixelLab 調達残骸 (FEAT-302 / FEAT-305 で確立、2026-05-25)
+# Sprite 採用版は mobile/assets/images/battle/ or mobile/assets/images/npc/ に
+# 個別配置、_variants/ に退避。zip ダウンロードや UUID 名一時 jpg は
+# リポジトリに含めない方針 (バイナリ容量節約 + 可読性維持)。
+mobile/assets/images/characters/pixcel_lab/
+mobile/assets/images/*.jpg
+*.zip
+# 【FEAT-320 追加 (2026-05-27)】PixelLab zip 展開フォルダ (キャラ別 prompt 名で命名)。
+# sprite 採用版は battle/ や sabi/ 配下に enemy_*.png / sabi_unified.png として直接
+# 配置するため、PixelLab 自動生成の展開フォルダは不要。
+mobile/assets/images/**/HUGE_*/
+
+# 機密
+doc/instructions_from_gemini/
+
+# ローカル専用スクリプト (個人環境固有、team 共有不要)
+# 【2026-07-08 追加】scripts/run-prod-android.ps1 は個人端末で prod backend
+# 向け Android 実機ビルドを叩くためのローカル用途スクリプト。
+# 端末固有の path や環境変数を含む可能性があるため team 共有せず、
+# git rm --cached で追跡解除済 + 本エントリで以降の再追跡防止。
+scripts/run-prod-android.ps1
+scripts/run-dev-android.ps1
+
+# Claude Code / セッション tempfile (2026-07-26 追加)
+# 【背景】ed05ca1 doc更新 コミットで broad `git add` により scratchpad/ 配下の
+# session tempfile 10 本 (commit_msg 下書き + fire_frame_*.png 等) が誤 sweep-in、
+# release merge 準備時に発覚 → git rm --cached で untrack + 本エントリで以降の
+# 再追跡防止。scratchpad/ はセッションローカル、team 共有・repo 保管どちらも不要。
+scratchpad/
+
+# Claude Code local settings (per-user permission grants�Ateam ���L�s�v)
+# �y20260729 �ǉ��z�{ file �� Claude Code �� permission ���F�̂��т� auto-modify ����
+# = �펞 dirty ��ԁA���R�~�b�g�� M �\�� + branch merge �� stash �K�v �̖��C�������B
+# �����K�� (.local.json) ���u���L���Ȃ��v�������ƊE�W���ɏ����B
+# �������K�v�ȏꍇ: git show HEAD:.claude/settings.local.json > .claude/settings.local.json
+.claude/settings.local.json
+
+# 【FEAT-489 Phase 3 (2026-08-02)】native reviewer 受け渡し用の CSV は生成物。
+# `python scripts/arb_review_export.py export` でいつでも再生成できる一方、
+# ARB を更新するたび差分が出て commit ノイズになるため追跡しない。
+# 納品された CSV も個人情報 / 契約物のため repo には置かない。
+doc/design/review_export/
+
+# 【2026-08-06】カバレッジ計測の生成物 (.github/workflows/ci.yml + backend/.coveragerc)。
+# CI では artifact としてアップロードするので repo には残さない。
+# 設定ファイル (backend/.coveragerc) は追跡する — 無視するのは計測結果だけ。
+backend/.coverage
+backend/coverage.xml
+backend/htmlcov/
+mobile/coverage/
+
+# 【2026-08-07】CI ログの一時置き場 (GitHub Actions からダウンロードした調査用ログ)。
+# GitHub Actions の画面からいつでも再取得できるうえ、1 run で ~1MB あるため追跡しない。
+# 追跡していないと `git add .` で巻き込まれるので、ここで明示的に除外する。
+doc/temp_logs/
+
+# 【2026-08-07】CI ログの一時置き場 (GitHub Actions からダウンロードした調査用ログ)。
+# GitHub Actions の画面からいつでも再取得できるうえ、1 run で ~1MB あるため追跡しない。
+# 追跡していないと `git add .` で巻き込まれるので、ここで明示的に除外する。
+doc/temp_logs/

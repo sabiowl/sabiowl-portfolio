@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Sign in with Apple capability
+	     Apple Developer の App ID で「Sign in with Apple」を有効化済みの場合、
+	     アプリ側でもこの entitlement を宣言しないと iOS が認証要求を拒否する
+	     (AuthorizationError 1000)。
+	     値 "Default" は当該 App ID に紐付く既定の Sign in with Apple 設定を使う。 -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
+	<!-- Push Notifications (APNs) capability
+	     FCM 経由の Push 通知 (FEAT-273 等) で必要。
+	     production = リリースビルド用、development = Xcode デバッグビルド用。
+	     TestFlight + App Store では production 環境が使われる。 -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>

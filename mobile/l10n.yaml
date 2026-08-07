@@ -1,0 +1,15 @@
+# 【FEAT-489 Phase 1 (2026-07-29)】v1.1 英語圏 launch 向け i18n 基盤設定。
+#
+# `flutter pub get` 実行時に `flutter gen-l10n` が自動起動し、
+# `lib/l10n/app_*.arb` を読んで `AppLocalizations` クラス (Dart) を生成する。
+#
+# Phase 1 では arb ファイルは空 skeleton (appTitle のみ)、実 render は Phase 2 以降。
+# BUG-27 (中文端末での漢字グリフ問題) 対策の Locale('ja', 'JP') 固定は Phase 1 では維持し、
+# supportedLocales に en を追加するのは Phase 2 (実 render 開始時) に慎重に判断する。
+
+arb-dir: lib/l10n
+template-arb-file: app_ja.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+synthetic-package: false
+output-dir: lib/l10n

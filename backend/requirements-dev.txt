@@ -1,0 +1,12 @@
+# 開発 / CI 専用の依存 (2026-08-06 導入)
+#
+# 本番 (Render) は requirements.txt だけを入れる。計測ツールを本番イメージに
+# 混ぜないため、ファイルを分けている。
+#
+# 使い方:
+#   pip install -r requirements-dev.txt   # 本番依存も一緒に入る
+-r requirements.txt
+
+# カバレッジ計測 (.coveragerc + .github/workflows/ci.yml)
+# C 拡張が使えると計測が数倍速いので、wheel のある系列を使う。
+coverage>=7.0,<8.0

@@ -1,0 +1,1830 @@
+{
+ "SabiMessage": [
+  {
+   "id": 67,
+   "pool": "context_comeback",
+   "content": "お休みのはずが、体が自然と動いてしまいましたか。それが習慣の証ですね。"
+  },
+  {
+   "id": 68,
+   "pool": "context_comeback",
+   "content": "「今日は休む」とお決めになったはずなのに、こうして来られた。その矛盾が、継続の本質です。"
+  },
+  {
+   "id": 69,
+   "pool": "context_comeback",
+   "content": "無理をなさるなとは申しましたが、来てくださったこと、しかと記録しておきますよ。"
+  },
+  {
+   "id": 70,
+   "pool": "context_default",
+   "content": "完璧なる始まりの刻など、存在しません。今日この瞬間が、その日ですよ。"
+  },
+  {
+   "id": 71,
+   "pool": "context_default",
+   "content": "小さく続けることの方が、大きく変えることよりも難しい。それをあなたはやっておられますね。"
+  },
+  {
+   "id": 72,
+   "pool": "context_default",
+   "content": "私はいつもここに控えています。用がなくとも、いつでもいらしてください。"
+  },
+  {
+   "id": 64,
+   "pool": "context_rest_day",
+   "content": "休むことを選ばれた判断、私は賢明だと思いますよ。心身の回復もまた、立派な積み上げです。"
+  },
+  {
+   "id": 65,
+   "pool": "context_rest_day",
+   "content": "疲れを感じるなら、それは止まれというご自身の体からの便りでしょう。今日はどうぞ、お休みください。"
+  },
+  {
+   "id": 66,
+   "pool": "context_rest_day",
+   "content": "負荷の後には回復の時が必要です。それは万物に共通する法則ですよ。"
+  },
+  {
+   "id": 73,
+   "pool": "context_undo",
+   "content": "おや、記録を正されるのですね。その誠実さこそが、真の成長への近道です。"
+  },
+  {
+   "id": 74,
+   "pool": "context_undo",
+   "content": "取り消しもまた、正確さへの意志の表れ。私はその誠実さを称えますよ。"
+  },
+  {
+   "id": 75,
+   "pool": "context_undo",
+   "content": "記録を整えることを厭わない。それが長く続ける者の心がけですね。"
+  },
+  {
+   "id": 76,
+   "pool": "context_undo",
+   "content": "数字を正すことを恐れない。その謙虚さが、揺るぎない土台を築くのです。"
+  },
+  {
+   "id": 77,
+   "pool": "context_undo",
+   "content": "正確さと誠実さは、一流の積み上げの両輪ですよ。"
+  },
+  {
+   "id": 8,
+   "pool": "home_all_done",
+   "content": "実に見事な積み上げですね。私も誇らしく思いますよ。"
+  },
+  {
+   "id": 9,
+   "pool": "home_all_done",
+   "content": "今日という日を、あなたは誠実に完結させましたね。静かに認めましょう。"
+  },
+  {
+   "id": 10,
+   "pool": "home_all_done",
+   "content": "完璧を求めずとも、結果として完璧な一日になりました。"
+  },
+  {
+   "id": 11,
+   "pool": "home_all_done",
+   "content": "この一石一石が、やがて揺るぎない地層になっていきますよ。"
+  },
+  {
+   "id": 12,
+   "pool": "home_all_done",
+   "content": "あなたは今日、自分との約束を守られた。これほど誇るに足る行いはありません。"
+  },
+  {
+   "id": 13,
+   "pool": "home_all_done",
+   "content": "結果ではなく、向き合った時間そのものが、あなたの財産になっていますよ。"
+  },
+  {
+   "id": 14,
+   "pool": "home_all_done",
+   "content": "達成感の余韻を、どうぞ十分に味わってください。それも積み上げの一部です。"
+  },
+  {
+   "id": 15,
+   "pool": "home_all_done",
+   "content": "派手な変化ではなくとも、確実な変化が起きています。私には見えていますよ。"
+  },
+  {
+   "id": 16,
+   "pool": "home_all_done",
+   "content": "自分を信じてあげる材料が、今日また一つ増えましたね。"
+  },
+  {
+   "id": 17,
+   "pool": "home_all_done",
+   "content": "やり遂げた事実は消えません。明日のあなたの基礎になりますよ。"
+  },
+  {
+   "id": 18,
+   "pool": "home_all_done",
+   "content": "今日のあなたを、未来のあなたが感謝することになるでしょうね。"
+  },
+  {
+   "id": 19,
+   "pool": "home_all_done",
+   "content": "整った一日というのは、こうして静かに完成するものなのですよ。"
+  },
+  {
+   "id": 45,
+   "pool": "home_early_level",
+   "content": "焦る必要はありません。大樹も最初は小さな芽でしたから。"
+  },
+  {
+   "id": 46,
+   "pool": "home_early_level",
+   "content": "始まりの時期が一番堪えるもの。私が隣で見守っていますよ。"
+  },
+  {
+   "id": 47,
+   "pool": "home_early_level",
+   "content": "再びここへ足を運ばれた。その意志に敬意を表します。"
+  },
+  {
+   "id": 48,
+   "pool": "home_early_level",
+   "content": "最初の数週間が一番重い。それを越えれば、自然と軽くなりますよ。"
+  },
+  {
+   "id": 49,
+   "pool": "home_early_level",
+   "content": "比べる相手は、昨日のあなただけで十分です。"
+  },
+  {
+   "id": 50,
+   "pool": "home_early_level",
+   "content": "一歩目を踏み出した時点で、もう半分は越えていますよ。"
+  },
+  {
+   "id": 39,
+   "pool": "home_high_level",
+   "content": "ここまで来られた方は、滅多にお目にかかれません。感服しました。"
+  },
+  {
+   "id": 40,
+   "pool": "home_high_level",
+   "content": "あなたが積み上げてきた時間は、もはや誰にも奪えない財産です。"
+  },
+  {
+   "id": 41,
+   "pool": "home_high_level",
+   "content": "継続という名の芸術を、私は特等席で見せていただいていますよ。"
+  },
+  {
+   "id": 42,
+   "pool": "home_high_level",
+   "content": "この高みからの景色は、積み上げてきた者だけのご褒美ですね。"
+  },
+  {
+   "id": 43,
+   "pool": "home_high_level",
+   "content": "あなたの歩んできた道のりは、これから始める誰かの道標になりますよ。"
+  },
+  {
+   "id": 44,
+   "pool": "home_high_level",
+   "content": "ここまで来た方には、私から申し上げることなどほとんどありません。"
+  },
+  {
+   "id": 52,
+   "pool": "home_knowledge_general",
+   "content": "新しい習慣が定着するまで、平均して66日かかるそうですよ。21日説はあくまで目安に過ぎません。"
+  },
+  {
+   "id": 53,
+   "pool": "home_knowledge_general",
+   "content": "「毎日」ではなく「週N回」と決めるほうが、続けやすいという研究があります。柔軟さは、強さに繋がるのですね。"
+  },
+  {
+   "id": 54,
+   "pool": "home_knowledge_general",
+   "content": "行動のきっかけを決めると、習慣は驚くほど定着します。「朝起きたら水を一杯」のように、合図と行動を結ぶのです。"
+  },
+  {
+   "id": 55,
+   "pool": "home_knowledge_general",
+   "content": "環境を整えることは、意志を鍛えることより遥かに効率的ですよ。摩擦を減らす方が、長続きするものです。"
+  },
+  {
+   "id": 56,
+   "pool": "home_knowledge_general",
+   "content": "「2分だけ」と決めて始めると、不思議と長く続きます。始まりさえすれば、惰性が味方してくれるのですね。"
+  },
+  {
+   "id": 57,
+   "pool": "home_knowledge_general",
+   "content": "完璧主義は、継続の最大の敵です。60点を毎日積むほうが、100点を週1回より遥かに強いのですよ。"
+  },
+  {
+   "id": 58,
+   "pool": "home_knowledge_general",
+   "content": "中断した習慣の復活率は、それを「失敗」と捉えなかった人ほど高いそうです。一度の途切れに、意味はありません。"
+  },
+  {
+   "id": 59,
+   "pool": "home_knowledge_general",
+   "content": "意志力は、朝が最も豊富だそうですよ。大切な習慣ほど、早い時間に置くと続きやすくなります。"
+  },
+  {
+   "id": 60,
+   "pool": "home_knowledge_general",
+   "content": "「〜する人になる」と捉え直すと、行動は驚くほど安定します。あなたは既に、そういう人なのですから。"
+  },
+  {
+   "id": 61,
+   "pool": "home_knowledge_general",
+   "content": "報酬を行動の直後に得られる仕組みを作ると、脳は素直に動くようになります。これが習慣化の本質ですよ。"
+  },
+  {
+   "id": 62,
+   "pool": "home_knowledge_general",
+   "content": "一日休んでも、二日連続では休まない。たったこれだけで、ほとんどの挫折は防げるそうです。"
+  },
+  {
+   "id": 63,
+   "pool": "home_knowledge_general",
+   "content": "睡眠中に、脳は得た経験を整理し、明日のための準備をしています。よく眠ることも、立派な習慣の一部ですよ。"
+  },
+  {
+   "id": 1,
+   "pool": "home_no_habits",
+   "content": "まずは一歩。その最初の一歩こそが、最も貴いものです。"
+  },
+  {
+   "id": 2,
+   "pool": "home_no_habits",
+   "content": "白紙の地図に、あなたの足跡を刻んでみませんか。"
+  },
+  {
+   "id": 3,
+   "pool": "home_no_habits",
+   "content": "静寂の中に、変化の兆しが眠っていますよ。"
+  },
+  {
+   "id": 4,
+   "pool": "home_no_habits",
+   "content": "形にする前の沈黙にも、価値はあります。考えること自体が、もう始まりですよ。"
+  },
+  {
+   "id": 5,
+   "pool": "home_no_habits",
+   "content": "迷いも、選択の一部です。あなたが進む道は、あなたが描けば良いのです。"
+  },
+  {
+   "id": 6,
+   "pool": "home_no_habits",
+   "content": "最初の一行を書く勇気と、最初の一歩を踏む勇気は、よく似ていますね。"
+  },
+  {
+   "id": 7,
+   "pool": "home_no_habits",
+   "content": "始めない自由も、始める自由も、どちらもあなたのものですよ。"
+  },
+  {
+   "id": 30,
+   "pool": "home_none_done",
+   "content": "止まる理由があるのも、また人間らしいというものですね。"
+  },
+  {
+   "id": 31,
+   "pool": "home_none_done",
+   "content": "今日は「何もしない」という選択をした。そう考えて、明日を待ちましょう。"
+  },
+  {
+   "id": 32,
+   "pool": "home_none_done",
+   "content": "羽を休めることも、長く飛び続けるためには必要な工程ですよ。"
+  },
+  {
+   "id": 33,
+   "pool": "home_none_done",
+   "content": "充電の時間ですね。次に飛び立つための力を蓄えておきましょう。"
+  },
+  {
+   "id": 34,
+   "pool": "home_none_done",
+   "content": "動けなかった日も、あなたの一日です。それも含めて、あなたの航路ですね。"
+  },
+  {
+   "id": 35,
+   "pool": "home_none_done",
+   "content": "明日の自分が今日の自分を責めぬよう、今日のあなたを私が肯定しておきますよ。"
+  },
+  {
+   "id": 36,
+   "pool": "home_none_done",
+   "content": "習慣は積み上げるもの。一日休んでも、あなたが築いてきたものは消えません。"
+  },
+  {
+   "id": 37,
+   "pool": "home_none_done",
+   "content": "来ていただけた、それだけで十分です。続ける意志は、まだ消えていませんね。"
+  },
+  {
+   "id": 38,
+   "pool": "home_none_done",
+   "content": "立ち止まる日があるからこそ、進む日の価値が際立つものですよ。"
+  },
+  {
+   "id": 20,
+   "pool": "home_partial",
+   "content": "大丈夫。あなたは十分頑張っていますよ。"
+  },
+  {
+   "id": 21,
+   "pool": "home_partial",
+   "content": "歩みを止めなかった。その事実こそが、何よりの収穫ですね。"
+  },
+  {
+   "id": 22,
+   "pool": "home_partial",
+   "content": "少しずつ、しかし確実に。それが長続きの秘訣ですよ。"
+  },
+  {
+   "id": 23,
+   "pool": "home_partial",
+   "content": "一つでも成し遂げたのなら、それは勝利と呼んで差し支えありません。"
+  },
+  {
+   "id": 24,
+   "pool": "home_partial",
+   "content": "全てを達成する日もあれば、そうでない日もある。それが続けるということです。"
+  },
+  {
+   "id": 25,
+   "pool": "home_partial",
+   "content": "途中で止めなかった。その判断こそが、長続きの分水嶺になりますよ。"
+  },
+  {
+   "id": 26,
+   "pool": "home_partial",
+   "content": "100点を求めず、60点で続ける。それが結局、一番遠くまで行ける道です。"
+  },
+  {
+   "id": 27,
+   "pool": "home_partial",
+   "content": "未達分は、明日への招待状とお考えください。"
+  },
+  {
+   "id": 28,
+   "pool": "home_partial",
+   "content": "一歩でも進めたなら、立ち止まっていたあなたとは別人です。"
+  },
+  {
+   "id": 29,
+   "pool": "home_partial",
+   "content": "出来た分だけ、自分を認める。それが続ける人の作法ですね。"
+  },
+  {
+   "id": 51,
+   "pool": "home_pun",
+   "content": "「コツコツ」こそが、人生を切り拓く最大の「コツ」なのですよ。"
+  },
+  {
+   "id": 78,
+   "pool": "time_early_morning",
+   "content": "このような早暁からお動きとは、感服しますよ。"
+  },
+  {
+   "id": 79,
+   "pool": "time_early_morning",
+   "content": "静寂の朝に、静かに刻む。それが一日の礎となりますね。"
+  },
+  {
+   "id": 80,
+   "pool": "time_early_morning",
+   "content": "夜明け前に目覚め、動き出す。その意志は並大抵ではありません。"
+  },
+  {
+   "id": 87,
+   "pool": "time_evening",
+   "content": "今日という日は、いかがでしたか。"
+  },
+  {
+   "id": 88,
+   "pool": "time_evening",
+   "content": "夕暮れ時にお立ち寄りいただきましたね。それだけで十分です。"
+  },
+  {
+   "id": 89,
+   "pool": "time_evening",
+   "content": "一日の終わりが近づいています。締めくくりを大切に。"
+  },
+  {
+   "id": 93,
+   "pool": "time_late_night",
+   "content": "この深い時刻まで、私はここに控えていますよ。"
+  },
+  {
+   "id": 94,
+   "pool": "time_late_night",
+   "content": "夜更かしはお身体に障りますが、来てくださったことは嬉しく思います。"
+  },
+  {
+   "id": 95,
+   "pool": "time_late_night",
+   "content": "深夜の習慣は、強い意志の証ですね。"
+  },
+  {
+   "id": 81,
+   "pool": "time_morning",
+   "content": "おはようございます。今日も良き一日でありますように。"
+  },
+  {
+   "id": 82,
+   "pool": "time_morning",
+   "content": "朝に動けば、一日が豊かになりますよ。"
+  },
+  {
+   "id": 83,
+   "pool": "time_morning",
+   "content": "始まりの時にいらっしゃいましたね。良い心がけです。"
+  },
+  {
+   "id": 90,
+   "pool": "time_night",
+   "content": "今日一日、よくお勤めくださいましたね。"
+  },
+  {
+   "id": 91,
+   "pool": "time_night",
+   "content": "夜に積み上げるものは、明日の糧となりますよ。"
+  },
+  {
+   "id": 92,
+   "pool": "time_night",
+   "content": "静かな夜の時間に、自分と向き合っておられるようですね。"
+  },
+  {
+   "id": 84,
+   "pool": "time_noon",
+   "content": "午後に差し掛かりましたね。いかがお過ごしでしょうか。"
+  },
+  {
+   "id": 85,
+   "pool": "time_noon",
+   "content": "折り返しの時刻ですね。ゆったりとしたペースでも構いませんよ。"
+  },
+  {
+   "id": 86,
+   "pool": "time_noon",
+   "content": "昼の陽光の下で積み上げるものもあります。焦らずに参りましょう。"
+  }
+ ],
+ "TaskSuggestion": [
+  {
+   "id": 1,
+   "title": "朝のランニング",
+   "hint": ""
+  },
+  {
+   "id": 2,
+   "title": "読書の時間",
+   "hint": ""
+  },
+  {
+   "id": 3,
+   "title": "ストレッチ",
+   "hint": ""
+  },
+  {
+   "id": 4,
+   "title": "休憩タイム",
+   "hint": ""
+  },
+  {
+   "id": 5,
+   "title": "集中作業",
+   "hint": ""
+  },
+  {
+   "id": 6,
+   "title": "ミーティング",
+   "hint": ""
+  },
+  {
+   "id": 7,
+   "title": "ランチ",
+   "hint": ""
+  },
+  {
+   "id": 8,
+   "title": "振り返りメモ",
+   "hint": ""
+  },
+  {
+   "id": 9,
+   "title": "趣味の時間",
+   "hint": ""
+  },
+  {
+   "id": 10,
+   "title": "ウォーキング",
+   "hint": ""
+  },
+  {
+   "id": 11,
+   "title": "コップ1杯の水を飲む",
+   "hint": "はじめの一歩"
+  },
+  {
+   "id": 12,
+   "title": "本を1ページ開く",
+   "hint": "自分への投資"
+  },
+  {
+   "id": 13,
+   "title": "5分だけ深呼吸する",
+   "hint": "心を整える"
+  },
+  {
+   "id": 14,
+   "title": "今日の出来事をメモする",
+   "hint": "振り返りの習慣"
+  },
+  {
+   "id": 15,
+   "title": "部屋を1か所だけ片づける",
+   "hint": "小さな整理"
+  },
+  {
+   "id": 16,
+   "title": "誰かに「ありがとう」と伝える",
+   "hint": "今日の思いやり"
+  },
+  {
+   "id": 27,
+   "title": "ディナー",
+   "hint": ""
+  },
+  {
+   "id": 28,
+   "title": "出勤",
+   "hint": ""
+  },
+  {
+   "id": 29,
+   "title": "リモートワーク",
+   "hint": ""
+  },
+  {
+   "id": 30,
+   "title": "外出",
+   "hint": ""
+  },
+  {
+   "id": 31,
+   "title": "商談",
+   "hint": ""
+  },
+  {
+   "id": 32,
+   "title": "面談",
+   "hint": ""
+  },
+  {
+   "id": 33,
+   "title": "プレゼン",
+   "hint": ""
+  },
+  {
+   "id": 34,
+   "title": "打ち合わせ",
+   "hint": ""
+  },
+  {
+   "id": 35,
+   "title": "営業",
+   "hint": ""
+  },
+  {
+   "id": 36,
+   "title": "残業",
+   "hint": ""
+  },
+  {
+   "id": 37,
+   "title": "通勤",
+   "hint": ""
+  },
+  {
+   "id": 38,
+   "title": "お風呂",
+   "hint": ""
+  },
+  {
+   "id": 39,
+   "title": "就寝",
+   "hint": ""
+  },
+  {
+   "id": 40,
+   "title": "ジム",
+   "hint": ""
+  },
+  {
+   "id": 41,
+   "title": "買い物",
+   "hint": ""
+  },
+  {
+   "id": 42,
+   "title": "デート",
+   "hint": ""
+  },
+  {
+   "id": 43,
+   "title": "スーパー",
+   "hint": ""
+  },
+  {
+   "id": 44,
+   "title": "コンビニ",
+   "hint": ""
+  },
+  {
+   "id": 45,
+   "title": "ドラッグストア",
+   "hint": ""
+  },
+  {
+   "id": 46,
+   "title": "Amazon注文",
+   "hint": ""
+  },
+  {
+   "id": 47,
+   "title": "ネットショッピング",
+   "hint": ""
+  },
+  {
+   "id": 48,
+   "title": "病院",
+   "hint": ""
+  },
+  {
+   "id": 49,
+   "title": "歯医者",
+   "hint": ""
+  },
+  {
+   "id": 50,
+   "title": "美容院",
+   "hint": ""
+  },
+  {
+   "id": 51,
+   "title": "郵便局",
+   "hint": ""
+  },
+  {
+   "id": 52,
+   "title": "銀行",
+   "hint": ""
+  },
+  {
+   "id": 53,
+   "title": "市役所",
+   "hint": ""
+  },
+  {
+   "id": 54,
+   "title": "花見",
+   "hint": ""
+  },
+  {
+   "id": 55,
+   "title": "GW旅行",
+   "hint": ""
+  },
+  {
+   "id": 56,
+   "title": "夏祭り",
+   "hint": ""
+  },
+  {
+   "id": 57,
+   "title": "お盆",
+   "hint": ""
+  },
+  {
+   "id": 58,
+   "title": "ハロウィン",
+   "hint": ""
+  },
+  {
+   "id": 59,
+   "title": "クリスマス",
+   "hint": ""
+  },
+  {
+   "id": 60,
+   "title": "大掃除",
+   "hint": ""
+  },
+  {
+   "id": 61,
+   "title": "初詣",
+   "hint": ""
+  },
+  {
+   "id": 62,
+   "title": "病院へ行く",
+   "hint": ""
+  },
+  {
+   "id": 63,
+   "title": "薬を飲む",
+   "hint": ""
+  },
+  {
+   "id": 64,
+   "title": "歯医者を予約する",
+   "hint": ""
+  },
+  {
+   "id": 65,
+   "title": "健康診断を予約する",
+   "hint": ""
+  },
+  {
+   "id": 66,
+   "title": "課題を提出する",
+   "hint": ""
+  },
+  {
+   "id": 67,
+   "title": "レポートを書く",
+   "hint": ""
+  },
+  {
+   "id": 68,
+   "title": "オンライン講義を見る",
+   "hint": ""
+  },
+  {
+   "id": 69,
+   "title": "模試を受ける",
+   "hint": ""
+  },
+  {
+   "id": 70,
+   "title": "メールを返信する",
+   "hint": ""
+  },
+  {
+   "id": 71,
+   "title": "資料を作成する",
+   "hint": ""
+  },
+  {
+   "id": 72,
+   "title": "請求書を作成する",
+   "hint": ""
+  },
+  {
+   "id": 73,
+   "title": "見積書を作成する",
+   "hint": ""
+  },
+  {
+   "id": 74,
+   "title": "電話をする",
+   "hint": ""
+  },
+  {
+   "id": 75,
+   "title": "タスクを整理する",
+   "hint": ""
+  },
+  {
+   "id": 76,
+   "title": "洗剤を買う",
+   "hint": ""
+  },
+  {
+   "id": 77,
+   "title": "食材を買う",
+   "hint": ""
+  },
+  {
+   "id": 78,
+   "title": "クリーニングへ行く",
+   "hint": ""
+  },
+  {
+   "id": 79,
+   "title": "宅配を受け取る",
+   "hint": ""
+  },
+  {
+   "id": 80,
+   "title": "銀行へ行く",
+   "hint": ""
+  },
+  {
+   "id": 81,
+   "title": "振込をする",
+   "hint": ""
+  },
+  {
+   "id": 82,
+   "title": "クレジットカードの支払いをする",
+   "hint": ""
+  },
+  {
+   "id": 83,
+   "title": "家賃を支払う",
+   "hint": ""
+  },
+  {
+   "id": 84,
+   "title": "LINEを返信する",
+   "hint": ""
+  },
+  {
+   "id": 85,
+   "title": "朝のストレッチ 5分",
+   "hint": ""
+  },
+  {
+   "id": 86,
+   "title": "本を15分読む",
+   "hint": ""
+  },
+  {
+   "id": 87,
+   "title": "水を2L飲む",
+   "hint": ""
+  },
+  {
+   "id": 88,
+   "title": "英単語10個覚える",
+   "hint": ""
+  },
+  {
+   "id": 89,
+   "title": "散歩20分",
+   "hint": ""
+  },
+  {
+   "id": 90,
+   "title": "日記を書く",
+   "hint": ""
+  },
+  {
+   "id": 91,
+   "title": "家族・友人に連絡",
+   "hint": ""
+  },
+  {
+   "id": 92,
+   "title": "週1でジム",
+   "hint": ""
+  },
+  {
+   "id": 93,
+   "title": "部屋を片づける",
+   "hint": ""
+  },
+  {
+   "id": 94,
+   "title": "月1で新しいことに挑戦する",
+   "hint": ""
+  },
+  {
+   "id": 95,
+   "title": "歯磨きをする",
+   "hint": ""
+  },
+  {
+   "id": 96,
+   "title": "サプリを飲む",
+   "hint": ""
+  },
+  {
+   "id": 97,
+   "title": "プロテインを飲む",
+   "hint": ""
+  },
+  {
+   "id": 98,
+   "title": "体重を測る",
+   "hint": ""
+  },
+  {
+   "id": 99,
+   "title": "血圧を測る",
+   "hint": ""
+  },
+  {
+   "id": 100,
+   "title": "睡眠時間を記録する",
+   "hint": ""
+  },
+  {
+   "id": 101,
+   "title": "禁煙する",
+   "hint": ""
+  },
+  {
+   "id": 102,
+   "title": "禁酒する",
+   "hint": ""
+  },
+  {
+   "id": 103,
+   "title": "ビタミンを飲む",
+   "hint": ""
+  },
+  {
+   "id": 104,
+   "title": "スクワット20回",
+   "hint": ""
+  },
+  {
+   "id": 105,
+   "title": "腹筋30回",
+   "hint": ""
+  },
+  {
+   "id": 106,
+   "title": "腕立て10回",
+   "hint": ""
+  },
+  {
+   "id": 107,
+   "title": "ラジオ体操",
+   "hint": ""
+  },
+  {
+   "id": 108,
+   "title": "瞑想10分",
+   "hint": ""
+  },
+  {
+   "id": 109,
+   "title": "ヨガ15分",
+   "hint": ""
+  },
+  {
+   "id": 110,
+   "title": "資格勉強30分",
+   "hint": ""
+  },
+  {
+   "id": 111,
+   "title": "プログラミング30分",
+   "hint": ""
+  },
+  {
+   "id": 112,
+   "title": "英会話",
+   "hint": ""
+  },
+  {
+   "id": 113,
+   "title": "ニュースを読む",
+   "hint": ""
+  },
+  {
+   "id": 114,
+   "title": "新聞を読む",
+   "hint": ""
+  },
+  {
+   "id": 115,
+   "title": "問題集を解く",
+   "hint": ""
+  },
+  {
+   "id": 116,
+   "title": "復習する",
+   "hint": ""
+  },
+  {
+   "id": 117,
+   "title": "洗濯",
+   "hint": ""
+  },
+  {
+   "id": 118,
+   "title": "掃除機をかける",
+   "hint": ""
+  },
+  {
+   "id": 119,
+   "title": "ゴミ出し",
+   "hint": ""
+  },
+  {
+   "id": 120,
+   "title": "食器洗い",
+   "hint": ""
+  },
+  {
+   "id": 121,
+   "title": "自炊する",
+   "hint": ""
+  },
+  {
+   "id": 122,
+   "title": "お弁当を作る",
+   "hint": ""
+  },
+  {
+   "id": 123,
+   "title": "洗面所掃除",
+   "hint": ""
+  },
+  {
+   "id": 124,
+   "title": "トイレ掃除",
+   "hint": ""
+  },
+  {
+   "id": 125,
+   "title": "家計簿をつける",
+   "hint": ""
+  },
+  {
+   "id": 126,
+   "title": "支出を確認する",
+   "hint": ""
+  },
+  {
+   "id": 127,
+   "title": "投資状況を確認する",
+   "hint": ""
+  },
+  {
+   "id": 128,
+   "title": "レシート整理",
+   "hint": ""
+  },
+  {
+   "id": 129,
+   "title": "ゲームをする",
+   "hint": ""
+  },
+  {
+   "id": 130,
+   "title": "映画鑑賞",
+   "hint": ""
+  },
+  {
+   "id": 131,
+   "title": "アニメを見る",
+   "hint": ""
+  },
+  {
+   "id": 132,
+   "title": "漫画を読む",
+   "hint": ""
+  },
+  {
+   "id": 133,
+   "title": "音楽を聴く",
+   "hint": ""
+  },
+  {
+   "id": 134,
+   "title": "楽器を練習する",
+   "hint": ""
+  },
+  {
+   "id": 135,
+   "title": "写真を撮る",
+   "hint": ""
+  },
+  {
+   "id": 136,
+   "title": "イラストを描く",
+   "hint": ""
+  }
+ ],
+ "Enemy": [
+  {
+   "key": "armored_knight",
+   "name": "鎧の騎士"
+  },
+  {
+   "key": "bat",
+   "name": "コウモリ"
+  },
+  {
+   "key": "chimera",
+   "name": "キメラ"
+  },
+  {
+   "key": "dark_knight",
+   "name": "闇の騎士"
+  },
+  {
+   "key": "dragon",
+   "name": "ドラゴン"
+  },
+  {
+   "key": "fire_demon",
+   "name": "炎の悪魔"
+  },
+  {
+   "key": "giant_slime",
+   "name": "巨大スライム"
+  },
+  {
+   "key": "goblin",
+   "name": "ゴブリン"
+  },
+  {
+   "key": "goblin_king",
+   "name": "ゴブリンキング"
+  },
+  {
+   "key": "griffin",
+   "name": "グリフォン"
+  },
+  {
+   "key": "ice_witch",
+   "name": "氷の魔女"
+  },
+  {
+   "key": "leviathan",
+   "name": "リヴァイアサン"
+  },
+  {
+   "key": "lich_king",
+   "name": "リッチキング"
+  },
+  {
+   "key": "lizard_warrior",
+   "name": "リザード戦士"
+  },
+  {
+   "key": "ogre",
+   "name": "オーガ"
+  },
+  {
+   "key": "rat",
+   "name": "ジャイアントラット"
+  },
+  {
+   "key": "shadow_mage",
+   "name": "シャドウメイジ"
+  },
+  {
+   "key": "skeleton",
+   "name": "スケルトン"
+  },
+  {
+   "key": "slime",
+   "name": "スライム"
+  },
+  {
+   "key": "vampire_lord",
+   "name": "吸血鬼の王"
+  },
+  {
+   "key": "void_dragon",
+   "name": "虚空の竜"
+  },
+  {
+   "key": "weak_goblin",
+   "name": "はぐれゴブリン"
+  },
+  {
+   "key": "wolf",
+   "name": "ダイアウルフ"
+  },
+  {
+   "key": "young_orc",
+   "name": "若オーク"
+  }
+ ],
+ "Character": [
+  {
+   "key": "aria",
+   "name": "アリア",
+   "role": "アサシン",
+   "tagline": "",
+   "description": "笑顔は仮面であり、最大の武器だ。ギルドに身を売ってから十年、標的の名前すら憶えていない。でも、あの子どもの目だけは忘れられない。いつかその記憶を清算する日のために、今日も影の中を歩く。"
+  },
+  {
+   "key": "aurum",
+   "name": "アウルム",
+   "role": "錬金術師",
+   "tagline": "",
+   "description": "薬と科学で戦況を覆す賢者。"
+  },
+  {
+   "key": "beatrix",
+   "name": "ベアトリス",
+   "role": "ナイト",
+   "tagline": "",
+   "description": "鎧を纏うのは自分を守るためではない、守るべき者の笑顔を守るためだ。女性騎士として偏見と戦いながら、彼女は誰よりも正面から盾を構え続けた。その背中を見て育った子どもたちが、今では彼女の誇りになっている。"
+  },
+  {
+   "key": "cyan",
+   "name": "シアン",
+   "role": "青魔導士",
+   "tagline": "",
+   "description": "禁書庫の奥で見つけた一ページが、彼の人生を変えた。古代語で書かれた呪文を唱えた瞬間、世界は別の色に染まった。知識は力であり、同時に孤独だ——すべてを知る者に、並走できる者はいない。"
+  },
+  {
+   "key": "faye",
+   "name": "フェイ",
+   "role": "アーチャー",
+   "tagline": "",
+   "description": "師に教わった言葉がある——「矢は放ったら戻らない、だから放つ前に全てを賭けろ」。森で独り修行した千日が、彼の目と腕を別次元へと磨き上げた。百発百中を超えた先に、彼だけが見える境地がある。"
+  },
+  {
+   "key": "fia",
+   "name": "フィア",
+   "role": "吟遊詩人",
+   "tagline": "",
+   "description": "歌声で仲間を支える詩人。"
+  },
+  {
+   "key": "irene",
+   "name": "イレーネ",
+   "role": "ネクロマンサー",
+   "tagline": "",
+   "description": "闇の力で敵を蝕む魔導士。"
+  },
+  {
+   "key": "kyle",
+   "name": "カイル",
+   "role": "魔法剣士",
+   "tagline": "",
+   "description": "物理と魔法を両立する剣士。"
+  },
+  {
+   "key": "lucia",
+   "name": "ルシア",
+   "role": "白魔導士",
+   "tagline": "",
+   "description": "傷を癒す光は、自分自身が深く傷ついているほど温かくなる。幼いころの病が彼女を医術へと向かわせ、戦場の悲劇が彼女を戦場医に変えた。誰かが苦しんでいる限り、彼女の手は止まらない。"
+  },
+  {
+   "key": "luna",
+   "name": "ルナ",
+   "role": "ガンナー",
+   "tagline": "",
+   "description": "遠距離から速射する射手。"
+  },
+  {
+   "key": "noir",
+   "name": "ノワール",
+   "role": "闇魔導士",
+   "tagline": "",
+   "description": "禁じられた力を手にした代償として、彼女は孤独を選んだ。世界の均衡を壊しかねない魔法を、自分の意志だけで制御し続けている。誰も近づかせないのは冷たさからではない——守りたいものがあるから、距離を置くのだ。"
+  },
+  {
+   "key": "rune",
+   "name": "ルーン",
+   "role": "黒魔導士",
+   "tagline": "",
+   "description": "禁忌の魔法書を紐解き、自らの内に黒い炎を宿した魔導士"
+  },
+  {
+   "key": "sol",
+   "name": "ソウル",
+   "role": "戦士",
+   "tagline": "",
+   "description": "幼いころ、村を焼いた炎の中で誓った。二度とあの日の無力感を繰り返さないと。戦場を渡り歩いた傷が全身を覆うが、剣を握る手だけは一度も震えたことがない。言葉より先に剣が語る——それが彼の流儀だ。"
+  },
+  {
+   "key": "zenon",
+   "name": "ゼノン",
+   "role": "モンク",
+   "tagline": "",
+   "description": "山籠もりの十年で見えたのは、強さは爆発ではなく息遣いだということ。一撃で天を割ることを夢見た少年は、今では一拳ごとに呼吸を整える求道者になった。動と静の間に答えがある——それがモンクの流儀だ。"
+  }
+ ],
+ "Achievement": [
+  {
+   "key": "exp_1000",
+   "name": "学びの泉",
+   "description": "累計 1,000 EXP を獲得する"
+  },
+  {
+   "key": "exp_20000",
+   "name": "経験の山",
+   "description": "累計 20,000 EXP を獲得する"
+  },
+  {
+   "key": "exp_5000",
+   "name": "知識の海",
+   "description": "累計 5,000 EXP を獲得する"
+  },
+  {
+   "key": "first_log",
+   "name": "はじめの一歩",
+   "description": "初めて習慣を記録する"
+  },
+  {
+   "key": "friends_1",
+   "name": "友達できたよ",
+   "description": "フレンドを1人作る"
+  },
+  {
+   "key": "friends_5",
+   "name": "仲間との絆",
+   "description": "フレンドを 5 人作る"
+  },
+  {
+   "key": "gacha_1",
+   "name": "運試し",
+   "description": "初めてガチャを引く"
+  },
+  {
+   "key": "gacha_10",
+   "name": "ガチャの探求",
+   "description": "ガチャを10回引く"
+  },
+  {
+   "key": "level_10",
+   "name": "熟練者",
+   "description": "レベル10に到達する"
+  },
+  {
+   "key": "level_20",
+   "name": "達人",
+   "description": "レベル20に到達する"
+  },
+  {
+   "key": "level_30",
+   "name": "賢者の一歩",
+   "description": "レベル 30 に到達する"
+  },
+  {
+   "key": "level_5",
+   "name": "新米冒険者",
+   "description": "レベル5に到達する"
+  },
+  {
+   "key": "level_50",
+   "name": "殿堂入り",
+   "description": "レベル 50 に到達する"
+  },
+  {
+   "key": "log_10",
+   "name": "継続の芽",
+   "description": "習慣を10回記録する"
+  },
+  {
+   "key": "log_100",
+   "name": "百回の証",
+   "description": "習慣を100回記録する"
+  },
+  {
+   "key": "log_1000",
+   "name": "千の積み上げ",
+   "description": "習慣を 1000 回記録する"
+  },
+  {
+   "key": "log_300",
+   "name": "礎の石",
+   "description": "習慣を 300 回記録する"
+  },
+  {
+   "key": "log_50",
+   "name": "習慣の木",
+   "description": "習慣を50回記録する"
+  },
+  {
+   "key": "log_500",
+   "name": "石塁の主",
+   "description": "習慣を 500 回記録する"
+  },
+  {
+   "key": "multi_habits_3",
+   "name": "多彩な日々",
+   "description": "3 つの習慣を同時に育てる"
+  },
+  {
+   "key": "multi_habits_5",
+   "name": "広い裾野",
+   "description": "5 つの習慣を同時に育てる"
+  },
+  {
+   "key": "perfect_day_1",
+   "name": "完璧な一日",
+   "description": "1 日のすべての習慣を達成する"
+  },
+  {
+   "key": "perfect_day_10",
+   "name": "完璧の連鎖",
+   "description": "完璧な一日を 10 日達成する"
+  },
+  {
+   "key": "perfect_day_30",
+   "name": "完璧の月",
+   "description": "完璧な一日を 30 日達成する"
+  },
+  {
+   "key": "streak_100",
+   "name": "百日の旅人",
+   "description": "100 日連続で習慣を記録する"
+  },
+  {
+   "key": "streak_14",
+   "name": "二週間の航海",
+   "description": "14 日連続で習慣を記録する (習慣化開始の節目)"
+  },
+  {
+   "key": "streak_3",
+   "name": "3日坊主を超えた",
+   "description": "3日連続で習慣を記録する"
+  },
+  {
+   "key": "streak_30",
+   "name": "鉄の意志",
+   "description": "30日連続で習慣を記録する"
+  },
+  {
+   "key": "streak_365",
+   "name": "年輪の英雄",
+   "description": "365 日連続で習慣を記録する (究極の継続)"
+  },
+  {
+   "key": "streak_60",
+   "name": "二月の刻",
+   "description": "60 日連続で習慣を記録する"
+  },
+  {
+   "key": "streak_7",
+   "name": "一週間の戦士",
+   "description": "7日連続で習慣を記録する"
+  }
+ ],
+ "Job": [
+  {
+   "job_id": "alchemist",
+   "description": "薬と科学で戦況を覆す賢者。回復特化で必殺発動はやや遅め。"
+  },
+  {
+   "job_id": "archer",
+   "description": "中距離の弓使い。中速 + 中火力で安定型。"
+  },
+  {
+   "job_id": "assassin",
+   "description": "高速行動 + 必殺多用。暗殺者の本領を発揮する。"
+  },
+  {
+   "job_id": "bard",
+   "description": "歌声で仲間を支える詩人。素早い行動と回復で粘り強く戦う。"
+  },
+  {
+   "job_id": "black_mage",
+   "description": "炎と雷を操る攻撃魔導士。安定した魔法ダメージを継続的に叩き込む"
+  },
+  {
+   "job_id": "blue_mage",
+   "description": "安定した魔法アタッカー。通常攻撃に炎の追加効果。"
+  },
+  {
+   "job_id": "dark_mage",
+   "description": "一撃の重みを持つ闇魔法使い。必殺 1 で即発動の華麗さ。"
+  },
+  {
+   "job_id": "gunner",
+   "description": "遠距離から速射する射手。高速行動で必殺を多用する。"
+  },
+  {
+   "job_id": "healer",
+   "description": "回復特化。与ダメの一部を HP 吸収する聖職者。"
+  },
+  {
+   "job_id": "knight",
+   "description": "重装の騎士。ATB は遅いが攻撃力中位、堅実な前衛。"
+  },
+  {
+   "job_id": "magic_swordsman",
+   "description": "物理と魔法を兼ね備えた剣士。安定した火力に炎の追加効果を添える。"
+  },
+  {
+   "job_id": "monk",
+   "description": "高速連撃型の格闘家。攻撃力は控えめだが必殺を多用する。"
+  },
+  {
+   "job_id": "necromancer",
+   "description": "闇の力で敵を蝕む魔導士。一撃は重いが必殺発動はやや遅め。"
+  },
+  {
+   "job_id": "warrior",
+   "description": "バランスの取れた王道戦士。攻撃力寄りで、扱いやすい。"
+  }
+ ],
+ "WeaponMaster": [
+  {
+   "key": "apprentice_grimoire",
+   "name": "見習いの魔導書",
+   "description": "見習い魔導士のための魔導書。基礎呪文がぎっしり。"
+  },
+  {
+   "key": "bronze_sword",
+   "name": "銅の剣",
+   "description": "初心者向けの軽い剣。最初の一振りに相応しい入門装備。"
+  },
+  {
+   "key": "dragon_slayer",
+   "name": "竜殺しの剣",
+   "description": "伝説の竜を屠った剣。ガチャの Weekly SSR でのみ入手可能な最強装備。"
+  },
+  {
+   "key": "glass_flask",
+   "name": "ガラスの試験管",
+   "description": "錬金の実験用ガラス試験管。割れやすいので慎重に。"
+  },
+  {
+   "key": "hemp_bandage",
+   "name": "麻のバンテージ",
+   "description": "麻布で作られた拳の保護布。素手の打撃を支える。"
+  },
+  {
+   "key": "hunting_rifle",
+   "name": "猟銃",
+   "description": "長距離狙撃に向いた猟銃。狩人の本格装備。"
+  },
+  {
+   "key": "iron_dagger",
+   "name": "鉄のダガー",
+   "description": "研ぎ澄まされた鉄のダガー。急所を狙うための短剣。"
+  },
+  {
+   "key": "iron_fine_needle",
+   "name": "鉄の細針",
+   "description": "魔法剣士の儀礼用、細く鋭い鉄の針。精緻な斬撃を可能にする。"
+  },
+  {
+   "key": "iron_frame_flask",
+   "name": "鉄枠のフラスコ",
+   "description": "鉄枠で補強されたフラスコ。錬金の実験を安全に行える。"
+  },
+  {
+   "key": "iron_hand_axe",
+   "name": "鉄の手斧",
+   "description": "片手で扱える鉄製の手斧。堅実な威力を誇る。"
+  },
+  {
+   "key": "iron_knuckle",
+   "name": "鉄のナックル",
+   "description": "拳に纏う鉄製のナックル。素手の打撃に重みを加える。"
+  },
+  {
+   "key": "iron_pistol",
+   "name": "鉄の小銃",
+   "description": "練習用の小型銃器。反動を抑えるための入門装備。"
+  },
+  {
+   "key": "iron_scythe",
+   "name": "鉄の鎌",
+   "description": "鉄製の鋭利な鎌。死神の本格的な一撃を打つ。"
+  },
+  {
+   "key": "iron_short_bow",
+   "name": "鉄の短弓",
+   "description": "鉄の補強が施された短弓。取り回しがよく狙いが安定する。"
+  },
+  {
+   "key": "iron_small_sword",
+   "name": "鉄の小剣",
+   "description": "使いやすさを追求した鉄製の小剣。素早い斬撃に向く。"
+  },
+  {
+   "key": "iron_string_harp",
+   "name": "鉄弦のハープ",
+   "description": "鉄の弦を張った小型ハープ。澄んだ音色で味方を鼓舞する。"
+  },
+  {
+   "key": "iron_sword",
+   "name": "鉄の剣",
+   "description": "一般的な戦士の剣。starter と同性能だが「自分で買った」達成感がある。"
+  },
+  {
+   "key": "iron_thrust_spear",
+   "name": "鉄の突槍",
+   "description": "一撃突きに特化した鉄製の槍。間合いを支配する。"
+  },
+  {
+   "key": "mythril_sword",
+   "name": "ミスリルの剣",
+   "description": "魔力を帯びた稀少な剣。ガチャの Daily SR でのみ入手可能。"
+  },
+  {
+   "key": "practice_foil",
+   "name": "練習用フルーレ",
+   "description": "刃を潰した訓練用の細剣。優雅な所作の習得に。"
+  },
+  {
+   "key": "starter_sword",
+   "name": "見習いの剣",
+   "description": "握りなじみの良い、刃こぼれひとつない一振り。"
+  },
+  {
+   "key": "steel_sword",
+   "name": "鋼の剣",
+   "description": "熟練の戦士に相応しい剣。コイン購入の最高峰、Lv 10+ の戦力強化に。"
+  },
+  {
+   "key": "wood_axe",
+   "name": "木の斧",
+   "description": "木製の練習用斧。素朴な作りだが、振り抜く感触は本物。"
+  },
+  {
+   "key": "wood_bow",
+   "name": "木の弓",
+   "description": "柔軟な若木で作られた練習用の弓。狙いの基本を養う。"
+  },
+  {
+   "key": "wood_knife",
+   "name": "木のナイフ",
+   "description": "木を削って作られた小さな練習用ナイフ。素早さの基本を学ぶ。"
+  },
+  {
+   "key": "wood_lute",
+   "name": "木彫りのリュート",
+   "description": "手彫りの素朴なリュート。優しい音色で仲間を励ます。"
+  },
+  {
+   "key": "wood_scythe",
+   "name": "木の鎌",
+   "description": "農具を模した練習用の木製鎌。死神への第一歩。"
+  },
+  {
+   "key": "wood_spear",
+   "name": "木の槍",
+   "description": "木製の練習用槍。間合いを掴むための入門装備。"
+  },
+  {
+   "key": "wood_staff",
+   "name": "木の杖",
+   "description": "魔力を秘めた素朴な木の杖。詠唱の練習に欠かせない。"
+  },
+  {
+   "key": "wood_sword",
+   "name": "木の剣",
+   "description": "練習用の木製の剣。軽くて扱いやすく、最初の一振りに相応しい。"
+  }
+ ],
+ "PuzzleWorldScene": [
+  {
+   "key": "morning_grassland",
+   "name": "目覚めの山頂",
+   "tagline": "静けさが染み渡る、朝の景色ですね 🪶"
+  },
+  {
+   "key": "night_forest_camp",
+   "name": "夜の森キャンプ",
+   "tagline": "焚き火のそばで、ひと息つく夜ですね 🪶"
+  },
+  {
+   "key": "noon_castle_town",
+   "name": "昼の城下町",
+   "tagline": "賑わいが目を覚ましてゆく街ですね 🪶"
+  }
+ ],
+ "GachaReward": [
+  {
+   "id": 7,
+   "ticket_type": "daily",
+   "rarity": "N",
+   "name": "経験値ボーナス",
+   "detail": "EXP +30"
+  },
+  {
+   "id": 8,
+   "ticket_type": "daily",
+   "rarity": "N",
+   "name": "経験値ボーナス",
+   "detail": "EXP +60"
+  },
+  {
+   "id": 9,
+   "ticket_type": "daily",
+   "rarity": "R",
+   "name": "経験値ボーナス",
+   "detail": "EXP +120"
+  },
+  {
+   "id": 10,
+   "ticket_type": "daily",
+   "rarity": "R",
+   "name": "XPブースト",
+   "detail": "15分 ×1.5倍"
+  },
+  {
+   "id": 3,
+   "ticket_type": "daily",
+   "rarity": "SR",
+   "name": "ミスリルの剣",
+   "detail": "ATK +35"
+  },
+  {
+   "id": 11,
+   "ticket_type": "daily",
+   "rarity": "SR",
+   "name": "大量経験値",
+   "detail": "EXP +350"
+  },
+  {
+   "id": 12,
+   "ticket_type": "daily",
+   "rarity": "SR",
+   "name": "XPブースト×2",
+   "detail": "30分 ×1.5倍"
+  },
+  {
+   "id": 13,
+   "ticket_type": "daily",
+   "rarity": "SSR",
+   "name": "特大経験値",
+   "detail": "EXP +1000"
+  },
+  {
+   "id": 5,
+   "ticket_type": "monthly",
+   "rarity": "SSR",
+   "name": "マンスリーキャラ (SSR)",
+   "detail": "未開放キャラから1体"
+  },
+  {
+   "id": 6,
+   "ticket_type": "monthly_pity",
+   "rarity": "SSR",
+   "name": "キャラ交換券 (SSR)",
+   "detail": "お好きな SSR キャラを 1 体お選びいただけますよ"
+  },
+  {
+   "id": 14,
+   "ticket_type": "weekly",
+   "rarity": "R",
+   "name": "ダイヤ",
+   "detail": "× 30"
+  },
+  {
+   "id": 15,
+   "ticket_type": "weekly",
+   "rarity": "R",
+   "name": "XPブースト×2",
+   "detail": "30分 ×1.5倍"
+  },
+  {
+   "id": 1,
+   "ticket_type": "weekly",
+   "rarity": "SR",
+   "name": "守護獣 (SR)",
+   "detail": "ランダム1体"
+  },
+  {
+   "id": 16,
+   "ticket_type": "weekly",
+   "rarity": "SR",
+   "name": "ダイヤ",
+   "detail": "× 80"
+  },
+  {
+   "id": 17,
+   "ticket_type": "weekly",
+   "rarity": "SR",
+   "name": "XPブースト×3",
+   "detail": "45分 ×1.5倍"
+  },
+  {
+   "id": 2,
+   "ticket_type": "weekly",
+   "rarity": "SSR",
+   "name": "レアキャラ (SSR)",
+   "detail": "未開放キャラから1体"
+  },
+  {
+   "id": 4,
+   "ticket_type": "weekly",
+   "rarity": "SSR",
+   "name": "竜殺しの剣",
+   "detail": "ATK +50"
+  },
+  {
+   "id": 18,
+   "ticket_type": "weekly",
+   "rarity": "SSR",
+   "name": "ダイヤ",
+   "detail": "× 200"
+  },
+  {
+   "id": 19,
+   "ticket_type": "weekly",
+   "rarity": "SSR",
+   "name": "XPブースト×5",
+   "detail": "75分 ×1.5倍"
+  }
+ ],
+ "Challenge": [],
+ "MaintenanceConfig": []
+}

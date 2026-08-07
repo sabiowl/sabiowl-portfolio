@@ -1,0 +1,20 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{# 【2026-06-27】Announcement の編集画面に「プレビューを表示」ボタンを追加。
+   既存お知らせ (object_id あり) のみ表示、新規追加時は非表示。
+   別タブで preview_view (admin URL: api_announcement_preview) を開く。 #}
+
+{% block object-tools-items %}
+  {% if original %}
+    <li>
+      <a href="{% url 'admin:api_announcement_preview' original.pk %}"
+         target="_blank"
+         class="historylink"
+         style="background: #79aec8; color: white;">
+        🔍 プレビューを表示 (別タブ)
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

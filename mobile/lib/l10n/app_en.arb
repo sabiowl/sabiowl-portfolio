@@ -1,0 +1,2113 @@
+{
+  "@@locale": "en",
+  "appTitle": "Sabiowl",
+  "@appTitle": {
+    "description": "The name of the application. Shown in the MaterialApp title."
+  },
+
+  "sabiSpeechPanelFallbackSabi_message": "It seems I'm a little out of reach just now. Please try again in a moment. 🪶",
+  "sabiTodoDone1Sabi_message": "Well done. Another layer has settled into place today. It will help shape tomorrow. 🪶",
+  "sabiTodoDone2Sabi_message": "You kept a small promise to yourself. I'm quietly glad to see it. 🪶",
+  "sabiTodoDone3Sabi_message": "You honored a promise to yourself. Another layer has found its place. 🪶",
+  "sabiTodoDone4Sabi_message": "It's done. That alone makes today enough. 🪶",
+  "sabiTodoCarryover1Sabi_message": "Yesterday's promise is still waiting. Keeping it today will become another steady layer. 🪶",
+  "sabiTodoCarryover2Sabi_message": "It carried over, and that's all right. There's no need to hurry. 🪶",
+  "sabiTodoCarryover3Sabi_message": "What remained yesterday can still be done today. I'll be here, quietly watching. 🪶",
+  "sabiTodoCarryover4Sabi_message": "The carried work is still within reach. 🪶",
+
+  "guildPageTitle": "Guild",
+  "guildPageMenuTooltip": "Menu",
+  "guildPageDrawerBarrierLabel": "Close",
+  "guildEnemyTierMidBoss": "Mid-Boss",
+  "guildEnemyTierBoss": "Boss",
+  "guildEnemyTierHiddenBoss": "Hidden Boss",
+  "guildEnemyTierZako": "Minor Boss",
+  "guildBoardLoadingSabi_message": "Checking the board. 🪶",
+  "guildBoardErrorSabi_message": "Couldn't retrieve the list of bosses. Please try again in a moment. 🪶",
+  "guildBoardRetryButton": "Try again",
+  "guildBoardEmptySabi_message": "No bosses are available to challenge just yet. 🪶",
+  "guildLockedQuestsLabel": "Locked Quests",
+  "guildEnemyUnlockLevelAndTierLabel": "{tier} · Unlocks at Lv.{unlockLevel}",
+  "@guildEnemyUnlockLevelAndTierLabel": {
+    "placeholders": {
+      "tier": { "type": "String" },
+      "unlockLevel": { "type": "int" }
+    }
+  },
+  "guildEnemyRewardLabel": "Rewards: +{coins} coins / +{exp} EXP",
+  "@guildEnemyRewardLabel": {
+    "placeholders": { "coins": { "type": "int" }, "exp": { "type": "int" } }
+  },
+  "guildEnemyAttackButton": "Attack",
+  "guildEnemyJoinButton": "Join",
+  "guildEnemyUnlockLevelButton": "Unlocks at Lv.{unlockLevel}",
+  "@guildEnemyUnlockLevelButton": {
+    "placeholders": { "unlockLevel": { "type": "int" } }
+  },
+  "guildEnemyPrepButton": "Preparing for Battle",
+  "guildLowStatsWarningBody": "It seems you're not quite ready. Build your habits a little more before taking this on. 🪶",
+  "guildEnemyPhysicalResistanceLabel": "Physical -{pct}%",
+  "@guildEnemyPhysicalResistanceLabel": {
+    "placeholders": { "pct": { "type": "int" } }
+  },
+  "guildEnemyPhysicalResistanceTooltip": "Physical attack damage (Warrior, Berserker, Rogue) is reduced. 🪶",
+  "guildEnemyMagicResistanceLabel": "Magic -{pct}%",
+  "@guildEnemyMagicResistanceLabel": {
+    "placeholders": { "pct": { "type": "int" } }
+  },
+  "guildEnemyMagicResistanceTooltip": "Magic effects (Mage fire, Cleric absorption) are reduced. 🪶",
+  "guildEnemyWeaknessUltLabel": "Weak: ult{ultCost}",
+  "@guildEnemyWeaknessUltLabel": {
+    "placeholders": { "ultCost": { "type": "int" } }
+  },
+  "guildEnemyWeaknessUltTooltip": "Jobs with ult cost {ultCost} can hit a weakness. 🪶",
+  "@guildEnemyWeaknessUltTooltip": {
+    "placeholders": { "ultCost": { "type": "int" } }
+  },
+  "guildAutoBattleLabel": "Auto Battle",
+  "guildAutoBattleSubtitle": "(Fights automatically when you open the app)",
+  "guildEnemyUnlockLevelOnly": "Unlocks at Lv.{unlockLevel}",
+  "@guildEnemyUnlockLevelOnly": {
+    "placeholders": { "unlockLevel": { "type": "int" } }
+  },
+  "guildEnemyDailyRemainingHint": "{remaining} more completions today to unlock a battle. 🪶",
+  "@guildEnemyDailyRemainingHint": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "guildAutoCountLabel": "Auto battles left",
+  "guildLiliaFallback": "Welcome to the guild! 🗡️",
+  "guildLiliaDefault1": "Welcome to the guild! Which quest are you taking on today? 🗡️",
+  "guildLiliaDefault2": "Thanks for coming in! Are you ready for battle? ⚔️",
+  "guildLiliaDefault3": "Welcome! I'm looking forward to seeing your accomplishments today! 🌸",
+  "guildLiliaDefault4": "Welcome! Which quest would suit you best today? 🛡️",
+  "guildLiliaDefault5": "We've been expecting you! Please choose whichever quest catches your eye from the board. 🗡️",
+  "guildLiliaFirstLogin1": "Oh, a new face! I'm Lilia. Welcome to the guild, and thank you for visiting! 🌸",
+  "guildLiliaLevelUp1": "Congratulations on reaching Lv.{level}! You're ready to take on even stronger opponents now! ⚔️",
+  "@guildLiliaLevelUp1": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "guildLiliaLevelUp2": "Lv.{level} already! You're coming along nicely — I'm so pleased! 🌸",
+  "@guildLiliaLevelUp2": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "guildLiliaRestDay1": "Ah, it's your rest day. Taking it slow is a strategy of its own. 🌸",
+  "guildLiliaConsecutiveBattles1": "Nice work out there! You've been battling nonstop — take care of yourself. 🛡️",
+  "guildLiliaBossUnlocked1": "New opponents just went up on the board! Take a look when you're ready. ⚔️",
+  "guildLiliaVictory1": "Well fought! Your reward is right here. 🗡️",
+  "guildLiliaVictory2": "Great work! That was a splendid battle! ⚔️",
+  "guildLiliaVictory3": "A triumphant return! A round of applause for your achievements! 🌸",
+  "guildLiliaDefeat1": "I hope you weren't hurt. Let's review your gear before your next attempt! 🛡️",
+  "guildDrawerTitle": "Guild Menu",
+  "guildDrawerStatusLabel": "Status",
+  "guildDrawerEquipmentLabel": "Equipment & Party",
+  "guildDrawerCharacterLabel": "Change Character",
+  "guildDrawerInventoryLabel": "Inventory",
+  "guildDrawerShopLabel": "Shop",
+  "guildDrawerGachaLabel": "Gacha",
+  "guildDrawerFriendsLabel": "Friends",
+  "guildDrawerAnnouncementsLabel": "Notices",
+  "guildDrawerSettingsLabel": "Settings",
+  "guildDrawerFooterSabi_message": "Take your time getting ready. There's no rush. 🪶",
+  "guildReceptionDailyQuestLabel": "Today's quests {count}/{limit}",
+  "@guildReceptionDailyQuestLabel": {
+    "placeholders": { "count": { "type": "int" }, "limit": { "type": "int" } }
+  },
+  "guildOnboardingStep1": "① Choose an enemy",
+  "guildOnboardingStep2": "② Set out",
+  "guildOnboardingStep3": "③ Collect your reward",
+  "guildOnboardingWelcomeSabi_message": "Welcome to the guild. Why not head out on your first sortie. 🗡️",
+
+  "battleAmbientDefeatTitle": "Auto Battle Stopped",
+  "battleAmbientDefeatBodySabi_message": "It seems fortune wasn't with you today. Rest your wings, then try again. 🪶",
+  "battleAmbientSummaryToastSabi_message": "You returned with {wins, plural, =1{1 victory} other{{wins} victories}}. +{coins} coins, +{exp} EXP. 🪶",
+  "@battleAmbientSummaryToastSabi_message": {
+    "placeholders": {
+      "wins": { "type": "int" },
+      "coins": { "type": "int" },
+      "exp": { "type": "int" }
+    }
+  },
+  "battleAmbientQueueFinishedToastSabi_message": "Your planned sorties are complete. Choose your next opponent when you're ready. 🪶",
+  "battleAmbientSummaryWeaponSabi_message": "{count, plural, =1{{names} has joined your pack} other{{names} have joined your pack}}",
+  "@battleAmbientSummaryWeaponSabi_message": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "names": { "type": "String" }
+    }
+  },
+  "battleAmbientSummaryFirstDiamondSabi_message": "Here are +5 diamonds for your first victory today.",
+  "battleAmbientSummaryMaxedJobSabi_message": "{count, plural, =1{Your hand as {names} has gone as far as it can} other{Your hands as {names} have gone as far as they can}}",
+  "@battleAmbientSummaryMaxedJobSabi_message": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "names": { "type": "String" }
+    }
+  },
+  "battleJobMasteryLevelUpToastSabi_message": "Your skill as a {jobName} has grown. Lv {level}. 🪶",
+  "@battleJobMasteryLevelUpToastSabi_message": {
+    "placeholders": {
+      "jobName": { "type": "String" },
+      "level": { "type": "int" }
+    }
+  },
+  "battleAmbientDefeatEnemyLabel": "(Defeated by {enemyName})",
+  "@battleAmbientDefeatEnemyLabel": {
+    "placeholders": { "enemyName": { "type": "String" } }
+  },
+  "battleAmbientDefeatRestButton": "Rest",
+  "battleAmbientDefeatContinueButton": "Continue",
+  "battlePageTitle": "Battle",
+  "battlePageBackTooltip": "Home (Battle continues)",
+  "battlePageLoadingSabi_message": "Preparing for battle. 🪶",
+  "battlePageWeaponDropToastSabi_message": "You obtained \"{weaponName}\". Please check your inventory. 🪶",
+  "@battlePageWeaponDropToastSabi_message": {
+    "placeholders": { "weaponName": { "type": "String" } }
+  },
+  "battlePageFirstVictoryDiamondSabi_message": "Congratulations on your first victory today. Please accept +5 diamonds. 🪶",
+  "battleEndModalVictoryTitleSabi_message": "Victory. 🪶",
+  "battleEndModalDefeatTitleSabi_message": "Let's withdraw for now. 🪶",
+  "battleEndModalVictoryRewardSabi_message": "You received +{coins} coins and +{exp} EXP.",
+  "@battleEndModalVictoryRewardSabi_message": {
+    "placeholders": { "coins": { "type": "int" }, "exp": { "type": "int" } }
+  },
+  "battleEndModalLevelUpSabi_message": "\nYou reached Level {level}.",
+  "@battleEndModalLevelUpSabi_message": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "battleEndModalDefeatBodySabi_message": "Rest your wings, then try again.\nI'll be here, watching over your next step.",
+  "battleEndModalReturnButton": "Return to Guild",
+  "battleWidgetTitle": "Battle",
+  "battleWidgetReadyButton": "Set Out",
+  "battleWidgetPrepButton": "Preparing",
+  "battleLogEmptyHint": "Battle log will appear here",
+  "battleBackHintSabi_message": "Even if you press the back button, the battle continues within the frame. 🪶",
+  "battleUltimateNotReadySnackBarSabi_message": "{remaining} more attacks until your ultimate. 🪶",
+  "@battleUltimateNotReadySnackBarSabi_message": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "battleUltimateChargingTooltipSabi_message": "{remaining} more attacks until ultimate. 🪶",
+  "@battleUltimateChargingTooltipSabi_message": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "battleUltimateChargingLabel": "Charging ultimate...",
+  "battleUltimateReadyTooltipSabi_message": "Tap to use your ultimate. 🪶",
+  "battleUltimateQueuedTooltipSabi_message": "Your ultimate will be used on your next move. 🪶",
+  "battlePreStartTitle": "Challenge {enemyName}",
+  "@battlePreStartTitle": {
+    "placeholders": { "enemyName": { "type": "String" } }
+  },
+  "battlePreStartPotionPrompt": "Select number of potions to use",
+  "battlePreStartOwnedCount": "Owned: {count}",
+  "@battlePreStartOwnedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "battlePreStartAutoPotionHint": "Potions are used automatically when HP drops below 30%",
+  "battlePreStartPotionPlusLabel": "Hi-Potion (Fully restores HP)",
+  "battlePreStartAttackPotionLabel": "Attack Potion (1 turn ATK +50%)",
+  "battlePreStartDefensePotionLabel": "Defense Potion (Damage taken ×0.67 for 1 turn)",
+  "battlePreStartJoinButton": "Set Out",
+  "battlePreStartCancelButton": "Cancel",
+  "battlePreStartPhysicalResistanceSabi_message": "This opponent deflects physical attacks. A magic-type job may be a wise choice.",
+  "battlePreStartMagicResistanceSabi_message": "Magic seems less effective here. A physical-type job may serve you better.",
+  "battlePreStartWeaknessSabi_message": "A job with ultimate cost {ultCost} can exploit this enemy's weakness.",
+  "@battlePreStartWeaknessSabi_message": {
+    "placeholders": { "ultCost": { "type": "int" } }
+  },
+  "battleOverlayBackTooltip": "Back",
+  "battleOverlayCloseTooltip": "Close",
+  "battleJobSelectionTitle": "Jobs",
+  "battleJobSelectionCurrentJobLabel": "Current job: {jobName} ({charName})",
+  "@battleJobSelectionCurrentJobLabel": {
+    "placeholders": { "jobName": { "type": "String" }, "charName": { "type": "String" } }
+  },
+  "battleJobSelectionLockedHint": "Unlock at max proficiency (v1.1+)",
+  "battleEquipmentTitle": "Equipment",
+  "battleEquipmentLoadErrorSabi_message": "Unable to retrieve weapons. Please try again later. 🛡️",
+  "battleEquipmentCurrentLabel": "Equipped: ⚔️ {name} (+{atkBonus})",
+  "@battleEquipmentCurrentLabel": {
+    "placeholders": { "name": { "type": "String" }, "atkBonus": { "type": "int" } }
+  },
+  "battleEquipmentCurrentEmpty": "Equipped: None",
+  "battleEquipmentEmptySabi_message": "You don't have any weapons yet. Purchase one from the Shop or obtain one through gacha. 🗡️",
+  "battleEquipmentAtkBonusLabel": "ATK +{atkBonus}",
+  "@battleEquipmentAtkBonusLabel": {
+    "placeholders": { "atkBonus": { "type": "int" } }
+  },
+  "battleEquipmentComingSoon": "Coming soon",
+  "battleEquipmentEquippedButton": "Equipped",
+  "battleEquipmentEquipButton": "Equip",
+  "battlePartyTitle": "Party & Equipment",
+  "battlePartyCloseButton": "Close",
+  "battlePartyLoadErrorSabi_message": "Unable to retrieve data. Please try again later. 🛡️",
+  "battlePartyJobHintSabi_message": "Your job is determined by your character. The proficiency system will be available in v1.1+. 🪶",
+  "battlePartySectionJob": "Job",
+  "battlePartyJobDetailHint": "Tap to view the job list. ⚔️",
+  "battlePartySectionEquip": "Equipment",
+  "battlePartyEquipDetailHint": "Tap to change your equipment. Find new weapons in the Shop and Gacha. 🗡️",
+  "battlePartySectionAbility": "Abilities",
+  "battlePartyAbilityHintSabi_message": "Ability selection will expand in the next update. 🌸",
+  "battlePartyWeaponEquippedToastSabi_message": "{name} has been equipped. I hope it serves you well. ⚔️",
+  "@battlePartyWeaponEquippedToastSabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "battlePartyEquipErrorSabi_message": "Equipment change failed. Please try again later. 🛡️",
+  "battlePartyJobNotSet": "Not set",
+  "battlePartyJobInitialLabel": "Starting Job",
+  "battlePartyInitialJobDisplay": "Starting Job: {jobName}",
+  "@battlePartyInitialJobDisplay": {
+    "placeholders": { "jobName": { "type": "String" } }
+  },
+  "battlePartyAtkStatLabel": "ATK",
+  "battlePartyWeaponSlotUnequipped": "🗡️ Unequipped (tap to select)",
+  "battlePartyWeaponSlotEquipped": "🗡️ {name} (+{atkBonus})",
+  "@battlePartyWeaponSlotEquipped": {
+    "placeholders": { "name": { "type": "String" }, "atkBonus": { "type": "int" } }
+  },
+  "battlePotionCountRemaining": "{remaining}/{planned}",
+  "@battlePotionCountRemaining": {
+    "placeholders": { "remaining": { "type": "int" }, "planned": { "type": "int" } }
+  },
+
+  "battleJobNameWarrior": "Warrior",
+  "battleJobNameAssassin": "Assassin",
+  "battleJobNameBlueMage": "Blue Mage",
+  "battleJobNameHealer": "White Mage",
+  "battleJobNameKnight": "Knight",
+  "battleJobNameArcher": "Archer",
+  "battleJobNameMonk": "Monk",
+  "battleJobNameDarkMage": "Dark Mage",
+  "battleJobNameMagicSwordsman": "Magic Swordsman",
+  "battleJobNameBard": "Bard",
+  "battleJobNameNecromancer": "Necromancer",
+  "battleJobNameGunner": "Gunner",
+  "battleJobNameAlchemist": "Alchemist",
+  "battleJobNameBlackMage": "Black Mage",
+  "battleJobDescWarrior": "ATB ×0.9 / ATK ×1.3 / ULT 2 charges\nBalanced frontline fighter (sol)",
+  "battleJobDescAssassin": "ATB ×1.4 (fast) / ATK ×1.0 / ULT 3 charges\nFast attacker with frequent ultimates (aria)",
+  "battleJobDescBlueMage": "ATB ×1.0 / ATK ×1.1 + fire / ULT 2 charges\nReliable magic attacker (cyan)",
+  "battleJobDescHealer": "ATB ×1.0 / ATK ×0.6 + lifesteal / ULT 3 charges\nRecovery specialist (lucia)",
+  "battleJobDescKnight": "ATB ×0.7 (heavy) / ATK ×1.1 / ULT 2 charges\nHeavily armored frontline fighter (beatrix)",
+  "battleJobDescArcher": "ATB ×1.2 / ATK ×1.0 / ULT 3 charges\nReliable mid-speed attacker (faye)",
+  "battleJobDescMonk": "ATB ×1.3 (fast) / ATK ×0.9 / ULT 4 charges\nFast combo fighter (zenon)",
+  "battleJobDescDarkMage": "ATB ×0.8 / ATK ×1.5 + fire / ULT 1 charge\nDevastating burst mage (noir)",
+  "battleJobDescMagicSwordsman": "ATB ×1.0 / ATK ×1.25 + fire / ULT 3 charges\nPhysical and magic hybrid (kyle)",
+  "battleJobDescBard": "ATB ×1.2 / ATK ×0.7 + lifesteal / ULT 3 charges\nFast support healer (fia)",
+  "battleJobDescNecromancer": "ATB ×0.8 / ATK ×1.4 + fire / ULT 4 charges\nHeavy-hitting dark mage (irene)",
+  "battleJobDescGunner": "ATB ×1.3 (fast) / ATK ×1.1 / ULT 2 charges\nFast ranged attacker with frequent ultimates (luna)",
+  "battleJobDescAlchemist": "ATB ×0.9 / ATK ×0.8 + lifesteal / ULT 4 charges\nHealing specialist with powerful ultimates (aurum)",
+  "battleJobDescBlackMage": "ATB ×0.9 / ATK ×1.4 + fire / ULT 2 charges\nOffensive mage wielding fire and lightning (rune)",
+  "battleJobStatsSummary": "ATB ×{atb} / ATK ×{atk} / ULT {ult}",
+  "@battleJobStatsSummary": {
+    "placeholders": {
+      "atb": { "type": "String" },
+      "atk": { "type": "String" },
+      "ult": { "type": "int" }
+    }
+  },
+  "battleTacticOffense": "Offense",
+  "battleTacticRecovery": "Recovery",
+  "battleTacticConserveUltimate": "Save Ultimate",
+  "battleAbilityKeyNormal": "Normal",
+  "battleAbilityKeyUltimate": "Ultimate",
+  "battleAbilityDescNormalWarrior": "Normal / Strong Attack",
+  "battleAbilityDescUltimateWarrior": "Ultimate (×3.0 dmg, 2 charges)",
+  "battleAbilityDescNormalAssassin": "Fast combo attack",
+  "battleAbilityDescUltimateAssassin": "Ultimate (3 charges, frequent use)",
+  "battleAbilityDescNormalBlueMage": "Normal attack + fire damage",
+  "battleAbilityDescUltimateBlueMage": "Ultimate + fire damage (2 charges)",
+  "battleAbilityDescNormalHealer": "Normal attack + lifesteal (10% damage)",
+  "battleAbilityDescUltimateHealer": "Ultimate / Heal (3 charges)",
+  "battleAbilityDescNormalKnight": "Normal / Strong (heavy armor)",
+  "battleAbilityDescUltimateKnight": "Ultimate (2 charges, heavy armor)",
+  "battleAbilityDescNormalArcher": "Reliable mid-range attack",
+  "battleAbilityDescUltimateArcher": "Ultimate (3 charges, balanced)",
+  "battleAbilityDescNormalMonk": "Fast combo attacks (fast ATB)",
+  "battleAbilityDescUltimateMonk": "Ultimate (requires 4 charges, combo-focused)",
+  "battleAbilityDescNormalDarkMage": "Dark magic + fire (high damage)",
+  "battleAbilityDescUltimateDarkMage": "Ultimate (activates instantly with 1 charge)",
+  "battleAbilityDescNormalDefault": "Normal / Strong Attack",
+  "battleAbilityDescUltimateDefault": "Ultimate",
+
+  "gamifAchievementPageTitle": "Achievements",
+  "gamifAchievementPageLoadingSabi_message": "Checking your achievements. 🪶",
+  "gamifAchievementPageErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "gamifAchievementTitleDiamondToastSabi_message": "To mark your new title, please accept +{diamonds} diamonds. 🪶",
+  "@gamifAchievementTitleDiamondToastSabi_message": {
+    "placeholders": { "diamonds": { "type": "int" } }
+  },
+  "gamifAchievementUnlockedCount": "{unlocked}/{total} unlocked",
+  "@gamifAchievementUnlockedCount": {
+    "placeholders": { "unlocked": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "gamifAchievementClaimBadge": "Claim {count}",
+  "@gamifAchievementClaimBadge": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifAchievementClaimSuccessToast": "Claimed!",
+  "gamifAchievementClaimErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "gamifAchievementEmptyLabel": "No achievements unlocked yet",
+  "gamifAchievementRewardDiamonds": "{diamonds} diamonds",
+  "@gamifAchievementRewardDiamonds": {
+    "placeholders": { "diamonds": { "type": "int" } }
+  },
+  "gamifAchievementClaimButton": "Claim diamonds",
+  "gamifAchievementClaimedLabel": "✅ Claimed",
+  "gamifCharacterPageTitle": "Characters",
+  "gamifCharacterPageExchangeTicketCount": "🎟️ Tickets: {tickets}",
+  "@gamifCharacterPageExchangeTicketCount": {
+    "placeholders": { "tickets": { "type": "int" } }
+  },
+  "gamifCharacterPageLoadingSabi_message": "Calling your companions. 🪶",
+  "gamifCharacterPageErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "gamifCharacterActivateToastSabi_message": "{name} is now by your side. A new course begins. 🪶",
+  "@gamifCharacterActivateToastSabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "gamifCharacterActivateErrorSabi_message": "Something went wrong. Please wait a moment and try again 🪶",
+  "gamifCharacterExchangeToastSabi_message": "{name} has joined you. A new course begins. 🪶",
+  "@gamifCharacterExchangeToastSabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "gamifCharacterExchangeErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "gamifCharacterInUseLabel": "Active",
+  "gamifCharacterExchangeDialogTitle": "Use a character exchange ticket?",
+  "gamifCharacterExchangeDialogBodySabi_message": "This will use 1 ticket to exchange for {name}. Are you sure? 🪶",
+  "@gamifCharacterExchangeDialogBodySabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "gamifCharacterExchangeDialogCancelButton": "Cancel",
+  "gamifCharacterExchangeDialogConfirmButton": "Exchange",
+  "gamifCharacterJobModifierFireLabel": " / Adds fire damage on attack",
+  "gamifCharacterJobModifierAbsorbLabel": " / Absorbs HP on attack",
+  "gamifCharacterJobModifierStats": "ATB ×{atbMod} / ATK ×{atkMod}",
+  "@gamifCharacterJobModifierStats": {
+    "placeholders": { "atbMod": { "type": "double" }, "atkMod": { "type": "double" } }
+  },
+  "gamifCharacterJobModifierUlt": "ULT gauge: {ultCost} charges",
+  "@gamifCharacterJobModifierUlt": {
+    "placeholders": { "ultCost": { "type": "int" } }
+  },
+  "gamifCharacterJobModifierPrefix": "Job modifier: {jobName}",
+  "@gamifCharacterJobModifierPrefix": {
+    "placeholders": { "jobName": { "type": "String" } }
+  },
+  "gamifCharacterJobMasteryMax": "{jobName} Lv 10 (Max)",
+  "@gamifCharacterJobMasteryMax": {
+    "placeholders": { "jobName": { "type": "String" } }
+  },
+  "gamifCharacterJobMasteryProgress": "{jobName} Lv {level} / 10",
+  "@gamifCharacterJobMasteryProgress": {
+    "placeholders": { "jobName": { "type": "String" }, "level": { "type": "int" } }
+  },
+  "gamifCharacterJobMasteryUnlockHint": "Will be equippable on other characters (planned for v1.1+)",
+  "gamifCharacterJobMasteryNextExpSabi_message": "{exp} more EXP until Lv {nextLevel}. 🪶",
+  "@gamifCharacterJobMasteryNextExpSabi_message": {
+    "placeholders": { "exp": { "type": "int" }, "nextLevel": { "type": "int" } }
+  },
+  "gamifCharacterSsrHintSabi_message": "Available from the Weekly (0.5%) banner, the guaranteed SSR gacha, and the Shop. 🪶",
+  "gamifCharacterInUseChip": "Currently selected",
+  "gamifCharacterSelectButton": "Select",
+  "gamifCharacterPurchaseButton": "💎 Purchase and select for {price}",
+  "@gamifCharacterPurchaseButton": {
+    "placeholders": { "price": { "type": "int" } }
+  },
+  "gamifCharacterExchangeTicketButton": "Or use a 🎟️ ticket ({count} remaining)",
+  "@gamifCharacterExchangeTicketButton": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifGachaPageTitle": "Gacha",
+  "gamifGachaPageLoadingSabi_message": "Checking your ticket book. 🪶",
+  "gamifGachaPageErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "gamifGachaPageReloadButton": "Reload",
+  "gamifGachaDailyTicketNewToastSabi_message": "{count, plural, =1{You've received 1 daily ticket. I hope you enjoy it. 🪶} other{You've received {count} daily tickets. I hope you enjoy them. 🪶}}",
+  "@gamifGachaDailyTicketNewToastSabi_message": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifGachaWeeklyTicketNewToastSabi_message": "{count, plural, =1{You've received 1 weekly ticket. I hope you enjoy it. 🪶} other{You've received {count} weekly tickets. I hope you enjoy them. 🪶}}",
+  "@gamifGachaWeeklyTicketNewToastSabi_message": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifGachaDailyTicketLabel": "Daily Tickets",
+  "gamifGachaWeeklyTicketLabel": "Weekly Tickets",
+  "gamifGachaSsrTicketLabel": "SSR Guaranteed Ticket",
+  "gamifGachaAllUnlockedSabi_message": "All SSR characters have already joined you. Until someone new arrives, I'll keep your tickets safe here. 🪶",
+  "gamifGachaDailyTicketClaimed": "✓ Monthly tickets claimed",
+  "gamifGachaDailyProgress": "{days, plural, =1{1 day this month ({pct}%)} other{{days} days this month ({pct}%)}}",
+  "@gamifGachaDailyProgress": {
+    "placeholders": { "days": { "type": "int" }, "pct": { "type": "int" } }
+  },
+  "gamifGachaWeeklyTicketClaimed": "✓ Weekly tickets claimed",
+  "gamifGachaWeeklyProgress": "{days, plural, =1{1 day this week ({pct}%)} other{{days} days this week ({pct}%)}}",
+  "@gamifGachaWeeklyProgress": {
+    "placeholders": { "days": { "type": "int" }, "pct": { "type": "int" } }
+  },
+  "gamifGachaHistoryLabel": "Recent history",
+  "gamifGachaPendingRewardLabel": "Pending Rewards",
+  "gamifGachaPendingRewardErrorLabel": "Couldn't load reward information. Please wait a moment and try again.",
+  "gamifGachaTicketCount": "🎫 {count}",
+  "@gamifGachaTicketCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifGachaPullButton": "Draw",
+  "gamifGachaCeilingRemaining": "Pity in: {count} pulls",
+  "@gamifGachaCeilingRemaining": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifGachaGuaranteeNext": "Next pull guarantees {label}!",
+  "@gamifGachaGuaranteeNext": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "gamifGachaGuaranteeRemaining": "{count, plural, =1{1 more miss until {label} guaranteed!} other{{count} more misses until {label} guaranteed!}}",
+  "@gamifGachaGuaranteeRemaining": {
+    "placeholders": { "count": { "type": "int" }, "label": { "type": "String" } }
+  },
+  "gamifGachaPendingExpiryLabel": "{days, plural, =1{Expires in: 1 day} other{Expires in: {days} days}}",
+  "@gamifGachaPendingExpiryLabel": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "gamifGachaPendingExchangeButton": "Exchange",
+  "gamifGachaPendingExchangeDialogTitle": "Exchange for Stat Points?",
+  "gamifGachaPendingExchangeDialogBodySabi_message": "You already have {name}.\nYou can exchange it for Stat Points × 5.",
+  "@gamifGachaPendingExchangeDialogBodySabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "gamifGachaStatPointLabel": "Stat Points × 5",
+  "gamifGachaPendingExchangeCancelButton": "Cancel",
+  "gamifGachaStatPointToast": "⚡ Received Stat Points × 5",
+
+  "gamifGachaPieceLabel": "Exchange Pieces × 100",
+  "gamifGachaPieceToast": "🧩 Received Exchange Pieces × 100. You can trade them in the Pieces tab of the shop.",
+  "gamifGachaExchangeErrorSabi_message": "Exchange failed. 🪶 Please try again.",
+  "gamifGachaSummonNetworkErrorSabi_message": "The connection seems unstable. 🪶 Please check \"Recent History\" on the gacha screen, then try again.",
+  "gamifGachaSummonOpenHintSabi_message": "Shall we open it together.",
+  "gamifGachaSummonOpenButton": "Open!",
+  "gamifGachaSummonningLabel": "✨  Summoning  ✨",
+  "gamifGachaSummonExchangeTicketToast": "Character Exchange Ticket +1 (Redeem it from the Characters screen.)",
+  "gamifGachaSummonCloseButton": "Close",
+  "gamifGachaSummonDuplicateSabi_message": "You already have this one. Perhaps exchange it instead.",
+  "gamifShopTabAll": "All",
+  "gamifShopTabItem": "Items",
+  "gamifShopTabTicket": "Tickets",
+  "gamifShopTabEquip": "Gear",
+  "gamifShopTitleInventory": "🎒 Inventory",
+  "gamifShopTitleShop": "🛍️ Shop",
+  "gamifShopBackToShopTooltip": "Back to shop",
+  "gamifShopInventoryTooltip": "View inventory",
+  "gamifShopLoadingSabi_message": "Preparing the shelves. 🪶",
+  "gamifShopErrorSabi_message": "Something went wrong. Please wait a moment and try again 🪶",
+  "gamifShopLegendaryRefundSabi_message": "Your Legendary Slot purchase has been refunded as Diamonds. 🪶",
+  "gamifShopInventoryEmptySabi_message": "It seems you don't have any yet.\nPerhaps you'll find something in the shop. 🪶",
+  "gamifShopEmptySabi_message": "There are no items in the shop just yet.\nPlease check back in a little while. 🪶",
+  "gamifShopGachaOnlyHintSabi_message": "This item can only be obtained from the gacha. 🪶",
+  "gamifShopPurchaseDialogTitle": "Purchase {emoji} {name}",
+  "@gamifShopPurchaseDialogTitle": {
+    "placeholders": { "emoji": { "type": "String" }, "name": { "type": "String" } }
+  },
+  "gamifShopOwnedLabel": "Owned: ",
+  "gamifShopBuyWithDiamondButton": "Purchase for {price}",
+  "@gamifShopBuyWithDiamondButton": {
+    "placeholders": { "price": { "type": "int" } }
+  },
+  "gamifShopBuyWithCoinButton": "Purchase for {price} coins",
+  "@gamifShopBuyWithCoinButton": {
+    "placeholders": { "price": { "type": "int" } }
+  },
+  "gamifShopTabPiece": "Pieces",
+
+  "gamifPieceProgressToTicket": "{remaining, plural, =1{1 more piece} other{{remaining} more pieces}} until a ticket",
+  "@gamifPieceProgressToTicket": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "gamifPieceReadyForTicketSabi_message": "You can trade these for a ticket now. 🪶",
+  "gamifShopPieceBalance": "Exchange Pieces: {count}",
+  "@gamifShopPieceBalance": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "gamifShopBuyWithPieceButton": "Exchange for {price} pieces",
+  "@gamifShopBuyWithPieceButton": {
+    "placeholders": { "price": { "type": "int" } }
+  },
+
+  "gamifShopCancelButton": "Cancel",
+  "gamifShopTicketPurchaseToast": "🎟️ {name} purchased. Check the Gacha screen.",
+  "@gamifShopTicketPurchaseToast": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "gamifShopItemPurchaseToast": "You received {name}. ✨ Use it well.",
+  "@gamifShopItemPurchaseToast": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "gamifShopInventoryItemCount": "×{count}",
+  "@gamifShopInventoryItemCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifShopSellPriceLabel": "Sell price: ",
+  "gamifShopNoDiamondSellSabi_message": "Items purchased with diamonds cannot be sold 🪶",
+  "gamifShopNoSellSabi_message": "This item cannot be sold 🪶",
+  "gamifShopCloseButton": "Close",
+  "gamifShopSellButton": "Sell",
+  "gamifShopSellSuccessToastSabi_message": "Sold {name}. You received {coins} coins. 🪶",
+  "@gamifShopSellSuccessToastSabi_message": {
+    "placeholders": { "name": { "type": "String" }, "coins": { "type": "int" } }
+  },
+  "gamifShopSellErrorSabi_message": "Could not sell the item. Please wait a moment and try again 🪶",
+  "gamifShopItemOwnedCount": "×{count} owned",
+  "@gamifShopItemOwnedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifShopBoostActiveSabi_message": "Boost active ({minutes} min remaining). You can use it again once it expires.",
+  "@gamifShopBoostActiveSabi_message": {
+    "placeholders": { "minutes": { "type": "int" } }
+  },
+  "gamifShopBoostDescriptionSabi_message": "Use this to increase EXP gained by 1.5× for 15 minutes.",
+  "gamifShopUseButton": "Use",
+  "gamifShopBoostSuccessToastSabi_message": "XP Boost activated. EXP gains are increased by 1.5× for {minutes} minutes. 🪶",
+  "@gamifShopBoostSuccessToastSabi_message": {
+    "placeholders": { "minutes": { "type": "int" } }
+  },
+  "gamifShopUseErrorSabi_message": "Something went wrong. Please wait a moment and try again 🪶",
+  "gamifShopEquipOwnedLabel": "Owned: {count}",
+  "@gamifShopEquipOwnedLabel": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifShopEquipPurchaseCount": "{purchased}/{max} slots purchased",
+  "@gamifShopEquipPurchaseCount": {
+    "placeholders": { "purchased": { "type": "int" }, "max": { "type": "int" } }
+  },
+  "gamifShopEquipOwnedWithUnit": "Owned: {count}",
+  "@gamifShopEquipOwnedWithUnit": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "gamifShopEquipMaxLimitLabel": "Limit reached",
+  "gamifStatsPageTitle": "Stats",
+  "gamifStatsPageLoadingSabi_message": "Tallying your progress 🪶",
+  "gamifStatsPageErrorSabi_message": "Something went wrong. Please wait a moment and try again 🪶",
+  "gamifStatsAchievementLabel": "Achievements",
+  "gamifStatsNameEditLabel": "Change Name",
+  "gamifStatsNameEditHint": "New name",
+  "gamifStatsNameEditCancelButton": "Cancel",
+  "gamifStatsNameEditConfirmButton": "Change",
+  "gamifStatsNameChangeSuccessToastSabi_message": "Your name has been updated 🪶",
+  "gamifStatsAllocatablePoints": "Allocatable points: {points}",
+  "@gamifStatsAllocatablePoints": {
+    "placeholders": { "points": { "type": "int" } }
+  },
+  "gamifStatsAllocatablePointsHeader": "Allocatable points: {points}",
+  "@gamifStatsAllocatablePointsHeader": {
+    "placeholders": { "points": { "type": "int" } }
+  },
+  "gamifStatsPointDescription": "Allocating points increases a stat's level and grants bonus EXP for habits in the matching category.",
+  "gamifStatsPointLongPressHint": "Long-press +1 to keep allocating points.",
+  "gamifStatsEffectHp": "⚔️ Max HP +{bonus}",
+  "@gamifStatsEffectHp": {
+    "placeholders": { "bonus": { "type": "int" } }
+  },
+  "gamifStatsEffectAtk": "🗡️ ATK +{bonus}",
+  "@gamifStatsEffectAtk": {
+    "placeholders": { "bonus": { "type": "int" } }
+  },
+  "gamifStatsEffectRegen": "💚 HP regen per turn +{bonus}",
+  "@gamifStatsEffectRegen": {
+    "placeholders": { "bonus": { "type": "int" } }
+  },
+  "gamifStatsEffectAtb": "⏱️ ATB speed +{bonus}%",
+  "@gamifStatsEffectAtb": {
+    "placeholders": { "bonus": { "type": "int" } }
+  },
+  "gamifStatsEffectCrit": "✨ Crit rate +{bonus}%",
+  "@gamifStatsEffectCrit": {
+    "placeholders": { "bonus": { "type": "String" } }
+  },
+  "gamifStatsEffectMitigation": "🛡️ Damage mitigation +{bonus}%",
+  "@gamifStatsEffectMitigation": {
+    "placeholders": { "bonus": { "type": "String" } }
+  },
+  "gamifStatsExerciseSabi_message": "Each time you move, your body grows a little stronger 🪶",
+  "gamifStatsStudySabi_message": "Knowledge quietly becomes strength. 🪶",
+  "gamifStatsHealthSabi_message": "Those who care for their days carry the greatest capacity to recover 🪶",
+  "gamifStatsMentalSabi_message": "A settled mind makes every action lighter 🪶",
+  "gamifStatsCreativitySabi_message": "The act of creating can, in time, become a flash of insight 🪶",
+  "gamifStatsContributionSabi_message": "Time spent helping others will, in time, watch over you. 🪶",
+  "gamifStatsBonusExpLabel": "EXP +{pct}% for \"{category}\" habits",
+  "@gamifStatsBonusExpLabel": {
+    "placeholders": { "category": { "type": "String" }, "pct": { "type": "int" } }
+  },
+  "gamifStatsCrystalExercise": "Exercise Crystal",
+  "gamifStatsCrystalStudy": "Study Crystal",
+  "gamifStatsCrystalHealth": "Health Crystal",
+  "gamifStatsCrystalMental": "Mental Crystal",
+  "gamifStatsCrystalCreativity": "Creativity Crystal",
+  "gamifStatsCrystalContribution": "Contribution Crystal",
+  "gamifStatsCrystalInventoryTitle": "Crystal Inventory",
+  "gamifStatsCrystalComingSoon": "Coming soon",
+  "gamifStatsCrystalDescriptionSabi_message": "The crystals you've gathered will become equippable in a future update. 🪶",
+  "gamifCrystalAwardedHeader": "You received a Crystal.",
+  "gamifCrystalTotalCount": "Total: {total}",
+  "@gamifCrystalTotalCount": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "gamifGachaOnboardingStep1": "① Draw with tickets",
+  "gamifGachaOnboardingStep2": "② Welcome a character",
+  "gamifGachaOnboardingStep3": "③ Fight together",
+  "gamifGachaOnboardingSabi_message": "Let's quietly celebrate new encounters 🪶",
+  "gamifGachaOnboardingBodySabi_message": "Tickets accumulate automatically as you keep up your habits.",
+  "gamifStatsOnboardingTitle": "How to improve your stats",
+  "gamifStatsOnboardingStep1": "① Stack your habits",
+  "gamifStatsOnboardingStep2": "② Gain EXP and +6 stats",
+  "gamifStatsOnboardingStatExercise": "Exercise",
+  "gamifStatsOnboardingStatStudy": "Study",
+  "gamifStatsOnboardingStatMental": "Mental",
+  "gamifStatsOnboardingSabi_message": "Every stone you lay reaches all six of your stats 🪶",
+  "gamifJobMasteryMaxedTitle": "{jobName} Mastery Maxed",
+  "@gamifJobMasteryMaxedTitle": {
+    "placeholders": { "jobName": { "type": "String" } }
+  },
+  "gamifJobMasteryMaxedBodySabi_message": "{jobName} has reached Max.\nYour steady efforts have become a lasting foundation.\nIt will become equippable on other characters (planned for v1.1+). 🪶",
+  "@gamifJobMasteryMaxedBodySabi_message": {
+    "placeholders": { "jobName": { "type": "String" } }
+  },
+  "gamifJobMasteryMaxedCloseButton": "Thank you",
+  "gamifStatusEditNameTooltip": "Change name",
+  "gamifStatusChangeCharButton": "Change character",
+  "gamifStatRankBadgeSemantics": "Overall rank {rankLabel}",
+  "@gamifStatRankBadgeSemantics": {
+    "placeholders": { "rankLabel": { "type": "String" } }
+  },
+  "gamifStatRankBadgeLabel": "Overall rank",
+  "gamifStatHexagonSemantics": "Radar chart of 6 stats",
+  "gamifStatHexagonLabelExercise": "Exercise",
+  "gamifStatHexagonLabelStudy": "Study",
+  "gamifStatHexagonLabelHealth": "Health",
+  "gamifStatHexagonLabelMental": "Mental",
+  "gamifStatHexagonLabelCreativity": "Creative",
+  "gamifStatHexagonLabelContribution": "Social",
+
+  "gamifStatFullNameExercise": "Physical",
+  "gamifStatFullNameStudy": "Intellect",
+  "gamifStatFullNameHealth": "Vitality",
+  "gamifStatFullNameMental": "Spirit",
+  "gamifStatFullNameCreativity": "Creativity",
+  "gamifStatFullNameContribution": "Social",
+  "gamifShopPurchaseFailedSabi_message": "Purchase failed. Please try again. 🪶",
+
+  "habitOnboardingStep1": "① Choose a category",
+  "habitOnboardingStep2": "② Keep going",
+  "habitOnboardingStep3": "③ Build up",
+  "habitOnboardingSabi_message": "Each small stone becomes a lasting foundation. 🪶",
+  "habitOnboardingStartButton": "Start your first habit",
+
+  "habitStatusFrameLongPressHint": "Long-press to view detailed stats",
+
+  "habitWorldBattleLimitTitle": "Daily battle limit",
+  "habitWorldBattleLimitConfirmButton": "OK",
+
+  "habitMonthlyTicketHeader": "Reward for completing 21 days this month",
+  "habitMonthlyTicketLabel": "SSR Guaranteed Ticket × 1",
+  "habitMonthlyTicketSabi_message": "21 days of steady effort. Splendid.\nI'll see you again at the gacha. 🪶",
+  "habitMonthlyTicketReceiveButton": "Receive",
+
+  "habitWorldBattleWinTitle": "Victory 🪶",
+  "habitWorldBattleLoseTitle": "Let's retreat for now 🪶",
+  "habitWorldBattleWinReward": "You earned +{coins} coins / +{exp} EXP.",
+  "@habitWorldBattleWinReward": {
+    "placeholders": { "coins": { "type": "int" }, "exp": { "type": "int" } }
+  },
+  "habitWorldBattleWinLevelUp": "You reached Level {level}.",
+  "@habitWorldBattleWinLevelUp": {
+    "placeholders": { "level": { "type": "int" } }
+  },
+  "habitWorldBattleLoseSabi_message": "Rest your wings, then try again.\nI'll be here to see your next step.",
+  "habitWorldBattleCloseButton": "Close",
+
+  "habitWorldAmbientIndicatorCharging": "{remaining, plural, =1{1 more completion until Auto Battle begins.} other{{remaining} more completions until Auto Battle begins.}} 🪶",
+  "@habitWorldAmbientIndicatorCharging": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "habitWorldAmbientIndicatorChargingManual": "{remaining, plural, =1{1 more completion until you can set out.} other{{remaining} more completions until you can set out.}} 🪶",
+  "@habitWorldAmbientIndicatorChargingManual": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "habitWorldAmbientQueueProgress": "⚔️ In battle — {remaining} battles remaining",
+  "@habitWorldAmbientQueueProgress": {
+    "placeholders": { "remaining": { "type": "int" } }
+  },
+  "habitWorldAmbientDailyLimitSabi_message": "Today's battles are done. Let's walk together again tomorrow 🪶",
+  "habitWorldAmbientCountdownHintSabi_message": "Auto battle begins in",
+  "habitWorldAmbientCountdownCancelButton": "Cancel",
+  "habitWorldAmbientCountdownStartButton": "Start Now",
+
+  "habitSabiPanelCollapse": "Close",
+  "habitSabiPanelExpand": "Read more",
+  "habitSabiPanelStreakOngoing": "{streak}-day streak",
+  "@habitSabiPanelStreakOngoing": {
+    "placeholders": { "streak": { "type": "int" } }
+  },
+  "habitSabiPanelMilestoneHint": "{remaining} more days to reach {next}-day streak",
+  "@habitSabiPanelMilestoneHint": {
+    "placeholders": { "remaining": { "type": "int" }, "next": { "type": "int" } }
+  },
+
+  "habitDrawerCopyIdToast": "ID copied 📋",
+  "habitDrawerMenuGuide": "Help Guide",
+  "habitDrawerMenuSleepingWorld": "Sleeping World",
+  "habitDrawerMenuStats": "Stats",
+  "habitDrawerMenuCharacter": "Change Character",
+  "habitDrawerMenuAchievements": "Achievements",
+  "habitDrawerMenuGacha": "Gacha",
+  "habitDrawerMenuFriends": "Friends",
+  "habitDrawerMenuBuyDiamonds": "Buy Diamonds",
+  "habitDrawerMenuNotifications": "Notifications",
+  "habitDrawerMenuSettings": "Settings",
+  "habitDrawerVersion": "Version {version}",
+  "@habitDrawerVersion": {
+    "placeholders": { "version": { "type": "String" } }
+  },
+  "habitDrawerVersionLoading": "Loading version...",
+
+  "habitTodoSectionLoadError": "Could not load today's commitments. Please wait a moment and try again.",
+  "habitTodoSectionHeader": "✅ Today's Commitments",
+  "habitTodoAddButton": "Add",
+  "habitTodoEmptyPrompt": "What will you commit to today?",
+  "habitTodoOverdueBadge": "Carried over",
+  "habitTodoPriorityHigh": "High",
+  "habitTodoPriorityLow": "Low",
+  "habitTodoLongPressHint": "Hold to edit ✏️",
+  "habitTodoAllDoneSabi_message": "You have kept every promise you made today.",
+  "habitTodoDoneLink": "View completed To-Dos",
+
+  "habitLoginBonusTitle": "Today's Reward",
+  "habitLoginBonusSabiDay1Sabi_message": "Your very first step — well done.\nPlease accept this small gift. 🪶",
+  "habitLoginBonusSabiDay2to7Sabi_message": "Another day of steady progress begins.\nPlease accept this small gift. 🪶",
+  "habitLoginBonusSabiDay8PlusSabi_message": "May today be another day of quiet progress.\nPlease accept this small gift. 🪶",
+  "habitLoginBonusDayMon": "Mon",
+  "habitLoginBonusDayTue": "Tue",
+  "habitLoginBonusDayWed": "Wed",
+  "habitLoginBonusDayThu": "Thu",
+  "habitLoginBonusDayFri": "Fri",
+  "habitLoginBonusDaySat": "Sat",
+  "habitLoginBonusDaySun": "Sun",
+  "habitLoginBonusTicketDaily": "Daily × {count}",
+  "@habitLoginBonusTicketDaily": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "habitLoginBonusTicketWeekly": "Weekly × {count}",
+  "@habitLoginBonusTicketWeekly": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "habitLoginBonusCloseButton": "Collect",
+
+  "habitHomeErrorSabi_message": "Could not load your habits.\nPlease wait a moment and try again. 🪶",
+  "habitHomeAchievementsTitle": "Your Progress",
+  "habitHomeWeekComparisonSubtitle": "This week vs. last week",
+  "habitHomeFilterFreqToday": "Today",
+  "habitHomeFilterFreqWeek": "This week",
+  "habitHomeFilterFreqMonth": "This month",
+  "habitHomeFilterTypeCount": "Count",
+  "habitHomeFilterTypeChecklist": "Checklist",
+  "habitHomeEmptyFilterSabi_message": "No habits found under \"{label}\".\nTry a different filter or add a new habit.",
+  "@habitHomeEmptyFilterSabi_message": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "habitHomeMemoCount": "Unsorted memos ({count})",
+  "@habitHomeMemoCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "habitHomeMemoConfirm": "View →",
+  "habitHomeMemoWarningSabi_message": "You have quite a few unsorted memos. 🪶",
+  "habitHomeXpBoost": "⚡ EXP ×1.5 active ({minutes} min remaining)",
+  "@habitHomeXpBoost": {
+    "placeholders": { "minutes": { "type": "int" } }
+  },
+
+  "habitHomeComebackSabi1_message": "You took another step on a day that was meant for rest. I hold quiet respect for your resolve. 🪶",
+  "habitHomeComebackSabi2_message": "On a day your wings were meant to rest, you still chose to move forward. I have taken note. 🪶",
+  "habitHomeComebackSabi3_message": "Please don't push yourself too hard. Even so, I will remember the person you were today. 🪶",
+  "habitHomeComebackSabi4_message": "Whether you choose to rest or to keep moving has always been yours to decide. I respect the choice you made today. 🪶",
+  "habitHomeComebackSabi5_message": "There is dignity in both resting and moving forward. Today, you chose the latter. 🪶",
+  "habitHomeChallengeGoldSabi_message": "{count, plural, =1{{title} — together, you've reached Gold. Please accept {totalExp} XP. Your one contribution was a fine one. 🪶} other{{title} — together, you've reached Gold. Please accept {totalExp} XP. Your {count} contributions were a fine achievement. 🪶}}",
+  "@habitHomeChallengeGoldSabi_message": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "totalExp": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "habitHomeChallengeSilverSabi_message": "{title} — together, you've reached Silver. Please accept {totalExp} XP. Perhaps next time, you'll reach even higher. 🪶",
+  "@habitHomeChallengeSilverSabi_message": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "totalExp": { "type": "int" }
+    }
+  },
+  "habitHomeChallengeBronzeSabi_message": "{title} — together, you've reached Bronze. Please accept {totalExp} XP. Your contribution has found its place. 🪶",
+  "@habitHomeChallengeBronzeSabi_message": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "totalExp": { "type": "int" }
+    }
+  },
+
+  "habitHomeDateLabel": "{weekday}, {month}/{day}",
+  "@habitHomeDateLabel": {
+    "placeholders": {
+      "month": { "type": "int" },
+      "day": { "type": "int" },
+      "weekday": { "type": "String" }
+    }
+  },
+  "habitHomeAmbientEmptyPresetSabi_message": "Set the auto-battle count per enemy in the Guild, and battles will begin automatically here. 🪶",
+  "habitHomeSabiTooltip": "Message from Sabi",
+  "habitHomeStatusTooltip": "Status",
+  "habitHomeMenuTooltip": "Menu",
+  "habitHomeFabMemoTooltip": "Jot down a quick thought",
+  "habitHomeFabAddTooltip": "Add a schedule, to-do, or habit",
+
+  "habitTodoDonePageTitle": "Kept Promises",
+  "habitTodoDoneLoadingSabi_message": "Loading your completed list. 🪶",
+  "habitTodoDoneErrorSabi_message": "I couldn't retrieve it. 🪶 Please wait a moment and try again.",
+  "habitTodoDoneEmptySabi_message": "No kept promises yet. Let the first step begin. ✨",
+  "habitTodoDoneTodayLabel": "Today",
+  "habitTodoDoneLongPressHint": "Hold to view details 📋",
+
+  "habitTodoPriorityMid": "Medium",
+
+  "habitCategoryOther": "Other",
+  "habitCategoryExercise": "Exercise",
+  "habitCategoryStudy": "Study",
+  "habitCategoryWork": "Work",
+  "habitCategoryPhysical": "Stamina",
+  "habitCategoryBeauty": "Beauty",
+  "habitCategoryHealth": "Health",
+  "habitCategoryMental": "Mental",
+  "habitCategoryCreativity": "Creativity",
+  "habitCategorySocial": "Social",
+  "habitCategoryRest": "Rest",
+
+  "habitQuickAddTitle": "Add To-Do",
+  "habitQuickAddSubtitle": "Add something to do today",
+  "habitQuickAddHint": "e.g. Borrow a book from the library",
+  "habitQuickAddPriorityLabel": "Priority",
+  "habitQuickAddDifficultyLabel": "Difficulty",
+  "habitQuickAddCategoryLabel": "Category",
+  "habitQuickAddSubmitButton": "Add ✅",
+  "habitQuickAddCategoryRequestLink": "Request another category",
+
+  "habitFilterBarAllHabits": "All Habits",
+  "habitFilterBarFilteredHabits": "{filters} habits",
+  "@habitFilterBarFilteredHabits": {
+    "placeholders": {
+      "filters": { "type": "String" }
+    }
+  },
+  "habitFilterBarAddButton": "Add",
+  "habitFilterBarCloseTooltip": "Close",
+  "habitFilterBarSectionFreq": "Frequency Filter",
+  "habitFilterBarFreqDaily": "Today's Habits",
+  "habitFilterBarFreqWeekly": "This Week's Habits",
+  "habitFilterBarFreqMonthly": "This Month's Habits",
+  "habitFilterBarSectionCategory": "Category",
+  "habitFilterBarSectionType": "Type",
+  "habitFilterBarAll": "All",
+  "habitFilterBarSectionOtherLists": "Other Lists",
+  "habitFilterBarNavArchive": "Archive",
+  "habitFilterBarNavTrash": "Deleted (Trash)",
+
+  "habitCardSwipeArchiveLabel": "Archive",
+  "habitCardSwipeTrashLabel": "Trash",
+  "habitCardTrashConfirmTitle": "Move to trash?",
+  "habitCardTrashConfirmContent": "Move \"{name}\" to the trash. You can restore it at any time within 30 days. 🪶",
+  "@habitCardTrashConfirmContent": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "habitCardDialogCancelButton": "Cancel",
+  "habitCardTrashConfirmButton": "Move to trash",
+  "habitCardArchiveConfirmTitle": "Archive this habit?",
+  "habitCardArchiveConfirmContent": "Move \"{name}\" to the archive. You can restore it at any time. 🪶",
+  "@habitCardArchiveConfirmContent": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "habitCardArchiveConfirmButton": "Archive",
+  "habitCardArchivedSabi_message": "\"{name}\" has been archived. 🪶",
+  "@habitCardArchivedSabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "habitCardUndoButton": "Undo",
+  "habitCardRestoreErrorSabi_message": "Couldn't restore it. Please try again from the Archive screen. 🪶",
+  "habitCardArchiveErrorSabi_message": "Something went wrong with archiving. Please try again. 🪶",
+  "habitCardTrashedSabi_message": "Moved \"{name}\" to trash. 🪶",
+  "@habitCardTrashedSabi_message": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "habitCardTrashErrorSabi_message": "Something went wrong. Please try again. 🪶",
+  "habitCardLongPressHintSabi_message": "Long press to open details. 🪶",
+  "habitCardPeriodDoneWeek": "Done this week",
+  "habitCardPeriodDoneMonth": "Done this month",
+  "habitCardStreakDays": "{days}d",
+  "@habitCardStreakDays": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "habitCardBestStreakDays": "Best: {days}d",
+  "@habitCardBestStreakDays": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "habitCardChecklistProgress": "{done} / {total} done",
+  "@habitCardChecklistProgress": {
+    "placeholders": {
+      "done": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "habitCardNetworkErrorSabi_message": "It seems the connection was interrupted. 🪶 Your record has been restored.",
+  "habitCardStreakProtectButton": "Reserve Streak Protection ({count} remaining)",
+  "@habitCardStreakProtectButton": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "habitCardStreakProtectSuccessSabi_message": "Protection has been reserved. If tomorrow calls for it, I'll use it quietly. 🪶",
+  "habitCardStreakProtectErrorSabi_message": "There's no need to hurry. We can begin again, quietly, when you're ready. 🪶",
+
+  "habitArchivedPageRestoreLabel": "Restore",
+  "habitArchivedPageRestoreContent": "Restore this habit to active?",
+  "habitArchivedPageCancelButton": "Cancel",
+  "habitArchivedPageRestoredSabi_message": "Habit restored.",
+  "habitArchivedPageLoadingSabi_message": "Bringing back your past records. 🪶",
+  "habitArchivedPageErrorSabi_message": "Something didn't go through. Please wait a moment and try again. 🪶",
+  "habitArchivedPageEmptyArchive": "No archived habits.",
+  "habitArchivedPageEmptyTrash": "Trash is empty.\nDeleted habits appear here for 30 days.",
+
+  "habitAddTodoTitle": "Add To-Do",
+  "habitAddTodoCopiedSabi_message": "Memo copied. 📋",
+  "habitAddTodoSavedSabi_message": "ToDo added.",
+  "habitAddTodoErrorSabi_message": "Something went wrong. Please try again. 🪶",
+  "habitAddTodoCategoryHint": "Distributed evenly across all 6 stats.",
+  "habitAddTodoNameLabel": "To-Do Name",
+  "habitAddTodoTitleHint": "Tap to search or type",
+  "habitAddTodoMemoLabel": "Memo",
+  "habitAddTodoMemoHint": "Memo (optional)",
+  "habitAddTodoSubmitButton": "Add To-Do ✨",
+
+  "habitEditTodoCopyTitleSabi_message": "Title copied. 📋",
+  "habitEditTodoSavedSabi_message": "ToDo saved.",
+  "habitEditTodoSaveErrorSabi_message": "Something went wrong. Please try again. 🪶",
+  "habitEditTodoDeleteTitle": "Delete To-Do",
+  "habitEditTodoDeleteContent": "Delete \"{name}\"?\nThis action can't be undone.",
+  "@habitEditTodoDeleteContent": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "habitEditTodoDeleteButton": "Delete",
+  "habitEditTodoDeletedSabi_message": "ToDo deleted. 🗑️",
+  "habitEditTodoDeleteErrorSabi_message": "Something went wrong. Please try again. 🪶",
+  "habitEditTodoDetailTitle": "To-Do Details",
+  "habitEditTodoEditTitle": "Edit To-Do",
+  "habitEditTodoDeleteTooltip": "Delete",
+  "habitEditTodoInputHint": "To-Do title",
+  "habitEditTodoMemoHint": "Notes...",
+  "habitEditTodoSaveButton": "Save To-Do ✏️",
+
+  "habitAddHabitModalTitle": "Add Habit",
+  "habitAddHabitAppBarTitle": "New Habit",
+  "habitAddHabitNameLabel": "Habit Name",
+  "habitAddHabitTypeLabel": "Type",
+  "habitAddHabitChecklistSectionLabel": "Checklist Items",
+  "habitAddHabitFreqLabel": "Frequency",
+  "habitAddHabitResetCycleLabel": "Reset Cycle",
+  "habitAddHabitSubmitButton": "Add Habit 🌱",
+  "habitAddHabitNameValidator": "Please enter a habit name.",
+  "habitAddHabitTypeCount": "Count",
+  "habitAddHabitTypeCountSub": "+1 per record",
+  "habitAddHabitTypeChecklist": "Checklist",
+  "habitAddHabitTypeChecklistSub": "Check items off",
+  "habitAddHabitChecklistItemHint": "Add item",
+  "habitAddHabitFreqDaily": "Daily",
+  "habitAddHabitFreqWeekly": "Weekly",
+  "habitAddHabitFreqMonthly": "Monthly",
+  "habitAddHabitFreqYearly": "Yearly",
+  "habitAddHabitMemoHint": "Goals, notes, etc.",
+  "habitAddHabitChecklistErrorSabi_message": "Please add at least one checklist item.",
+  "habitAddHabitErrorSabi_message": "Registration didn't go through. Please try again. \uD83E\uDEB6",
+
+  "habitEditHabitAppBarTitle": "Edit Habit",
+  "habitEditHabitTypeSectionLabel": "Type (locked)",
+  "habitEditHabitDifficultyLabel": "Difficulty",
+  "habitEditHabitSaveButton": "Save Changes",
+  "habitEditHabitNameHint": "e.g. Run 30 min every day",
+  "habitEditHabitTypeReadOnlyNote": "This can't be changed after creation.",
+  "habitEditHabitDiffEasy": "Easy",
+  "habitEditHabitDiffNormal": "Normal",
+  "habitEditHabitDiffHard": "Hard",
+  "habitEditHabitDiffLegendary": "Legendary",
+  "habitEditHabitLegendaryUnlockedChip": "{label} ({slotsUsed}/{slotsTotal})",
+  "@habitEditHabitLegendaryUnlockedChip": {
+    "placeholders": {
+      "label": { "type": "String" },
+      "slotsUsed": { "type": "int" },
+      "slotsTotal": { "type": "int" }
+    }
+  },
+  "habitEditHabitLegendaryLockedChip": "{label} (locked)",
+  "@habitEditHabitLegendaryLockedChip": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "habitEditHabitLegendaryLockedSabi_message": "When all stats exceed Lv.5, you can take on Legendary habits. \uD83E\uDEB6",
+  "habitEditHabitLegendarySlotLimitSabi_message": "You can have {slotsUsed}/{slotsTotal} Legendary habits. When all stats exceed Lv.{nextUnlockLv}, another slot opens. \uD83E\uDEB6",
+  "@habitEditHabitLegendarySlotLimitSabi_message": {
+    "placeholders": {
+      "slotsUsed": { "type": "int" },
+      "slotsTotal": { "type": "int" },
+      "nextUnlockLv": { "type": "int" }
+    }
+  },
+  "habitEditHabitLegendaryCurrentNote": "You are using {slotsUsed}/{slotsTotal} Legendary Habit slots. 🪶",
+  "@habitEditHabitLegendaryCurrentNote": {
+    "placeholders": {
+      "slotsUsed": { "type": "int" },
+      "slotsTotal": { "type": "int" }
+    }
+  },
+  "habitEditHabitLegendaryNextUnlockNote": "When all your stats exceed Lv.{nextUnlockLv}, another slot will unlock. 🪶",
+  "@habitEditHabitLegendaryNextUnlockNote": {
+    "placeholders": { "nextUnlockLv": { "type": "int" } }
+  },
+
+  "habitDetailPageTitleLoading": "Habit Details",
+  "habitDetailPageMenuEdit": "Edit",
+  "habitDetailPageMenuArchive": "Archive",
+  "habitDetailPageMenuDelete": "Delete",
+  "habitDetailPageLoadingSabi_message": "Loading your habit details… 🪶",
+  "habitDetailPageCompletedStatus": "Done for today!",
+  "habitPeriodProgressUnitDays": "{done}/{total} {total, plural, =1{day} other{days}}",
+  "@habitPeriodProgressUnitDays": {
+    "placeholders": {
+      "done": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "habitPeriodProgressUnitWeeks": "{done}/{total} {total, plural, =1{week} other{weeks}}",
+  "@habitPeriodProgressUnitWeeks": {
+    "placeholders": {
+      "done": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "habitPeriodProgressUnitMonths": "{done}/{total} {total, plural, =1{month} other{months}}",
+  "@habitPeriodProgressUnitMonths": {
+    "placeholders": {
+      "done": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "habitPeriodProgressScopeWeek": "This week {amount}",
+  "@habitPeriodProgressScopeWeek": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "habitPeriodProgressScopeMonth": "This month {amount}",
+  "@habitPeriodProgressScopeMonth": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "habitPeriodProgressScopeYear": "This year {amount}",
+  "@habitPeriodProgressScopeYear": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "habitDetailPageNotYetStatus": "Not yet today",
+  "habitDetailPageStreakLabel": "🔥 Current Streak",
+  "habitDetailPageBestStreakLabel": "🏆 Best Streak",
+  "habitDetailPageTotalCountLabel": "📊 Total",
+  "habitDetailPageTotalCountTimes": "{count, plural, =1{1 time} other{{count} times}}",
+  "@habitDetailPageTotalCountTimes": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "habitDetailPageRecordButton": "Record",
+  "habitDetailPageRecordAgainButton": "Record Again",
+  "habitDetailPageRecordSabi_message1": "Today's effort has become a quiet seed of good fortune somewhere in the world. 🪶",
+  "habitDetailPageRecordSabi_message2": "That was a fine step. I'm sure its ripples will travel far. 🪶",
+  "habitDetailPageRecordSabi_message3": "Habits continue on. In time, they quietly light the way for others. 🪶",
+  "habitDetailPageRecordSabi_message4": "One step today. That is enough. 🪶",
+  "habitDetailPageRecordSabi_message5": "I have a feeling this steady accumulation will one day become a light for someone else. 🪶",
+  "habitDetailPageMemoHeader": "Memo",
+  "habitDetailPageInfoHeader": "Details",
+  "habitDetailPageInfoCategory": "Category",
+  "habitDetailPageInfoFrequency": "Frequency",
+  "habitDetailPageInfoResetCycle": "Reset Cycle",
+  "habitDetailPageInfoDifficulty": "Difficulty",
+  "habitDetailPageArchiveDialogContent": "Archive this habit?\nYou can restore it later.",
+  "habitDetailPageDeleteDialogContent": "Permanently delete this habit?\nThis cannot be undone.",
+  "habitDetailPageChecklistHeader": "Checklist",
+  "habitDetailPageChecklistPendingCount": "{count} remaining items",
+  "@habitDetailPageChecklistPendingCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "habitDetailPageChecklistAllDone": "All items checked off!",
+  "habitDetailPageChecklistDoneCount": "Completed ({count})",
+  "@habitDetailPageChecklistDoneCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "habitProviderStreakMilestoneSabi_message": "{streakDays, plural, =1{1 day in a row — splendid. Here are +5 Diamonds for you. 🪶} other{{streakDays} days in a row — splendid. Here are +5 Diamonds for you. 🪶}}",
+  "@habitProviderStreakMilestoneSabi_message": {
+    "placeholders": { "streakDays": { "type": "int" } }
+  },
+  "habitProviderStreakProtectionSabi_message": "One streak shield has been used. 🪶",
+  "habitProviderExpThrottleSabi_message": "You've done well today. From here on, think of these as little extra rewards. 🪶",
+
+  "authPageTagline": "Build habits, one gentle step at a time.",
+  "authPageGoogleButton": "Continue with Google",
+  "authPageAppleButton": "Continue with Apple ID",
+  "authPageGuestButton": "Start as a guest",
+  "authPageDividerOr": "or",
+  "authPageSessionExpiredSnackbarSabi_message": "Your session has ended. 🪶 Please sign in again.",
+  "authPageSignInCancelledSnackbarSabi_message": "Sign-in was cancelled. 🪶",
+  "authPageLoadingSabi_message": "Getting things ready. Please wait a moment. 🪶",
+  "authPageGuestStartErrorSnackbarSabi_message": "Starting guest mode didn't go through. Please try again in a moment. 🪶",
+
+  "authOnboardingSlide1TitleSabi_message": "Welcome to Sabi's world.",
+  "authOnboardingSlide1SubtitleSabi_message": "I'm Sabi, a wise owl.\nI'll quietly watch over your path.",
+  "authOnboardingSlide2Title": "Today's step shapes tomorrow.",
+  "authOnboardingSlide2SubtitleSabi_message": "Each day's steady effort becomes a strength that's yours alone.\nSmall habits become lasting growth. 🪶",
+  "authOnboardingSlide3Title": "Rest is part of building, too.",
+  "authOnboardingSlide3SubtitleSabi_message": "There's no need to rush. Go at your own pace.\nI'll remain by your side. 🪶",
+
+  "authStarterSolName": "Soul",
+  "authStarterSolDescription": "A dependable companion who faces every habit with a burning spirit.",
+  "authStarterAriaName": "Aria",
+  "authStarterAriaDescription": "A swift rogue who moves in silence and strikes with quiet precision.",
+
+  "authOnboardingGenderTitle": "If you're comfortable sharing, what is your gender?",
+  "authOnboardingGenderSubtitle": "You can always change this later in Settings.",
+  "authOnboardingGenderMale": "Male",
+  "authOnboardingGenderFemale": "Female",
+  "authOnboardingGenderNotAnswer": "Prefer not to answer",
+  "authOnboardingGenderRequiredSnackbar": "🪶 Could you choose a gender?",
+
+  "authOnboardingNameTitle": "May I ask your name?",
+  "authOnboardingNameSubtitleSabi_message": "I'll call you by name along the way.",
+  "authOnboardingNameHint": "e.g. Hero Tarou",
+  "authOnboardingNameRequiredSnackbar": "🪶 Could you share your name?",
+  "authOnboardingDefaultName": "Hero",
+
+  "authOnboardingCharacterTitle": "Who would you like as your companion?",
+  "authOnboardingCharacterSubtitle": "You can change this anytime later.",
+  "authOnboardingPrevButton": "Back",
+  "authOnboardingNextButton": "Next",
+  "authOnboardingStartButtonSabi_message": "Let's begin. 🪶",
+
+  "timelineSectionHeaderLabel": "Timeline",
+  "timelineSectionHeaderCalendarTooltip": "Select date",
+  "timelineSectionHeaderSettingsTooltip": "Default settings",
+  "timelineSectionHeaderAddButton": "Add",
+  "timelineDashboardGoogleEventEditSnackbarSabi_message": "Google Calendar events cannot be edited here. Please check your Google Calendar. 🪶",
+
+  "timelineCalendarPickerSheetTitle": "Select date",
+
+  "timelineDefaultsPageTitle": "Default events",
+  "timelineDefaultsPageSubtitleSabi_message": "Each morning, these will be waiting for you on your timeline. 🪶",
+  "timelineDefaultsPageAutoCreateLabel": "Auto-create",
+  "timelineDefaultsPageAutoCreateOffSnackbarSabi_message": "I'll stop creating these automatically from tomorrow onward. Everything already scheduled will remain. 🪶",
+  "timelineDefaultsPageAutoCreateDialogContentSabi_message": "Turning this OFF stops automatically adding default events—such as Morning Prep, Lunch, and Evening Reflection—from tomorrow onward.\n\nEvents already on your timeline will remain. 🪶",
+  "timelineDefaultsPageAutoCreateDialogClose": "Close",
+  "timelineDefaultsPageRegisterButton": "Save as template",
+  "timelineDefaultsPageFootnote": "※ New events won't be created again on the same day. Take your time with the ones already before you.",
+
+  "timelineAddTemplatePageTitle": "Add template",
+  "timelineAddTemplatePageSaveButton": "Save template ✨",
+  "timelineEditTemplatePageTitle": "Edit template",
+  "timelineEditTemplatePageDeleteBuiltInTooltip": "Wake and Sleep events can't be deleted",
+  "timelineEditTemplatePageDeleteDialogTitle": "Delete template",
+  "timelineEditTemplatePageSaveButton": "Save template ✏️",
+
+  "timelineEditEventPageTitle": "Edit event",
+  "timelineEditEventPageTitleHint": "What is this time for?",
+  "timelineEditEventPageSaveButton": "Save event ✏️",
+  "timelineEditEventPageSaveSnackbar": "Event saved ✏️",
+  "timelineEditEventPageSaveErrorSnackbarSabi_message": "Something went wrong while saving. 🪶 Please try again.",
+  "timelineEditEventPageDeleteDialogTitle": "Delete event",
+  "timelineEditEventPageDeleteSnackbar": "Event deleted 🗑️",
+  "timelineEditEventPageDeleteErrorSnackbarSabi_message": "Something went wrong while deleting. 🪶 Please try again.",
+
+  "timelineAddEventLabel": "Add event",
+  "timelineAddEventPageTitleLabel": "Event name",
+  "timelineAddEventPageDateLabel": "Date",
+  "timelineAddEventPageTimeSlotLabel": "Time slot",
+  "timelineAddEventTimeSlotNone": "No time",
+  "timelineAddEventTimeSlotAm": "☀️ Morning",
+  "timelineAddEventTimeSlotPm": "🌙 Afternoon / Evening",
+  "timelineAddEventTimeSlotCustom": "🕐 Custom",
+  "timelineAddEventPageSaveButton": "Add event 📅",
+  "timelineAddEventPageSaveSnackbar": "Event added 📅",
+  "timelineAddEventPageErrorSnackbarSabi_message": "Something went wrong while adding. 🪶 Please try again.",
+
+  "timelineEventCardCompletedSnackbarSabi_message": "Marked as complete. 🪶",
+  "timelineEventCardOnTimeBonusSnackbarSabi_message": "{coinCount, plural, =1{⏰ Right on time. I've added +1 coin for you. 🪶} other{⏰ Right on time. I've added +{coinCount} coins for you. 🪶}}",
+
+  "timelineEmptyStateSabi_message": "What shall we mark into this day? 🪶",
+
+  "timelineAnchorRowWakeLabel": "Wake Up",
+  "timelineAnchorRowSleepLabel": "Bedtime",
+
+  "timelineTemplateRowEditHintSabi_message": "Long-press to edit 🪶",
+
+  "timelineDateStripTodayLabel": "Today",
+  "timelineDateStripWeekdayMon": "Mon",
+  "timelineDateStripWeekdayTue": "Tue",
+  "timelineDateStripWeekdayWed": "Wed",
+  "timelineDateStripWeekdayThu": "Thu",
+  "timelineDateStripWeekdayFri": "Fri",
+  "timelineDateStripWeekdaySat": "Sat",
+  "timelineDateStripWeekdaySun": "Sun",
+
+  "timelineMemoSnackbar": "Memo copied 📋",
+  "timelineMemoHint": "Memo (optional)",
+  "timelineTitleHint": "Tap to search or type",
+  "timelineTitleValidatorEmpty": "Please enter a title",
+  "timelineDeleteTooltip": "Delete",
+  "timelineDeleteDialogCancel": "Cancel",
+  "timelineDeleteDialogConfirm": "Delete",
+  "timelineDeleteDialogContent": "Are you sure you want to delete \"{title}\"?\nThis action cannot be undone.",
+  "timelineTemplateTimeSlotLabel": "When?",
+  "timelineTimeStartLabel": "Start",
+  "timelineTimeEndLabel": "End",
+  "timelineTimeStartOptionalLabel": "Start (optional)",
+  "timelineTimeEndOptionalLabel": "End (optional)",
+
+  "commonCancel": "Cancel",
+  "commonClose": "Close",
+  "commonYes": "Yes",
+
+  "settingsHelpPageTitle": "Help & Guide",
+  "settingsHelpPageRefreshTooltip": "Reload",
+  "settingsHelpPageErrorTitle": "Failed to load page",
+  "settingsHelpPageErrorBodySabi_message": "Please check your connection, wait a little while,\nand try again. 🪶",
+  "settingsHelpPageRetryButton": "Try again",
+
+  "settingsProfileEditPageTitle": "Edit Profile",
+  "settingsProfileEditPageSaveButton": "Save",
+  "settingsProfileEditPageEmptyNameSnackbar": "Please enter your name",
+  "settingsProfileEditPageSaveSuccessSnackbarSabi_message": "Your profile has been updated. 🪶",
+  "settingsProfileEditPageErrorSabi_message": "Something went wrong. Please try again in a moment 🪶",
+  "settingsProfileEditPageNameLabel": "Name",
+  "settingsProfileEditPageNameHint": "Enter your name",
+  "settingsProfileEditPageGenderLabel": "Gender",
+  "settingsProfileEditPageGenderMale": "Male",
+  "settingsProfileEditPageGenderFemale": "Female",
+  "settingsProfileEditPageGenderNoAnswer": "Prefer not to say",
+  "settingsProfileEditPageFriendIdLabel": "Friend ID",
+  "settingsProfileEditPageFriendIdCopiedSnackbar": "Friend ID copied.",
+  "settingsProfileEditPageFriendIdReadOnlyNote": "Friend ID cannot be changed",
+
+  "settingsReminderPageTitle": "Reminder Settings",
+  "settingsReminderPageSaveErrorSnackbarSabi_message": "Could not save. Please try again in a moment 🪶",
+  "settingsReminderPageInfoBox": "You'll receive a reminder at the selected time to check off today's habits.",
+  "settingsReminderPageToggleTitle": "Habit reminders",
+  "settingsReminderPageToggleEnabled": "Enabled",
+  "settingsReminderPageToggleDisabled": "Disabled",
+  "settingsReminderPageDescriptionSabi_message": "Every day at the time you choose, I'll remind you of any habits and ToDos you haven't completed yet. 🪶",
+  "settingsReminderPageTimeLabel": "Reminder time",
+  "settingsReminderPageTimeNotSet": "Not set",
+  "settingsReminderPageTimelineSection": "Reminders for incomplete timeline events",
+  "settingsReminderPageTimelineDescriptionSabi_message": "If an event hasn't been completed 15 minutes after its start time, I'll send you a reminder.\n※ Reminders for future events become active once you open Sabiowl that day.",
+  "settingsReminderPageTimelineToggleTitle": "Enable",
+
+  "settingsNotifPromptDeniedSabi_message": "Would you set my messenger pigeons free in your settings?\nWith notifications enabled, I can help you catch the moments that matter.",
+  "settingsNotifPromptNotDeterminedSabi_message": "May I send you a messenger pigeon now and then?\nI'd like to bring you habit reminders and news of your progress.",
+  "settingsNotifPromptBenefitReminder": "Morning & evening habit reminders",
+  "settingsNotifPromptBenefitLevelUp": "Level-up & achievement notifications",
+  "settingsNotifPromptBenefitFriends": "Messages & gifts from friends",
+  "settingsNotifPromptOpenSettingsButton": "Open Settings",
+  "settingsNotifPromptAllowButton": "Allow Notifications",
+  "settingsNotifPromptDismissDenied": "Not now",
+  "settingsNotifPromptDismissNotDetermined": "Later",
+
+  "settingsPageTitle": "Settings",
+  "settingsPageSectionAccount": "Account",
+  "settingsPageSectionTimeline": "Timeline",
+  "settingsPageSectionNotifications": "Notifications",
+  "settingsPageSectionSupport": "Support",
+  "settingsPageSectionAppInfo": "App Info",
+  "settingsPageSectionAccountManagement": "Account Management",
+  "settingsPageTileProfileEdit": "Edit Profile",
+  "settingsPageTileAccountLink": "Linked Accounts",
+  "settingsPageTileTimelineDefaults": "Default Events › Auto-Create",
+  "settingsPageTileReminderSettings": "Reminder Settings",
+  "settingsPageTileChallengeNotif": "Challenge Results",
+  "settingsPageTileFaq": "FAQ",
+  "settingsPageTileContact": "Contact Us",
+  "settingsPageTileVersion": "Version",
+  "settingsPageTilePrivacyPolicy": "Privacy Policy",
+  "settingsPageTileTermsOfService": "Terms of Service",
+  "settingsPageTileSpecifiedCommercial": "Legal & Consumer Information",
+  "settingsPageTileOfficialX": "Official X (Twitter)",
+  "settingsPageTileLogout": "Log Out",
+  "settingsPageTileDeleteAccount": "Delete Account",
+  "settingsPageStreakSection": "Streak Protection",
+  "settingsPageStreakAutoTitle": "Protect streaks automatically",
+  "settingsPageStreakAutoSubtitleHasItems": "In stock: {count} — Automatically used when a habit streak breaks. (Login streaks are tracked separately.)",
+  "settingsPageStreakAutoSubtitleNoItems": "In stock: 0 — Buy more in the Shop for 💎30 each.",
+  "settingsSaveErrorSnackbarSabi_message": "Could not save settings. Please try again in a moment 🪶",
+  "settingsPageBetaSection": "BETA FEATURES",
+  "settingsPageFreeMemoTitle": "Quick Notes",
+  "settingsPageFreeMemoDescSabi_message": "A place to quickly jot down passing thoughts, then turn them into events, ToDos, or habits later. You can disable it here if you don't need it. 🪶",
+  "settingsPageChallengeNotifOnSnackbarSabi_message": "On the morning of the first day of each month, I'll share last month's results with you. 🪶",
+  "settingsPageChallengeNotifOffSnackbarSabi_message": "I'll stop sending you challenge result notifications. 🪶",
+  "settingsPageOpenUrlErrorSabi_message": "Could not open the web page. Please try again in a moment 🪶",
+  "settingsPageOpenXErrorSabi_message": "Could not open X. Please try again in a moment 🪶",
+  "settingsAccountLinkSheetTitle": "Account Linking",
+  "settingsAccountLinkSheetDescSabi_message": "Linking your account with Google or Apple helps keep everything you've built safe. 🪶",
+  "settingsAccountLinkGoogleLabel": "Google account",
+  "settingsAccountLinkAppleLabel": "Apple account",
+  "settingsAccountLinkLoadingSubtitle": "Loading…",
+  "settingsAccountLinkErrorSubtitle": "Failed to load",
+  "settingsAccountLinkLinkedFallback": "Linked",
+  "settingsAccountLinkDisabledSubtitle": "Unavailable — {provider} is already linked",
+  "settingsAccountLinkUnlinkedSubtitle": "Not linked",
+  "settingsLinkConfirmDescGoogle": "Link your Google account. You'll be able to sign in with Google.",
+  "settingsLinkConfirmDescApple": "Link your Apple account. You'll be able to sign in with Apple.",
+  "settingsLinkConfirmButton": "Link",
+  "settingsAccountLinkStatusLinked": "Linked",
+  "settingsAccountLinkDialogEmail": "Email: {email}",
+  "settingsAccountLinkDialogHintSabi_message": "If you linked the wrong account, you can unlink it below and connect the correct one instead. 🪶",
+  "settingsAccountUnlinkButton": "Unlink",
+  "settingsUnlinkConfirmDialogTitle": "Unlink account?",
+  "settingsUnlinkConfirmDialogContentSabi_message": "Unlinking will remove the connection to your current account.\n\nYour habits, timeline, characters, and other data will remain safe, and you can link the correct account afterward. 🪶",
+  "settingsUnlinkConfirmButton": "Unlink",
+  "settingsUnlinkSuccessSnackbarSabi_message": "The account has been unlinked. Please link the correct one when you're ready. 🪶",
+  "settingsGenericErrorSnackbarSabi_message": "Something went wrong. Please try again in a moment 🪶",
+  "settingsLogoutCheckErrorSnackbarSabi_message": "Could not verify account link status. Please try again in a moment 🪶",
+  "settingsLogoutDialogTitle": "Log Out",
+  "settingsLogoutDialogContent": "You will be logged out of your current account.\nYou won't be able to access your data until you sign in again.",
+  "settingsLogoutDialogConfirm": "Log Out",
+  "settingsLogoutBlockedDialogTitle": "Cannot Log Out",
+  "settingsLogoutBlockedDialogContent": "Your account isn't linked to Google or Apple yet. If you log out now, you'll permanently lose access to everything you've built.",
+  "settingsLogoutBlockedDialogHintSabi_message": "Please link your account before signing out. 🪶",
+  "settingsAlreadyLinkedDialogTitle": "Already linked to another account",
+  "settingsAlreadyLinkedDialogContent": "This account is already linked to {provider}.\nTo switch accounts, log out or delete your account, then sign in with a different one.",
+  "settingsLinkSuccessGreetingNamed": "You're all set now, {name}.",
+  "settingsLinkSuccessGreetingDefault": "You're all set now.",
+  "settingsLinkSuccessMessageSabi_message": "Every stone you've laid is now safely protected with {provider}. Let's keep moving at your own pace. 🪶",
+  "settingsLinkErrorDuplicateAccount": "This account is already linked to another Sabiowl account.",
+  "settingsLinkErrorGeneric": "Operation failed. Please try again.",
+
+  "settingsAccountDeletePageTitle": "Delete Account",
+  "settingsAccountDeleteDeleting": "Deleting...",
+  "settingsDeleteReasonToodifficult": "Couldn't figure out how to use it",
+  "settingsDeleteReasonHardToContinue": "Hard to keep up",
+  "settingsDeleteReasonNotMyStyle": "Sabi / game elements weren't for me",
+  "settingsDeleteReasonSwitchedApp": "Switched to another app",
+  "settingsDeleteReasonBored": "Lost interest",
+  "settingsDeleteReasonPrivacyConcern": "Don't want data stored",
+  "settingsDeleteReasonOther": "Other",
+  "settingsDeletedItemsHabits": "All habit data and logs",
+  "settingsDeletedItemsStats": "EXP, level, and stats",
+  "settingsDeletedItemsCharacters": "Owned characters & items",
+  "settingsDeletedItemsDiamonds": "Diamonds",
+  "settingsDeletedItemsFriends": "Friend connections & message history",
+  "settingsDeleteStep1SabiMessage": "Once it's deleted, there's no going back. Are you sure? 🪶",
+  "settingsDeleteStep1DataTitle": "Data to be deleted",
+  "settingsDeleteStep1NextButton": "Enter reason for deletion →",
+  "settingsDeleteCancelButton": "Never mind",
+  "settingsDeleteStep2Question": "Why are you deleting your account?\nWould you mind telling us?",
+  "settingsDeleteStep2Subtitle": "Your feedback will help us improve Sabi and Sabiowl.",
+  "settingsDeleteStep2FreeTextLabel": "If you'd like, tell us more (optional)",
+  "settingsDeleteStep2FreeTextHint": "Share any feedback that could help us improve.",
+  "settingsDeleteStep2NextButton": "Final confirmation →",
+  "settingsDeleteStep3Title": "Are you sure you want to delete your account?",
+  "settingsDeleteStep3SabiMessage": "…I'll miss you. You'll always be welcome back. 🪶",
+  "settingsDeleteStep3Warning": "This cannot be undone. Your account and all data will be permanently deleted.",
+  "settingsDeleteStep3CountdownText": "{countdown, plural, =1{Button available in 1 second} other{Button available in {countdown} seconds}}",
+  "settingsDeleteStep3ButtonDelete": "Permanently Delete Account",
+  "settingsDeleteStep3ButtonCountdown": "{countdown, plural, =1{1 second left...} other{{countdown} seconds left...}}",
+  "settingsDeleteCancelFinal": "Don't delete",
+  "settingsDeleteItem1Habits": "Habits data and all records",
+  "settingsDeleteItem2Exp": "EXP, level and stats",
+  "settingsDeleteItem3Characters": "Characters and items",
+  "settingsDeleteItem4Diamonds": "Diamonds",
+  "settingsDeleteItem5Friends": "Friend connections and message history",
+
+  "@@section_calendar": "──────────── calendar feature ────────────",
+
+  "calendarPageYearMonthTitle": "{year}/{month}",
+  "calendarPageTodayButton": "Today",
+  "calendarPageThisMonthButton": "This month",
+  "calendarPageMenuTooltip": "Switch view",
+  "calendarPageViewMonthly": "Calendar",
+  "calendarPageViewAnalytics": "Analytics",
+  "calendarPageMenuGoogleSync": "Sync Google Calendar",
+  "calendarPageSyncDialogTitle": "Sync Google Calendar",
+  "calendarPageSyncDialogContent": "Your Google Calendar events will be imported into Sabiowl's Timeline.\nNext, you'll be asked to sign in to Google and grant calendar access. 🪶",
+  "calendarPageSyncDialogConfirm": "Sync",
+  "calendarPageUnsyncDialogTitle": "Remove Google Calendar sync",
+  "calendarPageUnsyncDialogContent": "All imported events will be deleted.\n(Your Google Calendar connection itself will remain.)",
+  "calendarPageUnsyncDialogAction": "Remove Sync",
+  "calendarPageUnsyncConfirmTitle": "Remove sync?",
+  "calendarPageUnsyncConfirmContent": "All events imported from Google Calendar will be deleted.\n\nYour Google account will remain linked. You can import them again anytime by choosing \"Sync.\"",
+  "calendarPageUnsyncConfirmAction": "Remove",
+  "calendarPageUnsyncSuccessSnackbarSabi_message": "{count, plural, =1{1 event has been unsynced. 🪶} other{{count} events have been unsynced. 🪶}}",
+  "calendarPageUnsyncErrorSnackbarSabi_message": "Couldn't remove the sync. Please try again in a moment. 🪶",
+  "calendarSyncPartFetched": "Imported: {count}",
+  "calendarSyncPartPushed": "Pushed: {count}",
+  "calendarSyncPartDeletedFollowup": "Deleted: {count}",
+  "calendarSyncPartPushFailed": "Failed: {count}",
+  "calendarSyncPartSkipped": "Skipped: {count}",
+  "calendarSyncSuccessSnackbar": "Synced with Google Calendar ({parts})",
+  "calendarSyncPartSeparator": ", ",
+  "calendarPageSyncStorageErrorSnackbarSabi_message": "There isn't enough storage space on your device. 🪶",
+  "calendarPageSyncErrorSnackbarSabi_message": "Sync didn't go through. Please wait a moment and try again. 🪶",
+  "calendarPageFabTooltip": "Add an event, to-do, or habit",
+  "calendarPagePickerYearLabel": "{year}",
+  "calendarPagePickerMonthLabel": "{month}",
+  "calendarAddPageTitle": "Add",
+  "calendarAddPageTabEvent": "📅 Add Event",
+  "calendarAddPageTabTodo": "✅ Add To-Do",
+  "calendarAddPageTabHabit": "🌱 Add Habit",
+  "calendarTabLoadingSabi_message": "Loading this month's records… 🪶",
+  "calendarTabErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "calendarTabHabitStreakDialogTitle": "Streaks by habit",
+  "calendarGridDowSun": "Sun",
+  "calendarGridDowMon": "Mon",
+  "calendarGridDowTue": "Tue",
+  "calendarGridDowWed": "Wed",
+  "calendarGridDowThu": "Thu",
+  "calendarGridDowFri": "Fri",
+  "calendarGridDowSat": "Sat",
+  "calendarDailyTaskTodayLabel": "Today {month}/{day}",
+  "calendarDailyTaskTomorrowLabel": "Tomorrow {month}/{day}",
+  "calendarDailyTaskYesterdayLabel": "Yesterday {month}/{day}",
+  "calendarDailyTaskDateLabel": "{month}/{day}",
+  "calendarDailyTaskScheduledBadge": "Scheduled",
+  "calendarDailyTaskGoHomeButton": "Home",
+  "calendarDailyTaskTimelineSection": "Timeline",
+  "calendarDailyTaskExternalCalendarSection": "External Calendar",
+  "calendarDailyTaskTodoSection": "ToDo",
+  "calendarDailyTaskHabitSection": "Habits",
+  "calendarDailyTaskEmptyState": "No habits, to-dos, or timeline events",
+  "calendarDayDetailRestDayBadge": "🌙 Rest day",
+  "calendarDayDetailCompletionLabel": "{completed} / {total} done",
+  "calendarGcalIntroTitle": "A quick note",
+  "calendarGcalIntroBody1": "Sabiowl can import events from your Google Calendar into your Sabiowl Timeline.",
+  "calendarGcalIntroBody2": "On the next screen, Google will ask you to grant calendar access. Once you do, you'll be able to import your events.",
+  "calendarGcalIntroBody3": "Note: This permission technically includes calendar editing access, but Sabiowl will never modify your Google Calendar. See Section 9 of our Privacy Policy for details.",
+  "calendarGcalIntroDismiss": "Maybe later",
+  "calendarGcalIntroAccept": "Continue to Google",
+  "calendarHabitStreakCurrentDays": "{count}d",
+  "calendarHabitStreakBestDays": "Best {count}d",
+  "calendarMonthlySummaryRateLabel": "Completion Rate",
+  "calendarMonthlySummaryAchievedDaysLabel": "Days done",
+  "calendarMonthlySummaryDaysValue": "{days}d",
+  "calendarMonthlySummaryStreakLabel": "Streak",
+  "calendarQuickAddHintText": "e.g. Meet a friend tomorrow at 6 PM",
+  "calendarQuickAddMemoHint": "Add details (optional)",
+  "calendarQuickAddDateLabel": "Date",
+  "calendarQuickAddTimeLabel": "Time",
+  "calendarQuickAddCategoryLabel": "Category",
+  "calendarQuickAddPriorityHigh": "High",
+  "calendarQuickAddPriorityMedium": "Medium",
+  "calendarQuickAddPriorityLow": "Low",
+  "calendarQuickAddDateToday": "Today",
+  "calendarQuickAddDateTomorrow": "Tomorrow",
+  "calendarQuickAddDateDayAfterTomorrow": "In 2 days",
+  "calendarQuickAddContinuous": "Add another",
+  "calendarQuickAddSubmitButton": "Add",
+  "calendarSabiInsightDateFormat": "{month}/{day}",
+  "calendarSabiInsightNoHabitsSabi_message": "No habits recorded on {date}.\nPerhaps you were resting that day.",
+  "calendarSabiInsightAllCompletedSabi_message": "You completed everything on {date}.\nA quiet day of steady progress.",
+  "calendarSabiInsightNoneCompletedSabi_message": "A day of stillness on {date}.\nAnd yet, here you are, looking back. That is enough.",
+  "calendarSabiInsightLegendaryDoneSabi_message": "{date} — a Legendary habit completed.\nYou make the extraordinary look ordinary.",
+  "calendarSabiInsightMostlyCompletedSabi_message": "{count, plural, =1{{date} — you completed almost everything.\nOne more stone laid, steady and true.} other{{date} — you completed almost everything.\n{count} stones laid, steady and true.}}",
+  "calendarSabiInsightHalfCompletedSabi_message": "Half done, half remaining.\nBoth are true facts about {date}.",
+  "calendarSabiInsightLittleCompletedSabi_message": "{date} — you managed a little.\nEven a little is something worth building on.",
+  "calendarStatsTabLoadingSabi_message": "Tallying your progress… 🪶",
+  "calendarStatsTabErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "calendarStatsComparisonTitle": "vs Last Month",
+  "calendarStatsCompletionRateLabel": "Completion Rate",
+  "calendarStatsInsightTitle": "Insights",
+  "calendarStatsBestHabitLabel": "Top habit",
+  "calendarStatsHabitRateAchievement": "{rate}% complete",
+  "calendarStatsWorstHabitLabel": "Needs work",
+  "calendarStatsWeakDowLabel": "Toughest day",
+  "calendarStatsWeakDowValue": "{label}",
+  "calendarStatsWeakDowRateLabel": "{rate}% avg",
+  "calendarStatsHabitRateTitle": "By habit",
+  "calendarStatsHabitPeriodLabel": "{completed} / {pastDays}d",
+  "calendarStatsDowHeatmapTitle": "By day of week",
+  "calendarStatsBestHabit90Sabi_message": "You've completed \"{habitName}\" {rate}% of the time.\nIt seems this has become your foundation.",
+  "calendarStatsBestHabit60Sabi_message": "\"{habitName}\" is the habit you've kept up best.\n{rate}% — a steady accumulation.",
+  "calendarStatsWeakDowSabi_message": "{dowLabel} tends to be a little lower ({rate}%).\nIf there's a reason, that reason is part of your rhythm too.",
+  "calendarStatsWorstHabitSabi_message": "\"{habitName}\" is at {rate}%.\nIf it feels hard, lowering the difficulty is always an option.",
+  "calendarStatsNoDataSabi_message": "I'm quietly reading through your data.\nLittle by little, your progress is coming into view.",
+  "calendarCumulativeErrorSabi_message": "Couldn't load your progress records. Please try again later.",
+  "calendarCumulativeChartTitle": "30-Day Progress",
+  "calendarCumulativeTotalBadge": "Total: {count}",
+  "calendarCumulativePrevPeriodDiff": "{signedDiff} (vs. previous 30 days)",
+  "calendarCumulativeXAxisStart": "{days}d ago",
+  "calendarCumulativeXAxisEnd": "Today",
+  "calendarCumulativeTooltip": "Total {count}",
+  "calendarCumulativeSubtitleSabi_message": "Part of the layers you've built so far.",
+  "calendarCumulativeLoadingSabi_message": "Drawing your progress chart… 🪶",
+  "calendarCumulativeEmptyTitle": "No progress recorded yet",
+  "calendarCumulativeEmptyBodySabi_message": "Every layer begins with a single stone."
+  ,
+
+  "coreNavHome": "Home",
+  "coreNavChallenge": "Challenge",
+  "coreNavGuild": "Guild",
+  "coreNavCalendar": "Calendar",
+  "coreSplashSubtitle": "Steady effort becomes lasting strength.",
+  "coreRetryButton": "Retry",
+  "coreLatestInfoButton": "News",
+  "coreSupportButton": "Contact",
+  "coreErrorOverlayTitle": "Connection failed",
+  "coreErrorOverlayBodySabi_message": "There may be a temporary issue with your network connection or the server. Please wait a moment and try again. 🪶",
+  "coreOpenHomePageFailedSabi_message": "Couldn't open the news page. Please wait a moment and try again. 🪶",
+  "coreOpenMailerFailedSabi_message": "Couldn't open your mail app. Please contact us at {email}. 🪶",
+  "coreMaintenanceExpiresAtPassedSabi_message": "The scheduled end time has passed. Please tap Retry to check the latest status. 🪶",
+  "coreMaintenanceExpiresAtLabel": "Ends: {dateTime}"
+  ,
+
+  "challengePageTitle": "Challenge",
+  "challengePageLoadingSabi_message": "Checking your challenges… 🪶",
+  "challengePageErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "challengePageRewardGoldSabi_message": "{contributionCount, plural, =1{{title} — together, you've reached Gold. I'll award {totalExp} XP in total. One contribution. Truly splendid. 🪶} other{{title} — together, you've reached Gold. I'll award {totalExp} XP in total. {contributionCount} contributions. Truly splendid. 🪶}}",
+  "challengePageRewardSilverSabi_message": "{title} — together, you've reached Silver. I'll award {totalExp} XP in total. Next time, let's quietly aim a little higher. 🪶",
+  "challengePageRewardBronzeSabi_message": "{title} — together, you've reached Bronze. I'll award {totalExp} XP. Your contribution has found its place here. 🪶",
+  "challengePageEmptyStateSabi_message": "No challenges are running right now. Keep building your habits at your own pace until the next one begins. 🪶",
+  "challengeCardDetailTooltip": "View details",
+  "challengeCardCountLabel": "{count, plural, =1{1 time} other{{count} times}}",
+  "challengeCardContributionLabel": "Your contribution: {contribution} · {remaining} days left",
+  "challengeCardContributionSabi_message": "{contribution, plural, =1{Your 1 contribution is part of this number. 🪶} other{Your {contribution} contributions are part of this number. 🪶}}",
+  "@challengeCardContributionSabi_message": {
+    "placeholders": {
+      "contribution": { "type": "int" }
+    }
+  },
+  "challengeCardTierBronze": "Bronze",
+  "challengeCardTierSilver": "Silver",
+  "challengeCardTierGold": "Gold",
+  "challengeCardTierTarget": "Target",
+  "challengeTierAchievedLabel": "✅ Achieved",
+  "challengeTierRemainingLabel": "{count} more to go",
+  "challengeDetailDescriptionTitle": "📝 Description",
+  "challengeDetailTieredSectionTitle": "📊 Achievement Stages (Cumulative)",
+  "challengeDetailSimpleSectionTitle": "📊 Achievement Goal",
+  "challengeDetailTierBronzeLabel": "🥉 Bronze B",
+  "challengeDetailTierSilverLabel": "🥈 Silver S",
+  "challengeDetailTierGoldLabel": "🥇 Gold G",
+  "challengeDetailMyContributionLabel": "{count, plural, =1{👤 Your contribution: 1 time} other{👤 Your contribution: {count} times}}",
+  "challengeDetailPeriodLabel": "{days, plural, =1{⏰ Period: {start} – {end} (1 day left)} other{⏰ Period: {start} – {end} ({days} days left)}}",
+  "challengeDetailRewardTitle": "📦 Reward Information",
+  "challengeDetailRewardTieredNote": "· Cumulative rewards: Reaching a higher tier also grants all lower-tier rewards.",
+  "challengeDetailRewardDistributionNote": "· Rewards are distributed automatically when you open the Challenge screen after the month ends.",
+  "challengeDetailRewardCountLimitNote": "· Each person's contribution is counted once per day.",
+  "challengeOnboardingStep1Label": "① Build habits in the category",
+  "challengeOnboardingStep2Label": "② Keep going until month-end",
+  "challengeOnboardingBodySabi_message": "No need to push yourself. Build at your own pace. 🪶",
+  "challengeOnboardingSubcaption": "Keeping up your habits automatically records your contribution.",
+
+  "freeMemoPageTitle": "Quick Memos",
+  "freeMemoPageTrashTooltip": "Deleted memos",
+  "freeMemoLoadErrorSabi_message": "Couldn't load your memos. Please try again. 🪶",
+  "freeMemoRetryButton": "Retry",
+  "freeMemoPageSearchHint": "Search memos",
+  "freeMemoPageSearchCountWithMore": "{count, plural, =1{Searching 1 visible memo. Older memos aren't included. 🪶} other{Searching {count} visible memos. Older memos aren't included. 🪶}}",
+  "freeMemoPageSearchCount": "{count, plural, =1{Searching 1 visible memo.} other{Searching {count} visible memos.}}",
+  "freeMemoPageEmptySearchSabi_message": "No memos matched your search. 🪶",
+  "freeMemoPageEmptyFlowStep1": "Have an idea",
+  "freeMemoPageEmptyFlowStep2": "Write it down",
+  "freeMemoPageEmptyFlowLeafEvent": "Event",
+  "freeMemoPageEmptyFlowLeafTodo": "ToDo",
+  "freeMemoPageEmptyFlowLeafHabit": "Habit",
+  "freeMemoPageEmptyFlowCaption": "Start by capturing whatever comes to mind.",
+  "freeMemoPageEmptyFlowSubcaption": "You can sort things out later, at your own pace. 🪶",
+  "freeMemoPageDisableHint": "You can disable this feature if you prefer not to use it.",
+  "freeMemoPageSettingsLink": "Go to Settings",
+  "freeMemoPageMonthlyPromptSabi_message": "It seems you still have a few memos waiting to be sorted. There's no need to hurry. Take a look whenever it feels right.",
+  "freeMemoPageOlderMemosNotice": "Older memos are not shown. 🪶",
+  "freeMemoPageSwipeHint": "👈 Swipe left to move to Trash  👉 Swipe right to save",
+  "freeMemoPageConvertDialogTitle": "Convert this memo to…",
+  "freeMemoPageConvertOptionEvent": "Save as Event",
+  "freeMemoPageConvertOptionTodo": "Save as To-Do",
+  "freeMemoPageConvertOptionHabit": "Save as Habit",
+  "freeMemoPageSwipeDeleteLabel": "Trash",
+  "freeMemoPageSwipeConvertLabel": "Save",
+  "freeMemoPageDeleteConfirmTitle": "Move to trash?",
+  "freeMemoPageDeleteConfirmBody": "Move \"{preview}\" to trash. 🪶",
+  "freeMemoDialogCancelAction": "Cancel",
+  "freeMemoPageDeleteAction": "Move to Trash",
+  "freeMemoPageMovedToTrashSnack": "Moved to trash. 🪶",
+  "freeMemoPageDeleteErrorSnack": "Could not move to trash. Please try again. 🪶",
+  "freeMemoPageConvertErrorSnack": "Could not convert. Please try again. 🪶",
+  "freeMemoPageSaveErrorSnack": "Could not save. Please try again. 🪶",
+  "freeMemoPageSaveSuccessSnack": "Saved. 🪶",
+  "freeMemoPageVoicePermissionTitle": "Microphone access required",
+  "freeMemoPageVoicePermissionBody": "Voice input requires microphone and speech recognition permissions in Settings.",
+  "freeMemoPageOpenSettings": "Open Settings",
+  "freeMemoPageVoiceTranscribingLabel": "Transcribing…",
+  "freeMemoPageVoiceStartupErrorSnack": "Could not start voice recognition. Check your device speech settings. 🪶",
+  "freeMemoPageVoiceRecognitionErrorSnack": "Could not recognize speech. Please try again. 🪶",
+  "freeMemoPageVoiceRetryAction": "Try again",
+  "freeMemoPageVoiceGenericErrorSnack": "Could not recognize speech. 🪶",
+  "freeMemoPageConvertedLeadingText": "Saved as {label}.",
+  "freeMemoEditSheetTitle": "Edit Memo",
+  "freeMemoEditSheetSaveButton": "Save",
+  "freeMemoTrashSheetTitle": "Trashed Memos",
+  "freeMemoTrashSheetEmptySabi_message": "No deleted memos. 🪶",
+  "freeMemoTrashSheetPurgeAllConfirmTitle": "Permanently delete all?",
+  "freeMemoTrashSheetPurgeAllConfirmBody": "{count, plural, =1{Permanently delete 1 memo. This cannot be undone. 🪶} other{Permanently delete {count} memos. This cannot be undone. 🪶}}",
+  "freeMemoTrashSheetPurgeAction": "Delete Permanently",
+  "freeMemoTrashSheetPurgeSingleConfirmTitle": "Permanently delete this memo?",
+  "freeMemoTrashSheetPurgeSingleConfirmBody": "Permanently delete \"{preview}\". This cannot be undone. 🪶",
+  "freeMemoTrashSheetRestoreSuccessSnack": "Memo restored. 🪶",
+  "freeMemoTrashSheetRestoreErrorSnack": "Could not restore. Please try again. 🪶",
+  "freeMemoTrashSheetPurgeAllSuccessSnack": "{count, plural, =1{1 memo permanently deleted. 🪶} other{{count} memos permanently deleted. 🪶}}",
+  "freeMemoTrashSheetPurgeAllErrorSnack": "Could not delete all. Please try again. 🪶",
+  "freeMemoTrashSheetPurgeSingleSuccessSnack": "Permanently deleted. 🪶",
+  "freeMemoTrashSheetPurgeSingleErrorSnack": "Could not delete. Please try again. 🪶",
+  "freeMemoTrashSheetPurgeAllButton": "Delete All Permanently",
+  "freeMemoTrashSheetLoadMoreButton": "Load more 🪶",
+  "freeMemoTrashSheetRestoreButton": "Restore",
+  "freeMemoTrashSheetDeleteForeverButton": "Delete Forever",
+
+  "@@section_shared": "──────────── shared/widgets ────────────",
+
+  "sharedLevelUpDialogSabiMessage": "Wonderful. What you've built is steadily becoming your strength. 🪶",
+  "sharedLevelUpDialogAboutStatusLink": "About your stats",
+  "sharedLevelUpDialogContinue": "Continue",
+  "sharedLevelUpDialogSkipContinue": "Skip and continue",
+  "sharedLevelUpDialogStatAllocTitle": "Allocate Stat Points",
+  "sharedLevelUpDialogRemainingPt": "{remaining} pt remaining",
+  "sharedLevelUpDialogAllocDone": "Allocation Complete ✓",
+  "sharedLevelUpDialogStatLoadError": "Could not load stats. Please try again later",
+  "sharedLevelUpDialogAutoAllocHeader": "Auto-allocated from achievements (10 pt)",
+  "sharedLevelUpDialogAutoAllocNote": "Automatically allocated based on your habit completion rate over the past 30 days.",
+  "sharedWeekdayMon": "Mon",
+  "sharedWeekdayTue": "Tue",
+  "sharedWeekdayWed": "Wed",
+  "sharedWeekdayThu": "Thu",
+  "sharedWeekdayFri": "Fri",
+  "sharedWeekdaySat": "Sat",
+  "sharedWeekdaySun": "Sun",
+  "sharedStackingChartEmptyMessage": "No progress yet. Let's begin today. 🪶",
+  "sharedStackingChartLegendThisWeek": "This week",
+  "sharedStackingChartLegendLastWeek": "Last week",
+  "sharedMilestoneChipAchieved": "{milestone}-day streak achieved. Wonderful. 🪶",
+  "sharedMilestoneChipProgress": "{daysRemaining, plural, =1{1 day to go until {milestone}-day milestone} other{{daysRemaining} days to go until {milestone}-day milestone}}",
+  "sharedMilestoneChipStreakLabel": "Current streak: {streak} days  •  {message}",
+  "sharedGuestPromoteConflictDialogTitle": "An existing account was found. 🪶",
+  "sharedGuestPromoteConflictDialogExistingFallback": "your existing account",
+  "sharedGuestPromoteConflictDialogExistingName": "“{name}”",
+  "@sharedGuestPromoteConflictDialogExistingName": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "sharedGuestPromoteConflictDialogBodyIntro": "This {providerLabel} account is already linked to {existing}.\n\n",
+  "sharedGuestPromoteConflictDialogBodyWarning": "Choosing \"Switch\" will discard your current guest data and log in with the existing account.",
+  "sharedGuestPromoteConflictDialogBodyNote": "Choosing \"Stay as guest\" keeps your progress and lets you link a different account.",
+  "sharedGuestPromoteConflictDialogCancelButton": "Stay as guest",
+  "sharedGuestPromoteConflictDialogConfirmButton": "Switch",
+  "sharedBackupPromptSheetSabiMessage": "Congratulations on levelling up.\nWould you like to back up your progress?\nOnce you do, you'll be able to restore it even if you switch devices.",
+  "sharedBackupPromptSheetBenefit1": "Securely save your data to the cloud",
+  "sharedBackupPromptSheetBenefit2": "Transfer your data even when you change devices",
+  "sharedBackupPromptSheetBenefit3": "Connect with friends",
+  "sharedBackupPromptSheetBackupButton": "Back up (free)",
+  "sharedBackupPromptSheetLaterButton": "Not right now",
+  "sharedCategoryRequestDialogTitle": "Request a new category?",
+  "sharedCategoryRequestDialogMessage": "If you have a category in mind, please send us a request via the contact form. 🪶\nThe Sabiowl team will consider your feedback in a future update.",
+  "sharedCategoryRequestDialogContactButton": "Send a request via contact form",
+  "sharedDrumRollTimePickerTitle": "Select time",
+  "sharedOfflineIndicatorFetching": "Refreshing...",
+  "sharedOfflineIndicatorOffline": "Showing offline data",
+  "sharedSabiComingSoonTitle": "Coming soon...",
+  "sharedSabiComingSoonSubtitle": "We're getting things ready.\nThank you for your patience. 🪶",
+  "sharedGuestLinkPromptCardLinkButton": "Link account",
+  "sharedSabiErrorChipDefaultMessage": "Something went wrong. Please wait a moment and try again",
+  "sharedRewardToastBonusLabel": "(+{bonusExp} bonus)",
+
+  "socialContactPageTitle": "Contact",
+  "socialContactPageFaqHintSabi_message": "Before sending your message, you may find the answer in Help & FAQ.\nIt might already be waiting for you there. 🪶",
+  "socialContactPageFaqOpenErrorSabi_message": "The page could not be opened. Please wait a moment and try again. 🪶",
+  "socialContactPageContentEmptyError": "Please enter your message",
+  "socialContactPageEmailMissingDialogTitle": "Add an email address",
+  "socialContactPageEmailMissingDialogBody": "Adding your email lets us send you a copy of your enquiry and our reply.",
+  "socialContactPageEmailMissingDialogSkipButton": "Send without email",
+  "socialContactPageEmailMissingDialogSetEmailButton": "Set email",
+  "socialContactPageConfirmDialogTitle": "Review before sending",
+  "socialContactPageConfirmDialogCategoryLabel": "Category",
+  "socialContactPageConfirmDialogTitleLabel": "Title",
+  "socialContactPageConfirmDialogContentLabel": "Content",
+  "socialContactPageConfirmDialogEmailLabel": "Reply to",
+  "socialContactPageConfirmDialogAttachmentRowLabel": "Attachments",
+  "socialContactPageConfirmDialogAttachmentCountValue": "{count, plural, =1{1 photo} other{{count} photos}}",
+  "socialContactPageConfirmDialogPolicyWarning": "Content that violates our guidelines (harassment, discrimination, spam, etc.) may not reach the developer. 🪶",
+  "socialContactPageConfirmDialogCancelButton": "Cancel",
+  "socialContactPageSendButton": "Send",
+  "socialContactPageCategorySectionLabel": "Category",
+  "socialContactPageCategoryBugLabel": "Bug report",
+  "socialContactPageCategoryFeatureLabel": "Feature request",
+  "socialContactPageCategoryAccountLabel": "Account",
+  "socialContactPageCategoryOtherLabel": "Other",
+  "socialContactPageTitleSectionLabel": "Title (optional)",
+  "socialContactPageTitleHint": "e.g. Can no longer log in",
+  "socialContactPageContentSectionLabel": "Message",
+  "socialContactPageContentHint": "Please describe your feedback, request, or bug details",
+  "socialContactPageAttachmentSectionLabel": "Attachments ({count}/{maxCount}, optional)",
+  "socialContactPageAttachmentAddButton": "Add photo",
+  "socialContactPageAttachmentLimitButton": "Limit reached",
+  "socialContactPageAttachmentHint": "Up to 2 MB per photo · JPEG/PNG/WebP supported",
+  "socialContactPageEmailSectionLabel": "Reply-to email (optional)",
+  "socialContactPageEmailHint": "Enter your email to receive a copy and our reply",
+  "socialContactPageSendingButton": "Sending…",
+  "socialContactPageSendErrorSabi_message": "Could not send. 🪶 Please try again",
+  "socialContactPageAttachmentPartialErrorSabi_message": "Some photos could not be added: {names}",
+  "socialContactPageAttachmentPickErrorSabi_message": "Could not load photos. 🪶",
+  "socialContactPageSuccessTitle": "Sent",
+  "socialContactPageSuccessBody": "Your enquiry has been received.\nWe'll get back to you within 2–3 business days.",
+
+  "socialFriendListPageTitle": "Friends",
+  "socialFriendListPageBackTooltip": "Back",
+  "socialFriendListPageAddTooltip": "Add friend",
+  "socialFriendListPageIncomingRequestLoadError": "Could not load friend requests. Please try again later",
+  "socialFriendListPageLoadErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "socialFriendListPageFriendsSectionHeader": "Friends ({count})",
+  "socialFriendListPageSentRequestsSectionHeader": "Pending requests",
+  "socialFriendListPageEmptyTitle": "No friends yet",
+  "socialFriendListPageEmptySubtitle": "Search by Friend ID to add friends.",
+  "socialFriendListPageEmptyAddButton": "Add friend",
+  "socialFriendListPageRemoveDialogTitle": "Remove friend",
+  "socialFriendListPageRemoveDialogBody": "Remove {name} from your friends?",
+  "socialFriendListPageRemoveButton": "Remove",
+  "socialFriendListPageIncomingRequestsHeader": "Friend requests ({count})",
+  "socialFriendListPageDeclineButton": "Decline",
+  "socialFriendListPageAcceptButton": "Accept",
+  "socialFriendListPageRemoveFriendMenu": "Remove friend",
+  "socialFriendListPagePendingChip": "Pending",
+
+  "socialNotificationsPageTitle": "Announcements",
+  "socialNotificationsPageBackTooltip": "Back",
+  "socialNotificationsPageNotificationsTab": "Notifications",
+  "socialNotificationsPageAnnouncementsTab": "Announcements",
+  "socialNotificationsPageMarkAllRead": "Mark all as read",
+  "socialNotificationsPageEmptyNotifications": "No notifications",
+  "socialNotificationsPageLoadingSabi_message": "Gathering your notifications. 🪶",
+  "socialNotificationsPageNotifLoadErrorSabi_message": "I couldn't retrieve your notifications. 🪶",
+  "socialNotificationsPageRetryHintSabi_message": "Let me check once more. 🪶",
+  "socialNotificationsPageRetryButton": "Reload",
+  "socialNotificationsPageAnnouncementsEmptySabi_message": "No announcements yet. 🪶",
+  "socialNotificationsPageAnnouncementDateFull": "{year}/{month}/{day}",
+  "socialNotificationsPageAnnouncementDateShort": "{year}/{month}/{day}",
+
+  "socialFriendAddPageTitle": "Add Friend",
+  "socialFriendAddPageMyIdSectionLabel": "My Friend ID",
+  "socialFriendAddPageMyIdHint": "Share this ID to receive friend requests.",
+  "socialFriendAddPageSearchSectionLabel": "Search by Friend ID",
+  "socialFriendAddPageSearchHint1": "Enter a friend ID (12-digit number) to search",
+  "socialFriendAddPageSearchHint2": "Hyphens are not required.",
+  "socialFriendAddPageSearchFieldHint": "Friend ID (12-digit number)",
+  "socialFriendAddPageSearchButton": "Search",
+  "socialFriendAddPageNotFoundError": "Not found",
+  "socialFriendAddPageSendErrorSabi_message": "Could not send. 🪶 Please try again",
+  "socialFriendAddPageCopySuccessSabi_message": "Friend ID copied. 🪶",
+  "socialFriendAddPageRelationSelf": "This is your account",
+  "socialFriendAddPageRelationFriend": "Already friends",
+  "socialFriendAddPageRelationSent": "Request already sent",
+  "socialFriendAddPageRelationReceived": "Request received",
+  "socialFriendAddPageRelationRequestSent": "Request sent ✓",
+  "socialFriendAddPageSendRequestButton": "Send friend request",
+
+  "socialFriendProfilePageTitle": "Friend Profile",
+  "socialFriendProfilePageLoadingSabi_message": "Checking their profile. 🪶",
+  "socialFriendProfilePageErrorTitle": "Could not display this profile",
+  "socialFriendProfilePageGiftDialogTitle": "Gift an XP Boost 🚀",
+  "socialFriendProfilePageGiftDialogBody": "Send 1 XP Boost (×1.5 for 15 min) to this friend?",
+  "socialFriendProfilePageGiftDialogNoteSabi_message": "You can send one gift to each friend per day. 🪶",
+  "socialFriendProfilePageGiftDialogCancelButton": "Cancel",
+  "socialFriendProfilePageGiftDialogConfirmButton": "Gift",
+  "socialFriendProfilePageStreakLabel": "Streak",
+  "socialFriendProfilePageStreakValue": "{streak} days",
+  "socialFriendProfilePageGiftSendingButton": "Sending...",
+  "socialFriendProfilePageGiftDoneSabi_message": "Already gifted today. 🪶",
+  "socialFriendProfilePageGiftButton": "Gift XP Boost",
+  "socialFriendProfilePageGiftSuccessSabi_message": "You sent {joined}. I hope it brings them a smile. 🪶",
+
+  "socialFriendGiftPopupTitle": "Today's gift 🎁",
+  "socialFriendGiftPopupBodySabi_message": "You've completed 3 tasks today. 🪶\nWould you like to send an XP Boost as a small thank-you?",
+  "socialFriendGiftPopupNote": "You can send one free gift per day.",
+  "socialFriendGiftPopupCancelButton": "Cancel",
+  "socialFriendGiftPopupConfirmButton": "Gift",
+  "socialFriendGiftPopupSuccessSabi_message": "You sent {joined} to {name}. I hope it brings them a smile. 🪶",
+  "socialFriendGiftPopupGenericErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+
+  "socialNotificationsPageTimeJustNow": "Just now",
+  "socialNotificationsPageTimeMinutesAgo": "{minutes}m ago",
+  "socialNotificationsPageTimeHoursAgo": "{hours}h ago",
+  "socialNotificationsPageTimeDaysAgo": "{days}d ago",
+
+  "socialGiftRewardXpBoost": "🚀 XP Boost",
+  "socialGiftRewardCoins": "{count, plural, =1{🪙 1 coin} other{🪙 {count} coins}}",
+  "socialGiftRewardBattleCharges": "⚔️ Battle Charge +{count}",
+
+  "sharedSabiWaitingPanelDefaultSabi_message": "Please wait a moment. 🪶",
+
+  "coreNotificationDefaultChannelName": "Sabiowl notifications",
+  "coreNotificationDefaultChannelDescription": "Habit reminders, level-ups, and friend notifications",
+  "coreNotificationTimelineChannelName": "Timeline notifications",
+  "coreNotificationTimelineChannelDescription": "Start-time reminders for your scheduled events",
+  "coreNotificationChallengeChannelName": "Challenge result notifications",
+  "coreNotificationChallengeChannelDescription": "Notifications for last month's challenge results.",
+
+  "coreNotificationTimelineEventTitle": "📅 Time for {title}",
+  "coreNotificationTimelineEventBody": "It's time for one of your scheduled events. Check your timeline.",
+  "coreNotificationTimelineUncompletedTitle": "⏰ {title} hasn't been completed yet",
+  "coreNotificationTimelineUncompletedBody": "If you have a moment, you might check in on it.",
+  "coreNotificationTaskDueTitle": "📋 {title}",
+  "coreNotificationTaskDueBody": "This task is due. Take a look when you can.",
+
+  "coreMaintenancePlaceholderTitle": "We're currently performing system maintenance.",
+  "coreMaintenancePlaceholderBodySabi_message": "Please wait a moment and try again. 🪶",
+
+  "coreApiDefaultErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+
+  "coreIapUnavailableSabi_message": "This is available on iOS for now. An Android version is planned for a future update. 🪶",
+  "coreIapNotConfiguredSabi_message": "In-app purchases are not ready yet. Please wait a moment and try again. 🪶",
+
+  "coreMaintenanceContactMailSubject": "[Maintenance inquiry] Sabiowl",
+  "coreMaintenanceContactMailBody": "Dear Sabiowl Support,\n\nThank you for using Sabiowl 🪶\nI am writing from the maintenance screen. Details below.\n\n─────────────────────────────\n● Date and time it happened:\n● Device model: (e.g. iPhone 15 / Pixel 8)\n● OS version:\n● Sabiowl app version:\n● What is happening:\n\n─────────────────────────────\n\nThank you for your help.\n",
+
+  "challengeNotificationResultTitle": "Last month's challenge results",
+  "challengeNotificationResultBodySabi_message": "Your results from last month are ready. 🪶",
+
+  "shopDiamondPackPageTitle": "Buy diamonds",
+  "shopDiamondPackAndroidComingSoonTitle": "Diamond purchases on Android\nwill be available in a future update",
+  "shopDiamondPackAndroidComingSoonBodySabi_message": "This is available on iOS for now.\nIt will take a little more time. 🪶",
+  "shopDiamondPackStoreErrorSabi_message": "Could not reach the store. Please wait a moment and try again. 🪶",
+  "shopDiamondPackEmptySabi_message": "The items are not ready yet. Please wait a moment and try again. 🪶",
+  "shopDiamondPackIntroSabi_message": "Choose the pack that suits you.\nYour Diamonds will be ready to use right away. 🪶",
+  "shopDiamondPackNotes": "• Diamond purchases are non-refundable.\n• Depending on your connection, diamonds may take a few seconds to arrive.\n• To help prevent accidental purchases on a family member's account, we recommend enabling Apple's\n  Purchase Restrictions. 🪶",
+  "shopDiamondPackConfirmDialogTitle": "Confirm purchase",
+  "shopDiamondPackConfirmDialogBodySabi_message": "You are about to buy {product} for {price}.\n\nShall we continue? 🪶",
+  "shopDiamondPackConfirmCancelButton": "Cancel",
+  "shopDiamondPackConfirmPurchaseButton": "Buy",
+  "shopDiamondPackLabel": "{count, plural, =1{1 diamond} other{{count} diamonds}}",
+  "shopDiamondPackBonusBadge": "+{amount} diamonds",
+  "shopDiamondPackPurchaseAcceptedSabi_message": "Your purchase has been received. Your Diamonds will appear shortly. 🪶",
+  "shopDiamondPackPurchaseFailedSabi_message": "The purchase could not be completed. Please wait a moment and try again. 🪶",
+  "shopDiamondPackRetryButton": "Try again",
+
+  "puzzleWorldSceneSelectionPageTitle": "The Sleeping World",
+  "puzzleWorldSceneSelectionLoadingSabi_message": "Laying out the scenery. 🪶",
+  "puzzleWorldGenericErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
+  "puzzleWorldFeatureDescriptionSabi_message": "Complete tasks and quests to gather the pieces. When every piece has found its color, the sleeping world will quietly begin to awaken. 🪶",
+  "puzzleWorldHeroCopyOnboardingSabi_message": "There are three landscapes before you. Choose the one you'd like to begin with. 🪶",
+  "puzzleWorldHeroCopyReturningSabi_message": "Shall we choose once more which landscape you'll tend? 🪶",
+  "puzzleWorldProgressBreakdown": "Outline {outline} / Colored {colored} / Unstarted {unstarted}",
+  "puzzleWorldStateActive": "Reviving",
+  "puzzleWorldStateCompleted": "Brought to Life",
+  "puzzleWorldStateInProgress": "In progress",
+  "puzzleWorldStateUnstarted": "Asleep",
+  "puzzleWorldActionMakeActiveOnboarding": "Bring this one to life",
+  "puzzleWorldActionMakeActive": "Bring to life",
+  "puzzleWorldActionDisabledCompletedSabi_message": "This landscape is already alive. 🪶",
+  "puzzleWorldActionDisplayed": "Shown on home",
+  "puzzleWorldActionDisplay": "Show on home",
+  "puzzleWorldActionDisabledUnstartedSabi_message": "You haven't gathered any pieces for this landscape yet. Choose it first as the one you'll tend. 🪶",
+  "puzzleWorldSelectActiveSuccessSabi_message": "I've switched you to the landscape you'll tend. 🪶",
+  "puzzleWorldSelectDisplayedSuccessSabi_message": "The framed landscape has been changed. 🪶",
+  "puzzleWorldCommandErrorSabi_message": "That did not go through this time. Please wait a moment and try again. 🪶",
+  "puzzleWorldThumbnailCompletedSabi_message": "This is the landscape you brought to life. 🪶",
+  "puzzleWorldThumbnailIncompleteSabi_message": "Once every piece takes on color, this landscape will begin to move. 🪶",
+  "puzzleWorldSceneDetailPageTitle": "Scene details",
+  "puzzleWorldSceneDetailLoadingSabi_message": "Laying out the pieces. 🪶",
+  "puzzleWorldSceneDetailNotFoundSabi_message": "That scene could not be found. 🪶",
+  "puzzleWorldStatPillOutline": "Outline",
+  "puzzleWorldStatPillColored": "Color",
+  "puzzleWorldStatPillUnstarted": "Not yet",
+  "puzzleWorldCompletionRecordTitle": "Completion Record 🪶",
+  "puzzleWorldCompletedDate": "{year}/{month}/{day}",
+  "puzzleWorldSceneDetailHeroCopySabi_message": "The days you've built, little by little, are gently awakening this world. 🪶",
+  "puzzleWorldCompletionTitleSabi_message": "Color has returned to the world. 🪶",
+  "puzzleWorldCompletionBodyHasNextSabi_message": "Step by step, you've brought this landscape to life. Take a quiet moment to look upon it.",
+  "puzzleWorldCompletionBodyAllDoneSabi_message": "You've brought every landscape back to life. You'll always be welcome here.",
+  "puzzleWorldCompletionRewardSuffixSabi_message": "I'd like you to have this. 🪶",
+  "puzzleWorldCompletionNextSceneHintSabi_message": "Choose the next landscape you'd like to tend. 🪶",
+  "puzzleWorldCompletionCloseButton": "Continue watching",
+  "puzzleWorldHomePromptSabi_message": "Shall we quietly choose a landscape together? 🪶",
+  "puzzleWorldPieceOverlayCloseTooltip": "Close",
+  "puzzleWorldPieceAwardedSabi_message": "A small piece has found its way into your world. 🪶",
+  "puzzleWorldPieceColoredSabi_message": "A touch of color has found its way into the piece. 🪶",
+
+  "taskSuggestionSearchSheetTitle": "Search or enter a title",
+  "taskSuggestionSearchSheetCloseLabel": "Close",
+  "taskSuggestionSearchSheetHint": "Filter by keyword…",
+  "taskSuggestionSearchSheetAddCustomButton": "Add \"{query}\"",
+  "taskSuggestionSearchSheetEmptyNetworkError": "Could not load suggestions.\nPlease type one in yourself.",
+  "taskSuggestionSearchSheetEmptyNoMatch": "No suggestions found.",
+  "taskSuggestionTemplateHint": "{start} - {end} · Template",
+
+  "announcementPopupMarkReadErrorSabi_message": "Could not mark it as read. Please wait a moment and try again. 🪶",
+  "announcementPopupPublishedDate": "{year}/{month}/{day}",
+  "announcementPopupConfirmCheckbox": "I have read this",
+  "announcementPopupCloseButton": "Close",
+  "announcementPopupViewDetailButton": "View details",
+
+  "battleAbilityNormalLabel": "Attack",
+  "battleAbilityStrongLabel": "Power Attack",
+  "battleAbilityHealLabel": "Heal",
+  "battleAbilityUltimateLabel": "Ultimate",
+
+  "battlePotionRecoveryName": "Healing Potion",
+  "battlePotionRecoveryPlusName": "Greater Healing Potion",
+  "battlePotionAttackName": "Attack Potion",
+  "battlePotionDefenseName": "Defense Potion",
+
+  "battleLogPotionPlusUsedSabi_message": "{emoji} Used {name}. (+{heal} HP, fully restored, {remaining} remaining)",
+  "battleLogPotionRecoveryUsedSabi_message": "{emoji} Used {name}. (+{heal} HP, {remaining} remaining)",
+  "battleLogPotionAttackUsedSabi_message": "{emoji} Used {name}. (Attack +50%, {remaining} remaining)",
+  "battleLogPotionDefenseUsedSabi_message": "{emoji} Used {name}. (Damage taken ×0.67, {remaining} remaining)",
+  "battleLogAttackLine": "{attacker} {ability} → {target} -{damage} HP",
+
+  "battleAvailabilityLabelEmpty": "Complete 3 more habits to deploy.",
+
+  "battleAvailabilityDescriptionNeedMoreSabi_message": "As you continue building your habits, you'll be ready to set out. 🪶",
+
+  "battleAvailabilityLabelDailyLimit": "Daily deployment limit reached ({count}/{limit})",
+
+  "battleAvailabilityDescriptionDailyLimitSabi_message": "Resting your wings is part of flying far. 🪶",
+
+  "battleAvailabilityLabelReadyWithStock": "Ready to deploy — {stock} deployments available",
+
+  "battleAvailabilityLabelReadySabi_message": "You are ready to set out. 🪶",
+
+  "battleAvailabilityDescriptionReadySabi_message": "Will you take up your sword and face the goblins? 🪶",
+
+  "battleAvailabilityLabelNeedMore": "Complete {remaining} more habits to deploy.",
+
+  "battleErrorDailyQuestQuota": "Today's quest quota: {count}/{limit}",
+
+  "battleStartFailedSabi_message": "The battle could not start. Please wait a moment and try again. 🪶",
+
+  "battleFinishRewardFailedSabi_message": "The rewards could not be collected. Please wait a moment and try again. 🪶",
+
+  "battleDailyLimitReachedFallbackSabi_message": "You've done enough for today. Rest your wings, and tomorrow we'll begin a new adventure. 🪶",
+
+  "battleSabiCombatantName": "Sabi",
+
+  "battleLogHeal": "{name} recovered +{heal} HP",
+
+  "battleLogBurn": "🔥 Flames catch {name} for -{damage} HP",
+
+  "battleLogDrain": "💚 {name} drained +{heal} HP",
+
+  "battleLogRegen": "🌿 {name} regenerated +{heal} HP",
+
+  "battleLogWeaknessCritical": "⚡ Hit {name}'s weak point (Critical)",
+
+  "battleLogCritical": "✨ {name} landed a critical hit",
+
+  "authErrorServerWaking": "The server is waking up. Please wait a moment and try again (the first request can take about a minute).",
+
+  "authErrorNoConnectionSabi_message": "The server cannot be reached. 🪶 Please check your connection.",
+
+  "authErrorGenericSabi_message": "Something went wrong. 🪶 Please wait a moment and try again.",
+
+  "settingsErrorAlreadyLinkedOtherProvider": "This is already linked to another account.",
+
+  "gamifShopPurchaseFailedFallbackSabi_message": "The purchase did not go through. Please try again. 🪶",
+
+  "timelineGooglePushFailedSabi_message": "I couldn't update Google. You can restore it later from the Sync menu. 🪶",
+
+  "calendarImportUntitledEvent": "(untitled)",
+
+  "timelineTimeSlotMorning": "Morning",
+
+  "timelineTimeSlotNoon": "Noon",
+
+  "timelineTimeSlotAfternoon": "Afternoon",
+
+  "timelineTimeSlotEvening": "Evening",
+
+  "timelineTimeSlotCustom": "Custom",
+
+  "timelineEventNoTimeLabel": "No time set",
+
+  "timelineTemplateWakeTitle": "Wake up",
+
+  "timelineTemplateWakeMemoSabi_message": "Good morning. Your time begins anew today. 🪶",
+
+  "timelineTemplateMorningTitle": "Morning Routine",
+
+  "timelineTemplateMorningMemoSabi_message": "Take your time with the first meal. A settled morning makes a settled day. 🪶",
+
+  "timelineTemplateLunchTitle": "Lunch",
+
+  "timelineTemplateLunchMemoSabi_message": "It's time for lunch. Take a little rest, then we'll continue. 🪶",
+
+  "timelineTemplateNapTitle": "Nap",
+
+  "timelineTemplateNapMemoSabi_message": "A short rest is a strategy in its own right. 🪶",
+
+  "timelineTemplateSnackTitle": "Snack",
+
+  "timelineTemplateSnackMemoSabi_message": "Something sweet is a small gift to the heart. 🪶",
+
+  "timelineTemplateDinnerTitle": "Dinner",
+
+  "timelineTemplateDinnerMemoSabi_message": "As you reflect on the day, enjoy your meal at an unhurried pace. 🪶",
+
+  "timelineTemplateSleepTitle": "Bedtime",
+
+  "timelineTemplateSleepMemoSabi_message": "You did well today. May your night be a calm one. 🪶",
+
+  "coreMaintenanceExpiresAtDateTime": "{year}/{month}/{day} {time}",
+
+  "timelineDateStripMonthYear": "{month}/{year}",
+
+  "socialContactPageAttachmentRejectedSlotLimit": "{name} (attachment limit reached)",
+
+  "socialContactPageAttachmentRejectedTooLarge": "{name} (over 2MB)",
+
+  "challengeDetailTierRow": "{label}  {target} times  {exp} XP",
+
+  "settingsPageSectionLanguage": "Language",
+
+  "settingsPageTileLanguage": "Display language",
+
+  "settingsLanguageDialogTitle": "Choose display language",
+
+  "settingsLanguageOptionJa": "日本語",
+
+  "settingsLanguageOptionEn": "English",
+
+  "settingsLanguageDialogCancelButton": "Cancel",
+
+  "settingsLanguageChangedSabi_message": "The display language has been changed. 🪶",
+
+  "apiErrorShopPurchaseInsufficientCoinsSabi_message": "You're a little short on coins. 🪶",
+  "apiErrorShopInsufficientCoinsSabi_message": "You don't have enough coins. 🪶",
+  "apiErrorShopAlreadyOwnedSabi_message": "You already own this. 🪶",
+  "apiErrorShopWeaponAlreadyOwnedSabi_message": "You already have this weapon. 🪶",
+
+  "apiErrorGachaNotEnoughTicketsSabi_message": "{ticketType, select, daily{You're a little short on daily tickets. 🪶} weekly{You're a little short on weekly tickets. 🪶} monthly{You're a little short on monthly tickets. 🪶} other{You're a little short on tickets. 🪶}}",
+  "apiErrorGachaRedoInsufficientDiamondsSabi_message": "You're a little short on diamonds — {needed} needed, {owned} on hand. 🪶",
+
+  "apiErrorBattleDailyLimitReachedSabi_message": "You have challenged enough for today. Resting your wings is part of flying far. Let's set out again tomorrow. 🪶",
+  "apiErrorBattleNotEnoughChargesSabi_message": "You're a little short on tickets. 🪶",
+  "apiErrorBattleNotEnoughPotionsSabi_message": "You can't carry any more recovery potions. 🪶",
+
+  "apiErrorHabitDuplicateNameSabi_message": "A habit with this name is already registered. 🪶",
+
+  "apiErrorFreeMemoTextRequiredSabi_message": "Please enter the text of your memo. 🪶",
+  "apiErrorFreeMemoTextTooLongSabi_message": "Memos can be up to 500 characters. 🪶",
+  "apiErrorFreeMemoNotArchivedSabi_message": "Please move it to the trash first, before deleting it for good. 🪶",
+
+  "apiErrorSocialGiftAlreadySentTodaySabi_message": "You have already sent a gift to this friend today. Please try again tomorrow. 🪶",
+  "apiErrorSocialGiftNotFriendSabi_message": "Gifts can only be sent to friends. 🪶",
+
+  "apiErrorAchievementAlreadyClaimedSabi_message": "You've already claimed this. 🪶",
+  "apiErrorAchievementNotUnlockedSabi_message": "This has not been unlocked yet. 🪶",
+
+  "apiErrorPuzzleSceneAlreadyCompletedSabi_message": "This landscape has already come to life. Perhaps it's time to tend another. 🪶",
+  "apiErrorPuzzleSceneNotAvailableSabi_message": "You haven't gathered any pieces for this landscape yet. Try choosing it as the one you'll tend first. 🪶",
+
+  "gachaOddsTitle": "Drop Rates",
+  "gachaOddsIntro": "Shows what you can get from each ticket and the chance of receiving it.",
+  "gachaOddsRaritySectionTitle": "By rarity",
+  "gachaOddsRewardSectionTitle": "By reward",
+  "gachaOddsNotesTitle": "Notes",
+  "gachaOddsLoadFailedSabi_message": "Couldn't load the drop rates. Please wait a little while and try again. 🪶",
+  "gachaOddsRetry": "Try again"
+}

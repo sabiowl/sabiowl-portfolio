@@ -1,0 +1,138 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block title %}認証コード入力 | Sabiowl 管理画面{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">Sabiowl 管理画面 認証</h1>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+<style>
+  .mfa-container {
+    max-width: 480px;
+    margin: 40px auto;
+    padding: 32px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .mfa-container h2 {
+    margin-top: 0;
+    color: #417690;
+  }
+  .mfa-error {
+    background: #fce4e4;
+    color: #c00;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    border-left: 4px solid #c00;
+  }
+  .mfa-code-input {
+    width: 100%;
+    padding: 16px;
+    font-size: 28px;
+    text-align: center;
+    letter-spacing: 8px;
+    border: 2px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-family: monospace;
+  }
+  .mfa-code-input:focus {
+    border-color: #417690;
+    outline: none;
+  }
+  .mfa-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .mfa-button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .mfa-button-primary {
+    background: #417690;
+    color: white;
+  }
+  .mfa-button-primary:hover {
+    background: #205067;
+  }
+  .mfa-button-secondary {
+    background: #f5f5f5;
+    color: #555;
+    border: 1px solid #ccc;
+  }
+  .mfa-button-secondary:hover {
+    background: #ebebeb;
+  }
+  .mfa-note {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #888;
+    line-height: 1.6;
+  }
+</style>
+
+<div class="mfa-container">
+  <h2>認証コード入力 🪶</h2>
+
+  {% if user_email %}
+    <p>
+      <strong>{{ user_email }}</strong> 宛に 6 桁の認証コードを送信しました。
+      10 分以内にご入力ください。
+    </p>
+  {% else %}
+    <p>登録メールアドレス宛に 6 桁の認証コードを送信しました。10 分以内にご入力ください。</p>
+  {% endif %}
+
+  {% if error %}
+    <div class="mfa-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="{{ verify_path }}">
+    {% csrf_token %}
+    <input
+      type="text"
+      name="code"
+      inputmode="numeric"
+      pattern="[0-9]{6}"
+      maxlength="6"
+      autocomplete="one-time-code"
+      autofocus
+      required
+      placeholder="000000"
+      class="mfa-code-input"
+    >
+    <div class="mfa-actions">
+      <button type="submit" class="mfa-button mfa-button-primary">
+        確認
+      </button>
+    </div>
+  </form>
+
+  <form method="post" action="{{ resend_path }}" style="margin-top: 12px;">
+    {% csrf_token %}
+    <button type="submit" class="mfa-button mfa-button-secondary" style="width: 100%;">
+      コードを再送信 (60 秒に 1 回)
+    </button>
+  </form>
+
+  <p class="mfa-note">
+    - メールが届かない場合は迷惑メールフォルダもご確認ください。<br>
+    - 試行回数 5 回を超えるとコードが無効化されます (再送信が必要)。<br>
+    - 心当たりがない場合は本ページを閉じてください。
+  </p>
+</div>
+{% endblock %}
