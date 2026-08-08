@@ -19,9 +19,26 @@
 
 ## テストの作り方
 
-`override_settings` で `DEBUG` / `DATABASES` を差し替え、
-ガードが弾く側に倒れることを確認する。実際に PostgreSQL へ繋ぐ必要はない
+`override_settings` で `DEBUG` / `DATABASES` を差し替え、ガードが弾く側 / 通す側の
+両方に倒れることを確認する。実際に PostgreSQL へ繋ぐ必要はない
 ——— コマンドが見ているのは `DATABASES['default']['ENGINE']` の文字列だけ。
+
+## 🔴 ENGINE は「通す側」でも必ず明示する (2026-08-08 修正)
+
+初版は「ガードを通す側」のテストで `DEBUG=True` だけを override し、ENGINE は
+実行環境まかせにしていた。ローカルのテスト DB は SQLite なのでガード 2 を素通りし、
+6 件すべて pass していた。
+
+**CI のテスト DB は PostgreSQL なので、同じ 6 件が全滅した。**
+コマンドが「SQLite 以外は拒否」する以上、ENGINE を書かないテストは
+「どの DB で走ったか」に結果が左右される。
+
+さらに悪いことに、`test_no_argument_deletes_nothing` のような
+「削除されないこと」を確かめるテストは、ガードに弾かれても assert が通る。
+**理由が違うのに緑になる**ので、壊れていることに気付けない。
+
+対策として `_with_engine()` を用意し、全テストが ENGINE を明示する形に統一した。
+ガードが見る値をテスト側で固定すれば、実行環境の DB に依存しなくなる。
 """
 from io import StringIO
 
@@ -29,12 +46,34 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 
-_POSTGRES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'dummy',
-    }
-}
+_SQLITE_ENGINE   = 'django.db.backends.sqlite3'
+_POSTGRES_ENGINE = 'django.db.backends.postgresql'
+
+
+def _with_engine(engine: str):
+    """ガードが見る `DATABASES['default']['ENGINE']` を固定する `override_settings`。
+
+    実接続はテスト開始時に確立済みのものが使われ続けるため、ここで ENGINE を
+    偽ってもクエリの発行先は変わらない (コマンドが読むのは設定値の文字列だけ)。
+
+    ## NAME をあえて実値にしない理由
+
+    実 `DATABASES` を deepcopy すると、**テスト DB 名 (`test_*`) ではなく
+    settings 読み込み時の DB 名**が入る。デコレータの引数は import 時に
+    評価されるため、`setup_databases()` が NAME を書き換える前の値を掴むからだ。
+
+    現状の Django は `DATABASES` の override で接続を張り直さないので実害は
+    出ないが、「テスト中の settings に開発 DB 名が載っている」状態は残したくない。
+    そこで **存在しない DB 名** を置く。万一この前提が崩れて新規接続が試みられた
+    場合、静かに開発 DB を触るのではなく接続エラーで落ちる。
+    """
+    return override_settings(DATABASES={
+        'default': {
+            'ENGINE': engine,
+            # 実在しない名前。接続が張られたら落ちて気付けるようにするための番人。
+            'NAME': 'nonexistent-db-for-engine-guard-test',
+        }
+    })
 
 
 def _run(*args, **kwargs):
@@ -52,6 +91,9 @@ class DeleteUserGuardTest(TestCase):
         User.objects.create_user(username='bob', email='bob@example.com')
 
     # ── ガード 1: DEBUG ──────────────────────────────────────────
+    # ENGINE は SQLite に固定する。そうしないと CI (PostgreSQL) では
+    # 「ガード 2 でも弾かれていた」状態になり、DEBUG 単独の検証にならない。
+    @_with_engine(_SQLITE_ENGINE)
     @override_settings(DEBUG=False)
     def test_refuses_when_debug_is_false(self):
         """DEBUG=False では何もしない。
@@ -64,7 +106,8 @@ class DeleteUserGuardTest(TestCase):
         self.assertIn('DEBUG=True', err)
 
     # ── ガード 2: SQLite ─────────────────────────────────────────
-    @override_settings(DEBUG=True, DATABASES=_POSTGRES)
+    @_with_engine(_POSTGRES_ENGINE)
+    @override_settings(DEBUG=True)
     def test_refuses_on_postgresql_even_with_debug_true(self):
         """DEBUG=True でも PostgreSQL なら拒否する。
 
@@ -78,6 +121,7 @@ class DeleteUserGuardTest(TestCase):
         self.assertIn('SQLite', err)
 
     # ── ガード 3: --confirm ──────────────────────────────────────
+    @_with_engine(_SQLITE_ENGINE)
     @override_settings(DEBUG=True)
     def test_all_without_confirm_is_refused(self):
         """`--all` 単独では実行しない (タイポ事故防止)。"""
@@ -86,6 +130,7 @@ class DeleteUserGuardTest(TestCase):
         self.assertEqual(User.objects.count(), 2, '--confirm 無しで全削除された')
         self.assertIn('--confirm', err)
 
+    @_with_engine(_SQLITE_ENGINE)
     @override_settings(DEBUG=True)
     def test_all_with_confirm_deletes_everything(self):
         """3 条件が揃ったときだけ全削除が走る。
@@ -99,6 +144,7 @@ class DeleteUserGuardTest(TestCase):
         self.assertIn('削除しました', out)
 
 
+@_with_engine(_SQLITE_ENGINE)
 @override_settings(DEBUG=True)
 class DeleteUserLookupTest(TestCase):
     """単一削除の照合範囲。"""

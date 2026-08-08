@@ -1,6 +1,6 @@
 # 【FEAT-469 (2026-07-03)】CI 自動テスト pipeline (GitHub Actions)
 #
-# PR + push (develop) 時に Backend / Flutter テストを自動実行。
+# main への push 時に Backend / Flutter テストを自動実行 (手動実行も可)。
 # Phase 1 (deprecated): flutter analyze は continue-on-error: true (baseline 13-15 issues)
 # Phase 2 (現行、2026-07-25 昇格): 全 job strict、fatal 化。
 #   - backend: python manage.py test api (全 pass 前提、@expectedFailure/@skip で暫定管理)
@@ -11,10 +11,9 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [develop, main]
   push:
-    branches: [develop]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   # ── Backend Django テスト ─────────────────────────────────────
