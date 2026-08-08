@@ -26,6 +26,7 @@
 「不変条件はテストで縛る」(FEAT-515 の教訓) の適用。
 """
 import re
+import unittest
 from pathlib import Path
 
 from django.test import TestCase
@@ -34,6 +35,18 @@ _BACKEND = Path(__file__).resolve().parents[2]
 _REPO_ROOT = _BACKEND.parent
 _ENV_EXAMPLE = _BACKEND / '.env.example'
 _RENDER_YAML = _REPO_ROOT / 'render.yaml'
+
+# 【2026-08-08】公開スナップショット (sabiowl-portfolio) では render.yaml を
+# 除外している。本番の Render service 名や Neon 接続の記述を出さないため。
+#
+# 単に「ファイルが無ければ skip」にすると、**開発リポジトリ側で render.yaml を
+# 誤って消したときも黙って skip** してしまい、このテストが守るはずの不変条件
+# (dead な環境変数を本番に注入し続けない) が抜け落ちる。
+#
+# そこで同期スクリプトが置くマーカーの有無で分岐する。
+#   マーカーあり = 意図的な除外  → skip
+#   マーカーなし = 消えているのは異常 → FileNotFoundError で落とす
+_IS_PORTFOLIO_SNAPSHOT = (_REPO_ROOT / '.portfolio-snapshot').exists()
 
 # 環境変数を読む全パターン。`\s*` を挟んで改行を許容する
 # (1 行 grep が書き方の揺れで 0 件に見えた FEAT-515 の事故の再発防止)。
@@ -133,6 +146,11 @@ class EnvExampleCompletenessTests(TestCase):
         )
 
 
+@unittest.skipIf(
+    _IS_PORTFOLIO_SNAPSHOT,
+    'render.yaml は公開スナップショットから意図的に除外している '
+    '(.portfolio-snapshot マーカーあり)。検証は開発リポジトリ側の CI で行う。',
+)
 class RenderBlueprintTests(TestCase):
     """render.yaml が dead な環境変数を本番に注入し続けていないこと。"""
 
