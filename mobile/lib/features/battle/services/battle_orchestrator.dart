@@ -536,10 +536,20 @@ class BattleOrchestrator {
     // 勝敗判定
     BattleStatus newStatus = s.status;
     DateTime? newEndedAt;
+    // 【FEAT-526】とどめの一撃イベント (KO 演出の発火キー)。
+    KoEvent? koEvent;
     if (!s.enemy.isAlive) {
       newStatus  = BattleStatus.won;
       newEndedAt = DateTime.now();
       _atb.pause();
+      // 【FEAT-526 (2026-08-21)】この分岐は **「今回のダメージで敵の HP が 0 以下に
+      // なった」瞬間にしか通らない** (status が一度 won になると running ガードで
+      // 以降の tick が入らない)。したがって KoEvent は 1 バトルにつき 1 回しか
+      // 立たず、重複ガードを別に足す必要がない。
+      //
+      // 🔴 `lost` 側では設定しない。「決めた」と「やられた」は演出の意味が逆で、
+      // 敗北演出は別設計が要る (指示書 決定事項 3)。
+      koEvent = KoEvent(damage: dealtDamage, isCritical: isCriticalAttack);
     } else if (!s.player.isAlive) {
       newStatus  = BattleStatus.lost;
       newEndedAt = DateTime.now();
@@ -581,6 +591,10 @@ class BattleOrchestrator {
       totalDamageDealt:    newDealt,
       totalDamageTaken:    newTaken,
       rounds:              s.rounds + 1,
+      // 【FEAT-526】status = won と **同じ copyWith** で設定する。
+      // 非 KO 時は null を渡すが、copyWith 側が `?? this.koEvent` なので
+      // 既存値を消す事故が起きない (センチネル不使用の理由)。
+      koEvent:             koEvent,
     );
 
     // 【FEAT-385 (2026-05-29)】攻撃エフェクト発火 (ability != heal && damage 発生時のみ)。
@@ -652,6 +666,24 @@ class BattleOrchestrator {
   }) {
     if (_disposed) return;
 
+    // 【FEAT-526 §4.5 (2026-08-21)】🔴 KO のときは **前の攻撃が残した復帰 Timer**
+    // をここで畳む。
+    //
+    // 自分の分を張らないだけでは足りない。ATB は 300ms 前後で 1 手進むのに対し
+    // 復帰 Timer の遅延は 500ms なので、**とどめが入った時点で 1 つ前の攻撃の
+    // 復帰 Timer がまだ飛んでいる**。放置すると KO 演出の途中でそれが発火し、
+    // 両者が idle に戻って待機ユラユラが再開してしまう。
+    //
+    // ここで畳んでよいのは、`_effectTimers` に入っているのが「攻撃演出を元に
+    // 戻す」用途の Timer だけだからである (`_scheduleEffectReset` の呼び出し元は
+    // 本メソッドと `_triggerUltimateHitEvent` の event クリアのみ)。
+    if (_state.value.status == BattleStatus.won) {
+      for (final t in _effectTimers) {
+        t.cancel();
+      }
+      _effectTimers.clear();
+    }
+
     final damageEvent = DamageEvent(
       amount:     dealtDamage,
       isCritical: isCritical,
@@ -675,6 +707,27 @@ class BattleOrchestrator {
     });
 
     // フェーズ 3 (500ms 後): 両者 idle 復帰 + DamageEvent クリア
+    //
+    // 【FEAT-526 §4.5 A 案 (2026-08-21)】🔴 **KO のときはこの復帰 Timer を張らない。**
+    //
+    // ここは素の `Timer` なので `_atb.pause()` では止まらない。KO 演出 (650ms) の
+    // 途中で発火すると **両者が idle に戻り、待機ユラユラが再開する** ——
+    // 出典が求める「最後の攻撃が命中した姿勢を維持」が崩れ、間の抜けた絵になる。
+    //
+    // B 案 (復帰 Timer の遅延を演出時間だけ伸ばす) ではなく A 案を採ったのは、
+    // **演出後は結局 fadeOut に入るので idle へ戻す意味が無い**から。
+    // 遅延を伸ばす実装は「演出時間」を orchestrator にも知らせる必要があり、
+    // 表示レイヤーの関心事をモデル側へ漏らすことになる (§4.1 と同じ理由)。
+    //
+    // 副作用として KO 時は `enemyDamageEvent` もクリアされないが、これは
+    // **とどめのダメージ数字が演出中ずっと出ている**ということで、望ましい。
+    // 次のバトルは新しい `BattleState` から始まるので持ち越しも起きない。
+    //
+    // フェーズ 2 (charge → slash) は KO でも張ったままにする。`slash` は 150ms の
+    // 斬撃線がフェードして終わる一過性エフェクトで、その後は通常の立ち絵に戻る
+    // ため「斬った姿勢のまま止まる」という意図どおりの絵になる。
+    if (_state.value.status == BattleStatus.won) return;
+
     _scheduleEffectReset(const Duration(milliseconds: 500), () {
       _state.value = _state.value.copyWith(
         playerAction: SpriteAction.idle,

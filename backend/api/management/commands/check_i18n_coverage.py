@@ -98,5 +98,64 @@ class Command(BaseCommand):
                 f'※ ja 原文が空のため対象外: {total_untranslatable} 件'
             )
 
-        if options['fail_on_empty'] and total_empty > 0:
+        dark_pools = self._check_sabi_pools()
+
+        if options['fail_on_empty'] and (total_empty > 0 or dark_pools):
             raise SystemExit(1)
+
+    # ── 【BUG-145】プール健全性 ────────────────────────────────────────────
+    def _check_sabi_pools(self) -> int:
+        """`SabiMessage` の全プールに有効な行が 1 件以上あるかを検査する。
+
+        ## なぜ空欄率だけでは足りないか (実際に起きたこと)
+
+        上の `_en` 空欄チェックは **`is_active` を見ていない**。`sabi_loader` は
+        DB に active 行が 0 件のプールを YAML の初期値で埋めるため、
+        プールを丸ごと無効化すると
+
+          - 日本語: YAML に同じセリフがあるので **見た目が変わらない**
+          - 英語:   YAML に `_en` が無いので **日本語に落ちる**
+
+        となる。dev では 2026-06-26 から 2026-08-16 まで `home_none_done` が
+        暗転していたが、本コマンドは **SabiMessage 100% filled** と報告し続けた。
+        `--fail-on-empty` を release gate に使っている以上、
+        **gate が緑のまま英語が壊れる**経路を塞いでおく必要がある。
+
+        戻り値: 問題のあるプール数 (0 なら健全)。
+        """
+        from api.models import SabiMessage
+        from api.sabi_loader import _POOL_TO_YAML_PATH
+
+        if SabiMessage.objects.count() == 0:
+            # seed されていない環境 (一部のテスト DB 等) では検査しない。
+            # ここで落とすと「レコードが無いだけ」で CI が赤くなる。
+            self.stdout.write('  － SabiMessage: (no records) — プール検査はスキップ')
+            return 0
+
+        active_pools = set(
+            SabiMessage.objects
+            .filter(is_active=True)
+            .values_list('pool', flat=True)
+            .distinct()
+        )
+        dark = sorted(set(_POOL_TO_YAML_PATH) - active_pools)
+
+        if not dark:
+            self.stdout.write(
+                f'  ✅ SabiMessage プール: {len(_POOL_TO_YAML_PATH)} プールすべてに有効な行あり'
+            )
+            return 0
+
+        self.stdout.write(self.style.WARNING(
+            f'\n❌ 有効な行が 0 件のプール: {len(dark)} 件'
+        ))
+        for pool in dark:
+            inactive = SabiMessage.objects.filter(pool=pool, is_active=False).count()
+            reason = (f'{inactive} 件すべて is_active=False'
+                      if inactive else 'レコード自体が存在しない')
+            self.stdout.write(f'     - {pool}: {reason}')
+        self.stdout.write(
+            '   → このプールは YAML の初期値に戻ります。'
+            '日本語では気付けず、英語だけが日本語表示になります。'
+        )
+        return len(dark)

@@ -298,7 +298,13 @@ class _AmbientBattleCountdownState extends State<_AmbientBattleCountdown> {
               ),
               const SizedBox(height: 4),
               Text(
-                AppLocalizations.of(context)!.habitWorldAmbientCountdownHintSabi_message,
+                // 🔴 【機能レビュー 20260822 followup §4】`secondsLeft` を渡すのは
+                // **単複の選択のためだけ**で、数値そのものはここには出ない
+                // (上の 56pt の Text が出している)。カウントダウンは 1 まで
+                // 下がる (`ambient_auto_battle_orchestrator` の `i > 0`) ので、
+                // 渡さないと英語で最後の 1 秒に **"1 seconds"** と出る。
+                AppLocalizations.of(context)!
+                    .habitWorldAmbientCountdownHintSabi_message(secondsLeft),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,

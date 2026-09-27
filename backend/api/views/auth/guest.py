@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from ...models import GuestSession, PlayerProfile
+from ...services.auth_token import issue_token
 from ...services.exp_service import create_default_stats
 from ...services.seed_default import seed_new_user_defaults
 
@@ -17,8 +18,13 @@ User = get_user_model()
 
 
 def _issue_token(user):
-    token, _ = Token.objects.get_or_create(user=user)
-    return token.key
+    """【FEAT-541 (2026-09-06)】発行の実体は `services/auth_token.issue_token`。
+
+    ⚠️ ここで `Token.objects.get_or_create` を直接呼ばないこと。
+    停止チェックがヘルパーの中にしかなく、
+    `test_account_suspension.py` の走査が**ヘルパー外の発行を禁じている**。
+    """
+    return issue_token(user)
 
 
 class GuestInitView(APIView):
@@ -85,7 +91,13 @@ class DevLoginView(APIView):
     開発用ワンタップログインエンドポイント。
     DEBUG=True の場合のみ有効。本番（DEBUG=False）では 403 を返す。
     固定の開発アカウント（dev@sabiowl.local）を取得 or 作成してトークンを返す。
+
+    【BUG-147 (2026-08-20)】`authentication_classes = []` を明示する。
+    DEBUG 限定なので実害は無いが、「AllowAny な view は例外なく認証を切る」という
+    不変条件を `test_allow_any_views_skip_authentication.py` が縛っているため、
+    ここだけ例外にすると規約が曖昧になる。
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     _DEV_EMAIL = 'dev@sabiowl.local'

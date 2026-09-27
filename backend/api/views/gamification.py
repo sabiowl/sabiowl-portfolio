@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -18,7 +18,7 @@ from .mixins import PlayerMixin
 
 
 class CharacterListView(PlayerMixin, APIView):
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -49,7 +49,7 @@ class CharacterListView(PlayerMixin, APIView):
 
 
 class CharacterSelectView(PlayerMixin, APIView):
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):
@@ -92,7 +92,7 @@ class CharacterSelectView(PlayerMixin, APIView):
 
 
 class CharacterPurchaseView(PlayerMixin, APIView):
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):
@@ -161,7 +161,7 @@ class CharacterExchangeView(PlayerMixin, APIView):
     BUG-107 で全 non-starter 価格を 1500 に統一した結果、price 基準が機能しなく
     なったため、starter かどうかで判定する (non-starter = 全て SSR 扱い)。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):

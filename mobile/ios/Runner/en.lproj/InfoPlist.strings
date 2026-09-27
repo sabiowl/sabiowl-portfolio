@@ -1,0 +1,24 @@
+/* 【2026-08-09 / FEAT-489 Phase 5 (v1.1 G4)】iOS native permission dialogs, English.
+
+   These are NOT covered by the Flutter ARB —— they are rendered by iOS itself,
+   so the only way to localize them is this file. Declaring `en` in
+   CFBundleLocalizations without this file would show the Japanese strings
+   (with the 🪶 marker) to English speakers inside a system dialog.
+
+   Tone follows the English Sabi voice established in FEAT-489 Phase 2F-b
+   (gentle, unhurried, 🪶 as the closing marker —— 322 of the 1,488 English
+   ARB strings carry it). Keep it consistent with `app_en.arb`.
+
+   ⚠️ When changing wording, update `ja.lproj/InfoPlist.strings` and the
+   fallback values in `Info.plist` as well.
+*/
+
+/* Free memo voice input (FEAT-499). Sabi voice + 🪶 marker */
+"NSSpeechRecognitionUsageDescription" = "Speech recognition lets you set down a passing thought in your own voice. 🪶";
+"NSMicrophoneUsageDescription" = "The microphone is used to receive what you say. 🪶";
+
+/* Inquiry screenshot attachment (FEAT-366).
+   Deliberately plain rather than in Sabi's voice —— Apple's guideline asks for a
+   concrete statement of need, and a direct explanation reads better here
+   (mirrors the original intent recorded in Info.plist). */
+"NSPhotoLibraryUsageDescription" = "Access to your photo library is needed so you can attach a screenshot to an inquiry.";

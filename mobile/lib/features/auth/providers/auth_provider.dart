@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/analytics/posthog_service.dart';  // FEAT-200
 import '../../../core/api/api_client.dart';
 import '../../../core/cache/cache_service.dart';  // FEAT-280
+import '../../../core/providers/account_suspension_provider.dart';  // 【FEAT-541】
 // 【BUG-83 (2026-06-10)】logout / セッション失効時の provider 一斉 invalidate 用。
 import '../../battle/providers/battle_provider.dart';
 import '../../calendar/providers/calendar_provider.dart';
@@ -161,6 +162,20 @@ class Auth extends _$Auth {
           : AuthStatus.unauthenticated,
     );
   }
+
+  // ⛔ 【FEAT-542 (2026-09-23)】`refreshAuthStatus()` は削除した。
+  //
+  // BUG-161 の応急処置で、「オンボーディングが `authProvider` の外で
+  // トークンを作ったあと、状態を追いつかせる」ためのものだった。
+  //
+  // 🔵 **本 FEAT でその迂回が無くなった。** オンボーディングは
+  // トークンを作らず、ゲストは `startAsGuest()` を通ってから来る ——
+  // **追いつかせるべき遅れが存在しない。**
+  //
+  // ⚠️ 「一応残しておく」を選ばないこと。読み手のいない再判定は、
+  // 次の誰かが「ここでも呼んでおけば安全だろう」と迂回を足す口実になる。
+  // 不変条件は `test/onboarding_lands_on_home_test.dart` が
+  // 「`authProvider` の外でトークンを作っている箇所」の走査で縛っている。
 
   /// ゲストとして開始する（FEAT-128 / FEAT-188）。
   ///
@@ -337,7 +352,7 @@ class Auth extends _$Auth {
     // 表示していたが、Render コールドスタート時に setPlayerName API の patch 待ちと
     // sheet dismiss の whenComplete が race して認証が誤って取り消される
     // 問題（freeze）があった。新規ユーザーは直接 `authenticated` + `justRegistered=true`
-    // にして、OnboardingPage（既に name PATCH + character select + markTutorialShown
+    // にして、OnboardingPage（既に name PATCH + character select + 設定済みフラグ
     // を完結する仕様）に委譲する。auth_page の `_onAuthenticated` 経路で
     // `justRegistered=true` なら `/onboarding` に遷移する。
     state = state.copyWith(
@@ -425,6 +440,13 @@ class Auth extends _$Auth {
     // cacheServiceProvider は SharedPreferences 層のみクリアするが、Provider state は
     // invalidate しない限り別アカウントログイン後も生存し続けるため、ホーム画面に
     // 直結する player-scoped provider をすべて明示的に dispose する。
+    // 🔴 【FEAT-541 (2026-09-06)】アカウント停止フラグを必ず下ろす。
+    //
+    // 消し忘れると**ログイン画面の上に停止 overlay が乗ったまま**になり、
+    // ログインボタンが押せなくなる —— **この機能で一番起きやすい詰み方**である。
+    // overlay 側ではなく**ここ**に置くのは、設定画面のログアウトも
+    // セッション失効も同じ経路を通るため (出口を 1 つにする)。
+    ref.read(accountSuspendedProvider.notifier).clear();
     _invalidateAllPlayerScopedProviders();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
@@ -549,6 +571,13 @@ class Auth extends _$Auth {
     // セッション失効後に別ユーザーがサインインするケースで、前ユーザーの provider state
     // が残らないことを保証する。fire-and-forget の cache clear と異なり、invalidate は
     // 同期実行で OK (Riverpod の dispose スケジューリングが面倒を見る)。
+    // 🔴 【FEAT-541 (2026-09-06)】アカウント停止フラグを必ず下ろす。
+    //
+    // 消し忘れると**ログイン画面の上に停止 overlay が乗ったまま**になり、
+    // ログインボタンが押せなくなる —— **この機能で一番起きやすい詰み方**である。
+    // overlay 側ではなく**ここ**に置くのは、設定画面のログアウトも
+    // セッション失効も同じ経路を通るため (出口を 1 つにする)。
+    ref.read(accountSuspendedProvider.notifier).clear();
     _invalidateAllPlayerScopedProviders();
     state = state.copyWith(
       status: AuthStatus.unauthenticated,
@@ -578,9 +607,11 @@ class Auth extends _$Auth {
       final authToken = await _service.devLogin();
       await _apiClient.saveToken(authToken);
       await _apiClient.markAsRegistered();
-      await _apiClient.markTutorialShown();
       // FEAT-188: ゲストトークンが残っていれば削除
       await _apiClient.deleteGuestToken();
+      // 🔵 【FEAT-542】`markTutorialShown()` の後継。⚠️ **ゲストトークンを
+      //    消したあとに呼ぶ** —— 持ち主はユーザートークン側である。
+      await _apiClient.markProfileSetupCompleted();
       // FEAT-185: ヘルパー経由で setGuestMode + invalidate(isGuestModeProvider)
       await _setGuestMode(false);
       state = state.copyWith(

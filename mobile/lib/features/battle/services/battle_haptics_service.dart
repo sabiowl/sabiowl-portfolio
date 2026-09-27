@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 ///   - [playGaugeMax]   : 必殺ゲージ MAX 到達時 — 中程度 ~100ms「ヴォン」
 ///   - [playCriticalHit]: クリ命中時 — 短い強パルス「ガツン」(2026-06-27 追加)
 ///   - [playUltimateHit]: 必殺技命中時 — 250-350ms 余韻ある「ヴヴーーーン」
+///   - [playKoFinish]   : とどめの一撃 — 「一撃 → 間 → 祝祭」380ms（FEAT-526）
 ///
 /// ## プラットフォーム別実装
 ///
@@ -89,6 +90,53 @@ class BattleHapticsService {
     HapticFeedback.mediumImpact();
     await Future<void>.delayed(const Duration(milliseconds: 90));
     HapticFeedback.lightImpact();
+  }
+
+  /// 【FEAT-526 (2026-08-22)】KO 演出のハプティクス（「一撃 → 間 → 祝祭」）。
+  ///
+  /// ## なぜ [playUltimateHit] を流用しないのか
+  ///
+  /// `ultimateHit` は **「強く当たった」** の感触（タメ → 最強パルス → 減衰余韻）で、
+  /// **「勝った」** ではない。KO はとどめの一撃であると同時に勝利の瞬間なので、
+  /// 減衰していく余韻ではなく **上昇していく祝祭** で終わる必要がある。
+  ///
+  /// ## 波形設計 —— KO 演出のタイムラインと同期させる
+  ///
+  /// ```
+  /// 強
+  ///  │██                    ██  ███
+  ///  │██              ██    ██  ███
+  ///  │██        ██    ██    ██  ███
+  /// 弱└──────────────────────────────→
+  ///   0    60         180  250  310  380ms
+  ///   ドン  ← 無音 →    タ    タ   ターン
+  ///   とどめ ヒットストップ  ↑「K.O.」表示に同期した上昇 3 連
+  /// ```
+  ///
+  /// **真ん中の無音がいちばん大事**。ヒットストップの「間」を触覚にも作ることで、
+  /// 「決めた」という手応えが出る。ここを詰めると、ただの連打になる。
+  ///
+  /// ## 倍速では縮めない
+  ///
+  /// 触覚は「早送りされた」ではなく「別のパターン」として感じられるので、
+  /// 3 倍速でも同じ波形を流す。300ms を下回ると人はパターンとして認識できない
+  /// （3 倍速なら映像 217ms に対し振動 380ms で、少しだけ余韻が残る形になる）。
+  ///
+  /// ## 必殺技がとどめだったとき
+  ///
+  /// `ultimateHitEvent` と `koEvent` はほぼ同時に立つ。呼び出し側で
+  /// **`status == won` なら `playUltimateHit` を打たない** ことで衝突を避けている
+  /// （こちらの波形が先頭に強い一撃を持っているので、とどめの重さは失われない）。
+  Future<void> playKoFinish() async {
+    if (await _invokeNative('koFinish')) return;
+    // Fallback: 一撃 → 間 → 上昇 3 連 を標準 API の組み合わせで近似する。
+    HapticFeedback.heavyImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    HapticFeedback.lightImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 70));
+    HapticFeedback.mediumImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 60));
+    HapticFeedback.heavyImpact();
   }
 
   /// MethodChannel 呼び出しヘルパ。

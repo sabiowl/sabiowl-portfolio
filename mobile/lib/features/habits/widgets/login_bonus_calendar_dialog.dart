@@ -14,7 +14,11 @@ import '../../../l10n/app_localizations.dart';
 ///   - Day 8 以降: +20 ダイヤ
 class LoginBonusCalendarDialog extends StatefulWidget {
   /// Backend `today_login_bonus` レスポンス:
-  ///   {amount, days_count, granted_daily_tickets, granted_weekly_tickets}
+  ///   {amount, days_count, granted_daily_tickets, granted_weekly_tickets,
+  ///    streak_days, total_days}
+  ///
+  /// 【FEAT-539 (2026-09-05)】`streak_days` / `total_days` を追加。
+  /// 古い Backend では両方 null になりうるので、その場合は行ごと出さない。
   final Map<String, dynamic> bonus;
 
   const LoginBonusCalendarDialog({super.key, required this.bonus});
@@ -62,6 +66,63 @@ class _LoginBonusCalendarDialogState extends State<LoginBonusCalendarDialog>
       widget.bonus['granted_daily_tickets'] as int? ?? 0;
   int get _grantedWeekly =>
       widget.bonus['granted_weekly_tickets'] as int? ?? 0;
+
+  // ── 【FEAT-539 (2026-09-05)】連続 / 累計の達成日数 ────────────────────
+  //
+  // ⚠️ `days_count` (上の `_daysCount`) とは**別物**である。
+  //    あちらは「登録日からの経過日数」で、1 日も達成していなくても増える。
+  //    ユーザーに見せる「何日目か」は `_totalDays` の方。
+  //
+  // ⚠️ `?? null` のままにしてあるのは、**古い Backend が返さない期間がある**ため。
+  //    その場合は行ごと出さない (下の `_StreakDisplay.hidden`)。
+  int? get _streakDays => widget.bonus['streak_days'] as int?;
+  int? get _totalDays  => widget.bonus['total_days'] as int?;
+
+  /// 3 状態のどれを出すかを決める。
+  ///
+  /// | 状態 | 判定 | 表示 |
+  /// |---|---|---|
+  /// | 真の初日 | `total == 1` | **出さない** (Day 1 のサビ台詞に任せる) |
+  /// | 途切れた翌日 | `streak == 1 && total > 1` | **累計だけ** |
+  /// | 通常 | `streak > 1` | 連続 + 累計 |
+  ///
+  /// 🔴 **「初日だけ出さない」ではない。** 2 つ目の状態を落とすと、
+  /// 昨日まで 38 日続けていた人に「**1 日連続**」と出すことになる。
+  /// それは CLAUDE.md の「停滞も休息も肯定する」「無理に高く積もうと
+  /// しなくていいんです」というサビの使命と正面から衝突する ——
+  /// 積み上げた事実 (累計) だけを伝え、翌日からは通常表示に戻す。
+  ///
+  /// 🔵 **Backend にフラグは要らない。** 「連続 1 なのに累計が 2 以上」は
+  /// 「昨日は達成していないが、過去に達成した日がある」と同値である。
+  _StreakDisplay get _streakDisplay {
+    final streak = _streakDays;
+    final total  = _totalDays;
+    if (streak == null || total == null) return _StreakDisplay.hidden;
+    if (total <= 1) return _StreakDisplay.hidden;        // 真の初日
+    if (streak <= 1) return _StreakDisplay.totalOnly;    // 途切れた翌日
+    return _StreakDisplay.streakAndTotal;                // 通常
+  }
+
+  Widget _buildStreakLine(AppLocalizations l10n) {
+    final display = _streakDisplay;
+    if (display == _StreakDisplay.hidden) return const SizedBox.shrink();
+    final text = display == _StreakDisplay.totalOnly
+        ? l10n.habitLoginBonusTotalOnlyLine(_totalDays!)
+        : l10n.habitLoginBonusStreakLine(_streakDays!, _totalDays!);
+    return Padding(
+      key: const Key('login_bonus_streak_line'),
+      padding: const EdgeInsets.only(top: 12),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
 
   String _sabiMessage(AppLocalizations l10n) {
     if (_daysCount == 1) return l10n.habitLoginBonusSabiDay1Sabi_message;
@@ -141,6 +202,9 @@ class _LoginBonusCalendarDialogState extends State<LoginBonusCalendarDialog>
 
             // ── 7 日カレンダー ─────────────────────────────
             _buildCalendar(l10n),
+
+            // ── 【FEAT-539】連続日数 (累計日数) ─────────────
+            _buildStreakLine(l10n),
             const SizedBox(height: 24),
 
             // ── 報酬表示 (ダイヤ) ──────────────────────────
@@ -334,4 +398,16 @@ class _CalendarCell extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 【FEAT-539 (2026-09-05)】連続日数行の 3 状態。
+enum _StreakDisplay {
+  /// 真の初日 (累計 1 日)、または古い Backend で値が無い。
+  hidden,
+
+  /// 連続が途切れた翌日。**累計だけ**出す (連続日数は出さない)。
+  totalOnly,
+
+  /// 通常。連続 + 累計。
+  streakAndTotal,
 }

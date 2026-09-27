@@ -147,13 +147,34 @@ class HabitSerializer(serializers.ModelSerializer):
         """
         prefetch キャッシュ (_year_logs) があればそれを返す。
         キャッシュがない場合は DB にフォールバックして今年分を取得する。
+
+        ## 【2026-08-16 機能レビュー P1】fallback 結果も同じ属性に載せる
+
+        本メソッドを呼ぶ `SerializerMethodField` は **5 つ**ある
+        (`get_today_log` / `get_history` / `get_period_count` / `get_period_done` /
+        `get_period_progress`)。旧実装は fallback で毎回 `list(...)` を評価して
+        いたため、**同じ習慣の同じログ集合を 5 回 DB から取っていた** (実測)。
+
+        リスト経路 (`/api/home/` や `/habits/`) は `Prefetch(..., to_attr='_year_logs')`
+        が効くので影響が無く、**効いていたのは単体直列化の経路** ——
+        `POST /habits/<id>/count/` (中核の動詞) / チェックリスト toggle /
+        習慣の CRUD —— だった。
+
+        ⚠ **前提**: `obj` はリクエストごとに新しくロードされる model インスタンス
+        なのでプロセス跨ぎの汚染は起きない。ただし **1 つのインスタンスを長生き
+        させ、途中で HabitLog を書き換えてから再度直列化すると stale になる**。
+        `views/habits.py` の count / toggle は `refresh_from_db()` の **後** に
+        直列化しているため現状は安全。この順序を崩さないこと。
         """
         cached = getattr(obj, '_year_logs', None)
         if cached is not None:
             return cached
         today = timezone.localdate()
         year_start = today.replace(month=1, day=1)
-        return list(obj.logs.filter(date__gte=year_start).order_by('date'))
+        logs = list(obj.logs.filter(date__gte=year_start).order_by('date'))
+        # prefetch 経路と同じ属性名に載せる。以後の呼び出しは上の分岐に収束する。
+        obj._year_logs = logs
+        return logs
 
     def get_today_log(self, obj):
         """今日の HabitLog を返す。なければ null。"""

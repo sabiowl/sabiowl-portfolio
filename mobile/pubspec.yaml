@@ -2,7 +2,19 @@ name: sabiowl
 description: "Sabiowl - Habit tracking RPG app"  # OPS-01
 publish_to: 'none'
 
-version: 1.0.5+6
+# 【2026-08-08】v1.1 開発に入ったので version name を 1.1.0 へ。
+# `+N` の build 番号は CI が上書きする (codemagic.yaml の Build IPA が
+# TestFlight / App Store / Codemagic カウンタの max+1 を `--build-number` で渡す)。
+# ここは version name (CFBundleShortVersionString) を決めるためだけに存在する。
+#
+# 【2026-08-20 / BUG-147】1.1.0 → 1.1.1。
+# 1.1.0+6 を審査に出した後に BUG-147 (古いトークンが残っていると全 API が 401 に
+# なり自力で回復できない) が発覚した。審査中のビルドを差し替えるには提出の
+# キャンセルが必要で、これは CLAUDE.md の絶対禁止事項なので、次バージョンで出す。
+# 承認されても却下されても 1.1.1 で出す (却下時に 1.1.0 をスキップすることになるが、
+# App Store 上でバージョン番号が連続している必要はなく、ユーザーに見えるのは
+# 公開されたバージョンだけ)。詳細: doc/release_checklist/v1.1.md §G7.6
+version: 1.1.3+9
 
 environment:
   sdk: ^3.7.2

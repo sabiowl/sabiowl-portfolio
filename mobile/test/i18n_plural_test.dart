@@ -147,6 +147,39 @@ void main() {
       expect(ja.socialGiftRewardCoins(3), '🪙 3 コイン');
     });
 
+    // ── 【機能レビュー 20260822 followup §4】数値を印字しない plural ──────
+    //
+    // 🔴 **単複だけ選ばせて、数値そのものは印字しない** という形が 1 件だけある。
+    // ホーム額縁のカウントダウンは 56pt の数字を**別の `Text`** が描いており、
+    // 説明文はその下に置かれる。ここで数値を印字すると二重に出てしまう。
+    //
+    //   ja: 10 / 秒後に自動出陣しますよ 🪶
+    //   en: 10 / seconds until Auto Battle begins 🪶
+    //
+    // カウントダウンは 1 まで下がる (`ambient_auto_battle_orchestrator` の
+    // `for (int i = countdownSeconds; i > 0; i--)`) ので、plural を付けないと
+    // **最後の 1 秒に "1 seconds" と出る** (機能レビュー followup §4 で指摘)。
+    //
+    // ja は本 group の契約どおり plain のまま。`seconds` は @-metadata で
+    // 宣言だけして本文では使わない —— gen-l10n はこれを許し、ja の実装は
+    // 引数を無視する形で生成される (実測で確認済み)。
+    test('🔴 カウントダウンは数値を印字せず単複だけ切り替える', () {
+      expect(en.habitWorldAmbientCountdownHintSabi_message(1),
+          'second until Auto Battle begins \u{1FAB6}',
+          reason: '🔴 1 のとき "1 seconds" に戻っていないか');
+      expect(en.habitWorldAmbientCountdownHintSabi_message(10),
+          'seconds until Auto Battle begins \u{1FAB6}');
+
+      for (final n in [1, 2, 10]) {
+        expect(en.habitWorldAmbientCountdownHintSabi_message(n).contains('$n'),
+            isFalse,
+            reason: '数値は 56pt の別 Text が描いている。ここに出すと二重になる');
+        expect(ja.habitWorldAmbientCountdownHintSabi_message(n),
+            '秒後に自動出陣しますよ \u{1FAB6}',
+            reason: 'ja は数によらず同一 (日本語に複数形は無い)');
+      }
+    });
+
     test('ja 側に plural 構文を書いていない (template は plain のままが正)', () {
       final offenders = <String>[];
       _readArbMessages('lib/l10n/app_ja.arb').forEach((k, v) {

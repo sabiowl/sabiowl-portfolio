@@ -38,7 +38,7 @@ field 意味を変える場合は models/free_memo.py の運用ルール ブロ�
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -113,8 +113,15 @@ def _award_convert_exp(player) -> int:
         while battle_state.current_exp >= battle_state.max_exp:
             battle_state.current_exp -= battle_state.max_exp
             battle_state.level       += 1
+            # 🔴 【FEAT-537 (2026-08-29)】この 1 行が丸ごと欠落しており、
+            # 本経路だけ「レベルは上がったのに 0pt」が確定で起きていた。
+            # `update_fields` にも入っていなかったので、加算だけ足しても
+            # DB には入らない —— 2 箇所とも直す必要がある。
+            battle_state.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
             battle_state.max_exp      = GameBalance.level_to_max_exp(battle_state.level)
-        battle_state.save(update_fields=['current_exp', 'level', 'max_exp'])
+        battle_state.save(update_fields=[
+            'current_exp', 'level', 'max_exp', 'allocatable_points',
+        ])
     return exp_gain
 
 
@@ -126,7 +133,7 @@ class FreeMemoListCreateView(FreeMemoOptInMixin, PlayerMixin, APIView):
     """
 
     # 【2026-07-25 hotfix】ゲスト経路対応。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -223,7 +230,7 @@ class FreeMemoDetailView(FreeMemoOptInMixin, PlayerMixin, APIView):
     """
 
     # 【2026-07-25 hotfix】ゲスト経路対応。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def _get_memo(self, request, pk):
@@ -307,7 +314,7 @@ class FreeMemoRestoreView(FreeMemoOptInMixin, PlayerMixin, APIView):
     の Django 標準 404 → error_response 化)。
     """
 
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):
@@ -344,7 +351,7 @@ class FreeMemoPurgeView(FreeMemoOptInMixin, PlayerMixin, APIView):
     【2026-07-26 レビュー §C7】error_response format 統一。
     """
 
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def delete(self, request, pk):
@@ -380,7 +387,7 @@ class FreeMemoTrashPurgeAllView(FreeMemoOptInMixin, PlayerMixin, APIView):
     (SnackBar 用、body 空維持で REST 慣習に整合)。
     """
 
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def delete(self, request):
@@ -420,7 +427,7 @@ class FreeMemoConvertView(FreeMemoOptInMixin, PlayerMixin, APIView):
     """
 
     # 【2026-07-25 hotfix】ゲスト経路対応。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk, to_type: str | None = None):

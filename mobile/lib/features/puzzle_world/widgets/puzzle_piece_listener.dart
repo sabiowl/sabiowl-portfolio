@@ -36,13 +36,13 @@ import 'puzzle_piece_overlay_modal.dart';
 ///
 /// **設計方針**:
 /// - `PopupSerializer` 経由で他 popup (LoginBonus / FriendGift 等) との直列化 (BUG-138 系対策)
-/// - **【v1 hotfix 2026-07-07】演出リズム制御**: PopupSerializer.enqueue 内の task
-///   先頭で [_kOverlayShowDelay] (2 秒) 待機し、RewardToast (1.7s) を先に完全表示させる。
-///   旧挙動では task listener が同フレームで enqueue → PopupSerializer をロック
-///   → RewardToast が次フレームで発火してもすでに overlay に隠される
-///   → 「タスク達成 → 5秒沈黙 → いきなり piece overlay」体感 bug。
-///   task 内 delay で queue 順序 (piece → LoginBonus) は保持しつつ、EXP 演出の
-///   時間帯を確保する。
+/// - **【v1 hotfix 2026-07-07 → FEAT-534 2026-08-29】演出リズム制御**:
+///   [_kOverlayShowDelay] (2 秒) 待機して RewardToast (1.7s) を先に完全表示させる。
+///   🔴 **FEAT-534 で待機の置き場所を enqueue の前に移した。** 旧実装は enqueue
+///   した task の**中**で寝ており、キューを握ったまま待つので
+///   **無関係な LoginBonusCalendarDialog / LevelUpDialog まで道連れ**にしていた。
+///   値 (2 秒) は変えていない —— RewardToast の 1700ms と連動しているため。
+///   表示順はもう enqueue 順ではなく [PopupPriority] が決める。
 /// - Task 発火 → 完了 → 300ms 待機 → provider null リセット → 状態更新 (invalidate)
 ///   の順で処理し、Quest が続いていれば 次サイクルで検出 → 起動 (自動連続表示)
 /// - completion (scene_completed=true) は Phase 4 で追加モーダル起動を実装、
@@ -52,12 +52,12 @@ import 'puzzle_piece_overlay_modal.dart';
 /// ```
 /// t=0.0s: タスクタップ (Backend API 応答後)
 ///          → RewardToast (+X EXP) 表示開始 (次フレーム、addPostFrameCallback)
-///          → PuzzlePieceListener が PopupSerializer.enqueue で task 登録 (同フレーム)
-///          → task 内で 2 秒 delay 開始
+///          → PuzzlePieceListener は **enqueue せずに** 2 秒 delay を開始
+///            (キューは空いたままなので他の popup は待たされない)
 /// t=1.7s: RewardToast 自動消滅 (OverlayEntry の Future.delayed で remove)
-/// t=2.0s: piece overlay 表示 (showPuzzlePieceTaskOverlay 発火)
-///          → ユーザー確認 → X で close
-/// t=Nsec: LoginBonus dialog 表示 (PopupSerializer 直列で piece の後)
+/// t=2.0s: PopupSerializer.enqueue(priority: puzzlePiece)
+///          → 先に出るべき popup (LevelUp 1 / LoginBonus 2 / MonthlyTicket 3)
+///            が残っていればそちらが先、無ければ即 piece overlay
 /// ```
 ///
 /// [_kOverlayShowDelay] は RewardToast の 1.7 秒 + マージン 0.3s を確保。
@@ -114,12 +114,16 @@ class _PuzzlePieceListenerState extends ConsumerState<PuzzlePieceListener> {
       // active が null (edge case) の場合は null 経由で popup 側 fallback (抽象色) が発動。
       final backgroundKey = active?.scene.backgroundKey;
 
-      await PopupSerializer.enqueue(() async {
-        // 【v1 hotfix 2026-07-07】RewardToast (1.7s) を先に完全表示させるため
-        // 2 秒待機してから piece overlay を出す。task_listener が同フレームで
-        // enqueue し PopupSerializer をロックする挙動は保持しつつ、演出リズム
-        // (task 達成 → EXP toast → 2s 後に piece overlay) を実現。
-        await Future.delayed(_kOverlayShowDelay);
+      // 【FEAT-534 (2026-08-29)】🔴 待つのは **enqueue する前**である。
+      // 旧実装はこの待機を enqueue した task の中に置いており、
+      // PopupSerializer のキューを握ったまま 2 秒寝ていた。待たせたい相手は
+      // かけら overlay だけ (RewardToast 1.7s を先に見せるため) なのに、
+      // **LoginBonusCalendarDialog も LevelUpDialog も道連れで 2 秒**
+      // 待たされていた。意図は正しく、置き場所だけが間違っていた。
+      await Future.delayed(_kOverlayShowDelay);
+      if (!mounted) return;
+      await PopupSerializer.enqueue(priority: PopupPriority.puzzlePiece,
+          () async {
         if (!mounted) return;
         // 【gameplay_review 20260708】かけら取得の触覚 FB (軽い一振動)。
         // 「輪郭のかけら」= 輪郭が現れる控えめな瞬間、lightImpact で軽く鳴らす。
@@ -156,12 +160,13 @@ class _PuzzlePieceListenerState extends ConsumerState<PuzzlePieceListener> {
       // 【2026-07-09】task 経路と同じ、popup 内に scene 背景を切り抜き描画するため。
       final backgroundKey = active?.scene.backgroundKey;
 
-      await PopupSerializer.enqueue(() async {
-        // 【v1 hotfix 2026-07-07】task 経路と同様、RewardToast (バトル勝利報酬)
-        // を先に見せるため 2 秒待機。バトルは戦闘終了 → 勝利モーダル → piece
-        // の流れで、間に勝利モーダルが挟まる場合はそちらが優先表示されるが、
-        // 直接遷移経路 (勝利モーダル無し) でも RewardToast との重なりを回避。
-        await Future.delayed(_kOverlayShowDelay);
+      // 【FEAT-534 (2026-08-29)】task 経路と同じく、待機は enqueue の**外**。
+      // RewardToast (バトル勝利報酬) を先に見せる意図は維持しつつ、
+      // キューを握ったまま寝るのをやめる。
+      await Future.delayed(_kOverlayShowDelay);
+      if (!mounted) return;
+      await PopupSerializer.enqueue(priority: PopupPriority.puzzlePiece,
+          () async {
         if (!mounted) return;
         // 【gameplay_review 20260708】かけら彩色の触覚 FB (やや長め)。
         // 「彩りのかけら」= 灰色から色付きへの遷移という「上位段階」の瞬間、
@@ -212,7 +217,10 @@ class _PuzzlePieceListenerState extends ConsumerState<PuzzlePieceListener> {
 
     // 2. 完成モーダル起動
     final hasNextScene = piece.nextSceneHint != null;
-    await PopupSerializer.enqueue(() async {
+    // 【FEAT-534】完成モーダルも「世界の変化」なので同じ優先度。
+    // 直前の quest overlay と同一優先度なので FIFO で後に出る。
+    await PopupSerializer.enqueue(priority: PopupPriority.puzzlePiece,
+        () async {
       if (!mounted) return;
       // 【gameplay_review 20260708】シーン完成の触覚 FB (強めの一撃)。
       // 「景色が復元される」祝祭的瞬間、task/quest より明確に強い heavyImpact。

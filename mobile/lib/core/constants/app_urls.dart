@@ -12,10 +12,14 @@ import '../l10n/service_l10n.dart';  // 【FEAT-489 Phase 2D】BuildContext な�
 
 /// Sabiowl 公式ホームページのベース URL (末尾 `/` なし)。
 ///
-/// 将来 sabiowl.com 独自ドメインに移行する際は本定数のみ変更すれば、
-/// 配下の各ページ URL も自動的に切り替わる。
-const String kSabiowlHomePageBase =
-    'https://sabiowl.github.io/sabiowl-home-pages';
+/// 【2026-09-23】**独自ドメイン `sabiowl.com` へ移行済**。本ファイルを作った
+/// 狙い (「移行時は本定数のみ変更すれば配下の各ページ URL も自動的に
+/// 切り替わる」) が実際に効いた形で、変更はこの 1 行だけである。
+///
+/// 🔵 旧 `https://sabiowl.github.io/sabiowl-home-pages/...` は **301 で
+/// 新ドメインへ飛ぶ**ので、更新していない旧バージョンのアプリも壊れない。
+/// ⚠️ ただしリンクごとに 1 ホップ増えるので、アプリ側は新ドメインを直に指す。
+const String kSabiowlHomePageBase = 'https://sabiowl.com';
 
 /// 【FEAT-489 Phase 5 (2026-08-02)】公式ページ URL を locale で出し分ける。
 ///
@@ -144,3 +148,27 @@ Uri buildSabiowlMaintenanceContactMailto() {
 /// 設定画面「アプリ情報」セクションから外部ブラウザで開く動線。
 /// sabiowl-home-pages の index.md / _config.yml にも同じハンドルが記載されている。
 const String kSabiowlOfficialXUrl = 'https://x.com/sabiowlapp';
+
+// ── 【FEAT-543 (2026-09-23)】App Store への遷移 ──────────────────────────────
+
+/// App Store の数値 ID。
+///
+/// 🔵 ストアの公開 URL に出る値なので**秘密ではない**。
+/// ⚠️ **ここ以外に書かないこと。** `test/core/store_url_no_literal_test.dart` が
+/// 走査で縛っている（`app_version_no_literal_test.dart` と同じ手口）。
+const String kAppStoreAppId = '6772130388';
+
+/// App Store アプリを直接開く deep link。**最初にこちらを試す。**
+///
+/// 🔵 `itms-apps:` は App Store アプリが処理するので、ブラウザを経由しない。
+const String kAppStoreDeepLinkUrl =
+    'itms-apps://itunes.apple.com/app/id$kAppStoreAppId';
+
+/// deep link が開けなかったときに落とす web URL。
+///
+/// ⚠️ シミュレータや App Store アプリを無効化した端末では deep link が
+/// 開けない。**2 段にしておかないと「押しても何も起きない」になる。**
+const String kAppStoreWebUrl = 'https://apps.apple.com/app/id$kAppStoreAppId';
+
+// ⏸️ Android は Play 未公開なので今回は対象外。追加するときは
+//    `market://details?id=...` → `https://play.google.com/...` の 2 段で同じ形になる。

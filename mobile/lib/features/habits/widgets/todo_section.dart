@@ -218,6 +218,9 @@ class _TodoItemState extends ConsumerState<_TodoItem>
   late final AnimationController _pressController;
   bool _pressed            = false;
   bool _longPressActivated = false;
+  /// 【FEAT-533 §8-3 (2026-08-25)】送信中フラグ。`habit_card.dart` の
+  /// `_actionInFlight` と同型で、守る対象も同じ `HabitsNotifier._inFlight[habitId]`。
+  bool _sending            = false;
 
   // ヒントバッジ（初回〜3回）
   bool _showHint = false;
@@ -264,20 +267,75 @@ class _TodoItemState extends ConsumerState<_TodoItem>
 
   void _onTapUp(TapUpDetails _) {
     if (!_longPressActivated) {
-      HapticFeedback.lightImpact();
-      // widget.todo.isCompletedToday を直接参照（build()の isDone は final のため）
-      if (widget.todo.isCompletedToday) {
-        // 完了済み → タップで取り消し（minus）
-        ref.read(habitsNotifierProvider.notifier).decrementCount(widget.todo.id);
-      } else {
-        // 未完了 → タップで完了（plus）
-        ref.read(habitsNotifierProvider.notifier).incrementCount(
-          widget.todo.id,
-          l10n: AppLocalizations.of(context),
-        );
-      }
+      _handleTap();
     }
     _resetPressState();
+  }
+
+  /// ToDo カードのタップ処理。
+  ///
+  /// 【FEAT-533 §8-3 (2026-08-25)】以前は `HapticFeedback.lightImpact()` を鳴らしてから
+  /// `incrementCount` / `decrementCount` を **await せずに**投げていた。両者は
+  /// `HabitsNotifier._inFlight[habitId]` guard で往復中の 2 回目以降を早期 return する
+  /// (throw しない) ので、**振動は鳴るのに何も起きない**。FEAT-532 が
+  /// `habit_card.dart` で直したのとまったく同じ嘘が、**同じホーム画面の隣のカード**で
+  /// 鳴っていた。
+  ///
+  /// ⚠️ ToDo カードには spinner を出さない。押下スケール演出 (`_pressController`) が
+  /// 既に「押した」を返しており、そこにスピナーを足すとカードの見た目が跳ねる。
+  /// **ここで直すのは「鳴らさない」ことだけ**で、それが嘘をやめる最小の形である。
+  ///
+  /// ⚠️ 解放は必ず `finally`。`_inFlight` はこの解放漏れで BUG-71 になった。
+  Future<void> _handleTap() async {
+    if (_sending) return;
+    setState(() => _sending = true);
+
+    HapticFeedback.lightImpact();
+
+    final notifier = ref.read(habitsNotifierProvider.notifier);
+    // widget.todo.isCompletedToday を直接参照（build()の isDone は final のため）
+    final undo = widget.todo.isCompletedToday;
+    final l10n = AppLocalizations.of(context);
+
+    try {
+      if (undo) {
+        // 完了済み → タップで取り消し（minus）
+        await notifier.decrementCount(widget.todo.id);
+      } else {
+        // 未完了 → タップで完了（plus）
+        await notifier.incrementCount(widget.todo.id, l10n: l10n);
+      }
+    } catch (_) {
+      // 【FEAT-533 追補 §9-5 (2026-08-26)】通信失敗をユーザーに伝える。
+      //
+      // 🔴 ここには「エラー通知は notifier 側が行う」と書いてあったが**事実ではない**。
+      // `HabitsNotifier.incrementCount` の catch は rollback +
+      // `pendingPlayerReward = null` + `playerNotifier.refresh()` + `rethrow` の 4 行で、
+      // **ユーザーに向けたメッセージは 1 つも出していない**。結果、同じホーム画面で
+      // 習慣カードは「通信が滞ってしまったようです 🪶」を出すのに、
+      // **ToDo カードだけが無言で元に戻る**という差が生まれていた。
+      //
+      // 🔵 これは FEAT-533 の退行ではない。変更前は `await` していなかったので例外は
+      // 未処理の非同期エラーになり、やはり何も出ていなかった。FEAT-533 は
+      // **元からあった沈黙を可視化しただけ**である。
+      //
+      // 文言は `habit_card` と同じ既存キーを再利用する (新規 ARB 不要)。
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.habitCardNetworkErrorSabi_message,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            backgroundColor: const Color(0xFF2A2A3E),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   void _onTapCancel() => _resetPressState();

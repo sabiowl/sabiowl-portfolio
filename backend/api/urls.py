@@ -262,6 +262,9 @@ urlpatterns = [
     # 【FEAT-463】緊急メンテナンスモード (AllowAny、起動時 + 再試行ボタン用)
     path('maintenance/',
          views.MaintenanceStatusView.as_view(),         name='maintenance-status'),
+    # 【FEAT-543 (2026-09-23)】バージョンアップ告知 (AllowAny、起動時に 1 回)
+    path('app-update/',
+         views.AppUpdateStatusView.as_view(),           name='app-update-status'),
 
     # 【FEAT-465 (2026-06-24)】月次カテゴリチャレンジ
     path('challenges/',

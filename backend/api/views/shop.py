@@ -17,6 +17,7 @@ from ..constants import (  # 【BUG-62】ticket maxima を gacha.py と共通参
 )
 from ..models import PlayerItem, PlayerProfile, PlayerWeapon, WeaponMaster  # 【FEAT-326】PlayerWeapon/WeaponMaster
 from ..permissions import IsAuthenticatedOrGuest  # FEAT-187
+from ..serializers import get_i18n_field  # 【BUG-146 Phase 3】WeaponMaster の _en を読む
 from ..services.posthog_capture import capture_for_player  # 【FEAT-497】ピース消費計測
 from ._error_helpers import error_response  # 【FEAT-475 Phase 3b】新形式統一
 from .mixins import PlayerMixin
@@ -290,7 +291,170 @@ SHOP_CATALOG = [
      'item_type': 'piece_exchange'},
 ]
 
+
+# ── 【BUG-146 Phase 3 (2026-08-19)】ショップの英語表示 ────────────────────
+#
+# `SHOP_CATALOG` は **model ではなく Python の dict リテラル**なので `_en` カラムが
+# 存在せず、model を走査する `test_i18n_field_census.py` の視界の外にある。
+# 英訳はここに置く。
+#
+# ## 二重管理を避ける切り分け
+#
+#   name   … **武器 27 品目は `WeaponMaster.name_en` を引く** (二重に持たない)。
+#            武器以外の 12 品目だけ `_SHOP_NON_WEAPON_NAME_EN` に持つ。
+#   effect … **全 39 品目をここに持つ**。`SHOP_CATALOG['effect']` と
+#            `WeaponMaster.description` は別の文言だからである
+#            (例: 銅の剣 → shop「攻撃力 +5 の入門装備。最初の一振りに相応しい。」/
+#             WeaponMaster「初心者向けの軽い剣。最初の一振りに相応しい入門装備。」)。
+#
+# ## model 化しない理由
+#
+# 38 行の seed migration と admin 画面が増えるが、運営がショップ文言を編集する予定は
+# 無い。FEAT-250「破壊的データマイグレーション禁止」の観点でも代償が大きい。
+#
+# ## id がずれたら落ちる (Pre-mortem #3)
+#
+# 片側だけ item を足すと**静かに日本語へ落ちる**。
+# `api/tests/test_shop_i18n_catalog.py` が id 集合の完全一致を assert しており、
+# 追加・削除した瞬間に CI が落ちる。
+
+# id -> name (武器以外の 12 品目のみ。武器は WeaponMaster.name_en を引く)
+_SHOP_NON_WEAPON_NAME_EN: dict[str, str] = {
+    'recovery_potion':         'Healing Potion',
+    'recovery_potion_plus':    'Greater Healing Potion',
+    'attack_potion':           'Attack Potion',
+    'defense_potion':          'Defense Potion',
+    'xp_boost_1.5x':           'XP Boost',
+    'ticket_daily':            'Daily Ticket Exchange',
+    'ticket_weekly':           'Weekly Ticket Exchange',
+    'streak_protection':       'Streak Stone',
+    'daily_quest_slot_expand': 'Daily Quest Slot Expansion',
+    'piece_xp_boost':          'XP Boost Exchange',
+    'piece_battle_charge':     'Battle Ticket Exchange',
+    'piece_character_ticket':  'Character Exchange Ticket',
+}
+
+# id -> effect (全 39 品目)
+_SHOP_EFFECT_EN: dict[str, str] = {
+    # ── 消耗品 / 交換 ────────────────────────────────────────────────
+    'recovery_potion':
+        'A refined potion that restores half your HP. You can set how many to use before a battle.',
+    'recovery_potion_plus':
+        'A refined potion that fully restores your HP. Being the greater grade, it is used before ordinary healing potions.',
+    'attack_potion':
+        'A stimulant that raises your attack by 50% for the turn it is used. You can set how many to use before a battle.',
+    'defense_potion':
+        'A protective draught that cuts the damage you take to 1/1.5 for the turn it is used. You can set how many to use before a battle.',
+    'xp_boost_1.5x':
+        'Multiplies EXP by 1.5 for a while. Obtained from the gacha.',
+    'ticket_daily':  'Daily gacha ticket +1',
+    'ticket_weekly': 'Weekly gacha ticket +1',
+    'streak_protection':
+        'The day after a streak breaks, spend one to restore it. A charm for keeping your own pace.',
+    'daily_quest_slot_expand':
+        'Daily quest slots +1 (up to +5, max 15 quests per day)',
+    'piece_xp_boost':
+        '100 exchange pieces for an XP Boost +1. Using it multiplies EXP by 1.5 for a while.',
+    'piece_battle_charge':
+        '100 exchange pieces for 5 battle tickets (up to 30). For when one more step is all you need.',
+    'piece_character_ticket':
+        '500 exchange pieces for a character exchange ticket +1. Trade it for any SSR character you do not own yet.',
+
+    # ── 武器 27 品目 (name は WeaponMaster.name_en 側) ────────────────
+    'bronze_sword':
+        'An entry-level weapon with +5 attack. A fitting first swing.',
+    'iron_sword':
+        '+10 attack. The same power as the starter blade, but with the satisfaction of having bought it yourself.',
+    'steel_sword':
+        '+20 attack. The peak of what coins can buy.',
+    'wood_sword':
+        '+5 attack. A wooden practice sword, a fitting first swing.',
+    'wood_axe':
+        '+5 attack. A plain wooden axe for practice.',
+    'wood_spear':
+        '+5 attack. An entry-level weapon for learning your reach.',
+    'wood_knife':
+        '+5 attack. A small blade for learning the basics of speed.',
+    'wood_staff':
+        '+5 attack. A plain staff, essential for practising incantations.',
+    'practice_foil':
+        '+5 attack. A training rapier, ideal for mastering graceful form.',
+    'wood_bow':
+        '+5 attack. An entry-level bow for building the basics of your aim.',
+    'hemp_bandage':
+        '+5 attack. Hemp wrappings that support an unarmed strike.',
+    'wood_lute':
+        '+5 attack. A hand-carved instrument whose gentle tone lifts your companions.',
+    'glass_flask':
+        '+5 attack. A glass flask for alchemical experiments. Handle it with care.',
+    'wood_scythe':
+        '+5 attack. A wooden practice scythe modelled on a farming tool.',
+    'iron_pistol':
+        '+5 attack. A small entry-level firearm built to tame the recoil.',
+    'iron_small_sword':
+        '+10 attack. An iron short sword built for ease of handling.',
+    'iron_hand_axe':
+        '+10 attack. A one-handed iron axe with dependable force.',
+    'iron_thrust_spear':
+        '+10 attack. An iron spear made for the single decisive thrust.',
+    'iron_dagger':
+        '+10 attack. A finely honed iron dagger that seeks the vital point.',
+    'apprentice_grimoire':
+        '+10 attack. A grimoire for apprentice mages, packed with the basic spells.',
+    'iron_fine_needle':
+        '+10 attack. A thin, sharp iron needle for the magic swordsman rites.',
+    'iron_short_bow':
+        '+10 attack. A short bow reinforced with iron, steadying your aim.',
+    'iron_knuckle':
+        '+10 attack. Iron knuckles worn over the fist, adding weight to every blow.',
+    'hunting_rifle':
+        '+10 attack. A hunting rifle suited to long-range shots, proper gear for a hunter.',
+    'iron_string_harp':
+        '+10 attack. A small harp strung with iron, rousing your allies.',
+    'iron_frame_flask':
+        '+10 attack. A flask reinforced with an iron frame, letting you experiment safely.',
+    'iron_scythe':
+        '+10 attack. A keen iron scythe that strikes like a reaper.',
+}
+
+# XP ブーストは effect を動的に組み立てる (3 状態)。静的な既定値は
+# `_SHOP_EFFECT_EN['xp_boost_1.5x']` 側にあり、ここは残り 2 状態ぶん。
+_XP_BOOST_ACTIVE_EFFECT = {
+    'ja': 'ブースト中 (残り {minutes} 分)。期限終了後に再使用できますよ',
+    'en': 'Boost active ({minutes} min left). You can use another once it ends.',
+}
+_XP_BOOST_OWNED_EFFECT = {
+    'ja': '一定時間 EXP を 1.5 倍に。タップで使えますよ',
+    'en': 'Multiplies EXP by 1.5 for a while. Tap to use.',
+}
+
+
 _CATALOG_BY_ID = {item['id']: item for item in SHOP_CATALOG}
+
+
+def _localize_catalog_item(item: dict, locale: str, weapon_name_en: dict) -> dict:
+    """【BUG-146 Phase 3】`SHOP_CATALOG` の 1 品目を locale に合わせて差し替える。
+
+    `locale != 'en'` のときは **item をそのまま返す** ので、日本語経路は
+    完全に従来どおり (辞書のコピーすら作らない)。
+
+    英訳が引けなかった場合は日本語へ silent fallback する。id ずれで静かに
+    日本語に落ちる事故は `test_shop_i18n_catalog.py` の集合一致テストが
+    CI で捕まえる (Pre-mortem #3)。
+    """
+    if locale != 'en':
+        return item
+    if item.get('item_type') == 'weapon':
+        # 武器名は WeaponMaster が真実値 (shop 側に二重に持たない)
+        name = weapon_name_en.get(item.get('weapon_key'), '')
+    else:
+        name = _SHOP_NON_WEAPON_NAME_EN.get(item['id'], '')
+    effect = _SHOP_EFFECT_EN.get(item['id'], '')
+    return {
+        **item,
+        'name':   name or item['name'],
+        'effect': effect or item['effect'],
+    }
 
 
 def compute_coins(player) -> int:
@@ -326,8 +490,26 @@ class ShopItemsView(PlayerMixin, APIView):
         # 旧実装は DEBUG モードのみ dev_tool を表示する分岐があったが、SHOP_CATALOG から
         # 該当アイテム自体を削除したため不要に。
         catalog = SHOP_CATALOG
+
+        # 【BUG-146 Phase 3】locale の解決は view ごとに 1 行だけ (Pre-mortem #4)。
+        locale = getattr(request, 'locale', 'ja')
+        # 武器名は WeaponMaster が真実値。**en のときだけ** 1 クエリで引く
+        # (ja 経路のクエリ数は従来どおり = 既存のクエリ数ガードに影響しない)。
+        weapon_name_en: dict = {}
+        if locale == 'en':
+            weapon_name_en = {
+                w.key: (w.name_en or '').strip()
+                for w in WeaponMaster.objects.filter(
+                    key__in=[
+                        it['weapon_key'] for it in catalog
+                        if it.get('item_type') == 'weapon' and it.get('weapon_key')
+                    ],
+                ).only('key', 'name_en')
+            }
+
         items = []
         for item in catalog:
+            item = _localize_catalog_item(item, locale, weapon_name_en)
             if item.get('item_type') == 'weapon':
                 # 【FEAT-327 Fix-1】 PlayerWeapon の所持状態を反映 (1 = 既所持、0 = 未所持)。
                 # 武器は 1 人 1 個の UniqueConstraint (PlayerWeapon model) があるため、
@@ -355,11 +537,15 @@ class ShopItemsView(PlayerMixin, APIView):
                     # 他 2 経路 (home_body.dart _XpBoostChip / shop_page.dart カード)
                     # と同じ「分単位切り上げ」に統一。
                     remaining_minutes = math.ceil((active_until - now).total_seconds() / 60)
-                    effect = f'ブースト中 (残り {remaining_minutes} 分)。期限終了後に再使用できますよ'
+                    # 【BUG-146 Phase 3】動的 effect も locale 別に持つ。
+                    # 静的な既定値だけ英訳しても、ブースト中は日本語に戻ってしまう。
+                    effect = _XP_BOOST_ACTIVE_EFFECT[locale].format(
+                        minutes=remaining_minutes)
                 elif qty > 0:
-                    effect = '一定時間 EXP を 1.5 倍に。タップで使えますよ'
+                    effect = _XP_BOOST_OWNED_EFFECT[locale]
                 else:
-                    effect = item['effect']  # '...ガチャから入手できますよ' (デフォルト)
+                    # 既定値は `_localize_catalog_item` で locale 済
+                    effect = item['effect']
                 items.append({
                     **item, 'owned_quantity': qty, 'effect': effect,
                 })
@@ -417,7 +603,8 @@ class ShopItemsView(PlayerMixin, APIView):
             for weapon in WeaponMaster.objects.filter(key__in=extra_weapon_keys):
                 items.append({
                     'id':             weapon.key,
-                    'name':           weapon.name,
+                    # 【BUG-146 Phase 3】catalog 外の所持武器も master data。
+                    'name':           get_i18n_field(weapon, 'name', locale),
                     'category':       'weapons',
                     'emoji':          '⚔️',
                     # rarity は暫定 3 (SSR 想定、Mobile UI 表示用のバッジ相当)。
@@ -439,7 +626,13 @@ class ShopItemsView(PlayerMixin, APIView):
                     # が縛っている。
                     'price':          0,
                     'diamond_price':  0,
-                    'effect':         weapon.description or f'攻撃力 +{weapon.atk_bonus} の装備です',
+                    # 【BUG-146 Phase 3】description も master data。空だったときの
+                    # 既定文も locale 別に出す (英語 UI に日本語が混ざらないように)。
+                    'effect': (
+                        get_i18n_field(weapon, 'description', locale)
+                        or (f'Equipment with +{weapon.atk_bonus} attack.' if locale == 'en'
+                            else f'攻撃力 +{weapon.atk_bonus} の装備です')
+                    ),
                     'item_type':      'weapon',
                     'weapon_key':     weapon.key,
                     # PlayerWeapon の unique_player_weapon 制約により所持数は常に 0 or 1、

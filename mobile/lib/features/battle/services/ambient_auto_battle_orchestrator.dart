@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/analytics/posthog_service.dart';
 import '../../habits/providers/habits_provider.dart' show playerNotifierProvider;
+import '../constants/battle_constants.dart';
 import '../models/battle_state.dart' show BattleStatus;
 import '../models/enemy.dart' show EnemyMaster;
 import '../providers/battle_provider.dart';
@@ -20,6 +21,7 @@ class AmbientBattleState {
     this.isRunning = false,
     this.countdownSecondsLeft,
     this.defeatEnemyName,
+    this.defeatRemainingBattles = 0,
     this.showEmptyPresetSnackBar = false,
     this.remainingBattles = 0,
     this.summary,
@@ -33,6 +35,14 @@ class AmbientBattleState {
 
   /// 非 null = ホーム画面に敗北 dialog を表示させるシグナル。
   final String? defeatEnemyName;
+
+  /// 【BUG-148】敗北 dialog に出す「**この敵の**残り回数」。
+  /// [defeatEnemyName] が非 null のときだけ意味を持つ。
+  ///
+  /// 🔴 [remainingBattles] とは別物。あちらは **queue 全体**の残数で
+  /// `isRunning == true` の間だけ意味を持つ。名前が似ているうえ同じ class に
+  /// 並ぶので、**dialog に queue 全体の数が出る**という取り違えをしやすい。
+  final int defeatRemainingBattles;
 
   /// true = ホーム画面に「敵を選んでください」SnackBar を表示させるシグナル。
   final bool showEmptyPresetSnackBar;
@@ -154,12 +164,11 @@ class AmbientAutoBattleNotifier extends StateNotifier<AmbientBattleState> {
   /// 【FEAT-513 v1.1 hotfix 2026-07-31】countdown 中に user が Cancel = auto battle 中止。
   bool _cancelRequested = false;
 
-  /// 【gameplay_review 20260803 要素 A-4】次回 1 回だけ countdown を省略する。
-  ///
-  /// 敗北 dialog の「続ける」は user の明示的な再開意思なので、countdown の目的
-  /// (= 意図しない発火を止める猶予) は既に満たされている。そこで再度 10 秒待たせるのは
-  /// 「今まさに続けると言ったのに待たされる」という一番いらない待ちになる。
-  bool _skipNextCountdown = false;
+  // 【BUG-148 (2026-08-24)】旧 `_skipNextCountdown` は撤去した。
+  // 由来は gameplay_review 20260803 要素 A-4「敗北 dialog の『続ける』直後に
+  // 10 秒待たせない」で、**唯一の発火点だった「続ける」ボタンごと無くなった**
+  // ため、呼ばれない分岐だけが残る形になっていた。
+  // 🔵 「続ける」を復活させるなら、これも一緒に戻すこと。
 
   /// ホーム到着時 or task 達成で charges 到達時に呼ぶ。前提条件確認 → 10 秒
   /// countdown → バトルループ実行の 3 段階。
@@ -215,11 +224,8 @@ class AmbientAutoBattleNotifier extends StateNotifier<AmbientBattleState> {
       }
 
       // ─── 6. 10 秒 countdown (FEAT-513 v1.1 hotfix 2026-07-31) ─────────────
-      // 【要素 A-4】「続ける」直後は 0 秒 = countdown を挟まず即開始する。
-      final countdownSeconds = _skipNextCountdown
-          ? 0
-          : _ref.read(ambientAutoBattleCountdownSecondsProvider);
-      _skipNextCountdown = false;
+      final countdownSeconds =
+          _ref.read(ambientAutoBattleCountdownSecondsProvider);
       _countdownActive = true;
       _skipRequested = false;
       _cancelRequested = false;
@@ -310,9 +316,12 @@ class AmbientAutoBattleNotifier extends StateNotifier<AmbientBattleState> {
           // _onOrchestratorUpdate の auto-finish を wait する。
           BattleSession? session;
           try {
+            // 【FEAT-529】`ambient: true` = 倍速の実効値を 3x で頭打ちにする。
+            // Skip (50x) のままだと FEAT-527 の攻撃モーション (400ms 固定) が
+            // 一度も見えないまま決着する。ユーザーの設定自体は書き換えない。
             await _ref
                 .read(battleSessionProvider.notifier)
-                .startBattle(enemyKey: enemy.key);
+                .startBattle(enemyKey: enemy.key, ambient: true);
             session = await _awaitBattleCompletion();
           } on DailyBattleLimitReachedException {
             // T7: 日次上限 → ループ終了
@@ -335,11 +344,32 @@ class AmbientAutoBattleNotifier extends StateNotifier<AmbientBattleState> {
           );
 
           if (!won) {
+            // 🔴 【BUG-148 (2026-08-24)】**敗北でも 1 消費する。**
+            //
+            // 戦った以上チャージは払っており、ギルド画面のラベルも「残り回数」
+            // なので、減らさないとこの数字が嘘になる。減らさないと、負け続ける
+            // かぎり同じ敵が永久にキューの先頭に残り (tier 降順ソートなので
+            // hidden_boss は必ず先頭)、**ホームに来るたびに一番強い相手に
+            // 報酬ゼロで負ける**。ユーザーからは「設定していないのに勝手に
+            // 始まった」としか見えない (2026-08-24 実機報告)。
+            //
+            // 🔵 消費するのは 1 回分だけで、**ループは止める** (下の return)。
+            // Q7「敗北 1 回で停止」= 連敗防止 (FEAT-513 S2) は別の目的なので
+            // 維持する。ここで続けると負け続けてチャージを全部溶かす。
+            remaining--;
+            if (remainingTotal > 0) remainingTotal--;
+            await AmbientAutoBattlePreferences.setPreset(
+              prefs,
+              enemy.key,
+              remaining,
+            );
+
             // Q7: 敗北 → ループ停止 + 敗北 dialog シグナル
             // 【gameplay_review 20260803 §2-2 d】敗北までに積んだ戦果も同時に渡す
             // (ホーム側でトースト → 敗北 dialog の順に消化される)。
             state = AmbientBattleState(
               defeatEnemyName: enemy.name,
+              defeatRemainingBattles: remaining,
               summary: wins > 0
                   ? AmbientBattleSummary(
                       wins: wins,
@@ -418,7 +448,17 @@ class AmbientAutoBattleNotifier extends StateNotifier<AmbientBattleState> {
         if (status == BattleStatus.won || status == BattleStatus.lost) {
           if (!completer.isCompleted) {
             // _sendFinish の Backend round-trip を待つため 2 秒余裕を持たせる。
-            Future.delayed(const Duration(seconds: 2), () {
+            //
+            // 🔴 【FEAT-526 / 2026-08-22】**KO 演出より短くしてはいけない。**
+            // 短いと額縁が畳まれる前に次の戦闘が始まり、演出が途中で切れる。
+            // 以前は 2 秒固定で、KO 演出 1.33 秒との差が 670ms しか無かった。
+            // 「K.O.」を 1.5 秒に伸ばした時点で残り 170ms になり、**次に
+            // 誰かが演出を伸ばした瞬間に静かに壊れる**距離だった。
+            // 定数側にコメントを書いて祈るのではなく、**長いほうを待つ**。
+            const roundTrip = Duration(seconds: 2);
+            final koTotal = BattleConstants.koScaledTotal(
+                next.state?.speedMultiplier ?? 1.0);
+            Future.delayed(koTotal > roundTrip ? koTotal : roundTrip, () {
               if (!completer.isCompleted) {
                 completer.complete(_ref.read(battleSessionProvider));
               }
@@ -446,12 +486,6 @@ class AmbientAutoBattleNotifier extends StateNotifier<AmbientBattleState> {
   /// 【FEAT-513 v1.1 hotfix】countdown 中に「キャンセル」button 押下時に呼ぶ。
   void cancelCountdown() {
     if (_countdownActive) _cancelRequested = true;
-  }
-
-  /// 【gameplay_review 20260803 要素 A-4】次回 1 回だけ countdown を省略させる。
-  /// 敗北 dialog の「続ける」から `maybeStartAutoBattle()` を呼ぶ直前に使う。
-  void requestSkipNextCountdown() {
-    _skipNextCountdown = true;
   }
 
   /// ホーム画面が dialog / SnackBar を表示した後に呼ぶ。UI シグナルをリセットする。

@@ -61,6 +61,10 @@ class LevelUpDialog extends ConsumerStatefulWidget {
     int newLevel, {
     Map<String, int> autoAllocations = const {},
     Map<String, int> crystalsAwarded = const {},  // 【FEAT-379】
+    // 【BUG-150 (2026-08-29)】main.dart の builder から呼ぶ経路では
+    // 既に `rootNavigatorKey.currentContext` (= Navigator の内側) を渡すので
+    // 祖先探索は不要。true のままだと null crash する。
+    bool useRootNavigator = true,
   }) {
     // 【gameplay_review 20260627 P2-1】祝祭系 popup の直列化のため
     // PopupSerializer.enqueueShowDialog 経由に変更。既存 API (show の戻り値)
@@ -68,6 +72,10 @@ class LevelUpDialog extends ConsumerStatefulWidget {
     return PopupSerializer.enqueueShowDialog<bool>(
       context: context,
       barrierDismissible: true,
+      useRootNavigator: useRootNavigator,
+      // 【FEAT-534】1: タップした行為の直接の結果なので最優先。
+      // EXP バーが満ちた理由をその場で示す。
+      priority: PopupPriority.levelUp,
       builder: (_) => LevelUpDialog(
         newLevel: newLevel,
         autoAllocations: autoAllocations,

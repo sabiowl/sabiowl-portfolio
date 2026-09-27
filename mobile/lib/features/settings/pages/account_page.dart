@@ -53,74 +53,156 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     setState(() => _step = 3);
   }
 
+  /// アカウント削除の実行。
+  ///
+  /// ## 🔴 【BUG-157 (2026-09-11)】①と②以降を分けている理由
+  ///
+  /// 旧実装は 6 つの処理を**1 つの `try/catch`** で包み、
+  /// **どこで落ちても同じ汎用文言**を出していた。つまり
+  ///
+  ///   - ①で落ちた（**アカウントは残っている**）のか
+  ///   - ②③で落ちた（**アカウントは既に消えている**）のか
+  ///
+  /// が、ユーザーにも運営にも区別できなかった。
+  ///
+  /// 後者の場合、**アカウントは消えているのに「うまくいきませんでした」と
+  /// 表示され、画面は削除画面に留まる**。ユーザーは「消えていない」と信じて
+  /// もう一度押すが、トークンはもう無効なので今度は①が失敗する ——
+  /// **同じ文言のまま、状態だけが変わっている。**
+  ///
+  /// 🔴 **`context.go(AppRoutes.auth)` を後片付けの失敗で飛ばしてはならない。**
+  /// 削除が成功しているのに削除画面に留まるのが、今の一番悪い結果である。
   Future<void> _executeDelete() async {
     if (_deleting) return;
     final l10n = AppLocalizations.of(context)!;
     setState(() => _deleting = true);
+
+    // 🔴 【BUG-162 (2026-09-12)】**サーバ削除を始める前に立てる。**
+    //
+    // 最初の実装は「削除成功の直後」に立てていたが、**実機では抑止が効かず
+    // 再作成のトーストが出た**。サーバ応答を待っているあいだに、
+    // それ以前に飛んでいたリクエストの 401 が先に着くためである。
+    //
+    // ⚠️ 削除が失敗したら [ApiClient.allowGuestSessionRecreation] で戻す。
+    // **削除できていないのに抑止を残すと、そのセッションが後で無効になっても
+    // BUG-147 の出口が使えないまま詰む。**
+    ApiClient.suppressGuestSessionRecreation();
+
+    // ── ① サーバでの削除。**ここで落ちたときだけ「失敗」である** ──────────
     try {
       await ref.read(settingsServiceProvider).deleteAccount(
             reason:     _selectedReason!,
             reasonText: _reasonTextController.text.trim(),
           );
-
-      // FEAT-200: アカウント削除完了イベント（identifyed のうちに送る）。
-      // この後 logout() で reset() が走り識別子はクリアされる。
-      // バックエンド側でも PostHog Identity Deletion API が呼ばれ、サーバー側のデータも消える。
-      await PosthogService.instance.capture('account_deleted');
-
-      // FEAT-195: logout() で GoogleSignIn signOut/disconnect が走る（Phase 1）。
-      await ref.read(authProvider.notifier).logout();
-
-      // FEAT-195: 万一 logout 内の Google クリアが失敗した場合の保険として再実行。
-      // 削除済みユーザーで再サインインが起きると `/auth/social/verify/` が
-      // 新規ユーザー作成に分岐し UI 応答停止につながるため、冗長でも確実性を優先。
-      try {
-        await GoogleSignIn().signOut();
-        await GoogleSignIn().disconnect();
-      } catch (_) {/* 既にクリア済み等は無視 */}
-
-      // 【BUG-128 (2026-06-14)】ゲストモードでアカウント削除した場合、logout() は
-      // ユーザートークンしか削除しないためゲストトークンが残留する。明示的に削除
-      // して次回起動時に死んだゲストトークンで API を叩くのを防ぐ。
-      try {
-        await ref.read(apiClientProvider).deleteGuestToken();
-      } catch (e) {
-        debugPrint('[account_delete] deleteGuestToken failed: $e');
-      }
-
-      // FEAT-195: アカウント削除はユーザーの「完全にやり直したい」意思表示なので、
-      // オンボーディング関連のローカル状態も全削除して完全クリーンスタートにする。
-      await _clearOnboardingLocalData();
-
-      if (mounted) context.go(AppRoutes.auth);
     } catch (e, st) {
-      debugPrint('account delete failed: $e\n$st');
+      debugPrint('[account_delete] server delete failed: $e\n$st');
+      // 🔴 削除できていないので抑止を戻す（上のコメント参照）。
+      ApiClient.allowGuestSessionRecreation();
       if (!mounted) return;
       setState(() => _deleting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.settingsGenericErrorSnackbarSabi_message),
+          content: Text(l10n.settingsAccountDeleteFailedSabi_message),
         ),
       );
+      return;
     }
+
+    // ── ②以降は後片付け。失敗しても「削除は完了した」ことは変わらない ──────
+    //
+    // ⚠️ **黙って捨てないこと。** `debugPrint` を残す ——
+    //    ③の `logout()` が落ちるとローカルにトークンが残り、次回起動で
+    //    「消えたアカウントのトークン」で 401 になる（BUG-156 の詰みに合流する）。
+    //    **ログが無いと追えない。**
+
+    // FEAT-200: アカウント削除完了イベント（identify されているうちに送る）。
+    // この後 logout() で reset() が走り識別子はクリアされる。
+    try {
+      await PosthogService.instance.capture('account_deleted');
+    } catch (e) {
+      debugPrint('[account_delete] posthog capture failed: $e');
+    }
+
+    // FEAT-195: logout() で GoogleSignIn signOut/disconnect が走る（Phase 1）。
+    try {
+      await ref.read(authProvider.notifier).logout();
+    } catch (e) {
+      debugPrint('[account_delete] logout failed: $e');
+    }
+
+    // FEAT-195: 万一 logout 内の Google クリアが失敗した場合の保険として再実行。
+    // 削除済みユーザーで再サインインが起きると `/auth/social/verify/` が
+    // 新規ユーザー作成に分岐し UI 応答停止につながるため、冗長でも確実性を優先。
+    try {
+      await GoogleSignIn().signOut();
+      await GoogleSignIn().disconnect();
+    } catch (_) {/* 既にクリア済み等は無視 */}
+
+    // 【BUG-128 (2026-06-14)】ゲストモードでアカウント削除した場合、logout() は
+    // ユーザートークンしか削除しないためゲストトークンが残留する。明示的に削除
+    // して次回起動時に死んだゲストトークンで API を叩くのを防ぐ。
+    try {
+      await ref.read(apiClientProvider).deleteGuestToken();
+    } catch (e) {
+      debugPrint('[account_delete] deleteGuestToken failed: $e');
+    }
+
+    // 🔴 【BUG-162 (2026-09-12)】secure storage 側のローカル状態を消す。
+    //
+    // 下の `_clearOnboardingLocalData()` は `has_seen_tutorial` と `guest_mode`
+    // を **`SharedPreferences` から**消していたが、**当時このキーは
+    // secure storage にあった**ので**何も消えていなかった**。
+    //
+    // 🔵 【FEAT-542 (2026-09-23)】4 キーは `SharedPreferences` へ移設し、
+    // `has_seen_tutorial` は `profile_setup_completed_for` に置き換わった。
+    // ⚠️ それでも**消す役目はこのメソッドに集約したまま**にしている ——
+    // 保存先が 2 つに分かれると、また片方だけ消す事故が起きる。
+    //
+    // 🔵 どちらも `app_router._performAuthCheck` が起動時の行き先を決めるのに
+    // 読むキーである。消え残ると、アカウントを消したのに「前の続き」として
+    // 扱われる。
+    try {
+      await ref.read(apiClientProvider).clearLocalStateForAccountDeletion();
+    } catch (e) {
+      debugPrint('[account_delete] clearLocalState failed: $e');
+    }
+
+    // FEAT-195: アカウント削除はユーザーの「完全にやり直したい」意思表示なので、
+    // オンボーディング関連のローカル状態も全削除して完全クリーンスタートにする。
+    await _clearOnboardingLocalData();
+
+    // 🔴 ここには**必ず到達する**。
+    if (mounted) context.go(AppRoutes.auth);
   }
 
   /// FEAT-195: アカウント削除時にオンボーディング系の SharedPreferences を一括削除。
   ///
+  /// 🔴 【BUG-162 (2026-09-12)】`has_seen_tutorial` と `guest_mode` をここから
+  /// 外した。**当時このキーは secure storage にあった**ので、
+  /// `prefs.remove` では**何も消えていなかった** ——
+  /// 下の宣言（「完全クリーンスタート」）が起きていなかった。
+  /// 消すのは `ApiClient.clearLocalStateForAccountDeletion()` の役目である。
+  ///
+  /// 🔵 【FEAT-542 (2026-09-23)】あの 4 キーは `SharedPreferences` へ移したが、
+  /// **役割分担は変えていない** —— 起動時の行き先を決めるキーは
+  /// `ApiClient` が消し、ここはオンボーディングの入力値だけを消す。
+  /// ⚠️ 保存先で分けるのではなく、**意味で分けている**。
+  ///
+  /// ⚠️ **ここに残っている 4 キーはオンボーディングの入力値である**
+  /// (`onboarding_service.dart` の 3 つ + 廃止済みの `guest_habits`)。
+  ///
   /// ログアウト時はこれを呼ばない（一時的にアプリを離れる経路のため、再ログイン時に
-  /// オンボーディングフローを再度通らないよう `has_seen_tutorial` 等を残す）。
+  /// オンボーディングフローを再度通らないよう設定済みフラグ等を残す）。
   Future<void> _clearOnboardingLocalData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('onboarding_player_name');
       await prefs.remove('onboarding_character_key');
-      await prefs.remove('has_seen_tutorial');
       await prefs.remove('first_todo_completed');
       // 【FEAT-221】launch_count / second_launch_shown は「特別なお知らせ」シート
       // 完全廃止（2026-05-15）に伴い key 自体が廃止されたため remove 行も削除。
       // FEAT-180 / FEAT-188 で廃止済みキーの残骸を念のため削除
       await prefs.remove('guest_habits');
-      await prefs.remove('guest_mode');
     } catch (e, st) {
       debugPrint('clear onboarding SP failed: $e\n$st');
     }

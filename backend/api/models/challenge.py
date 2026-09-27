@@ -180,6 +180,11 @@ class ChallengeParticipation(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='初回貢献日時')
 
     class Meta:
+        # 【BUG-153 (2026-09-06)】model の verbose_name が無かったため、
+        # admin の削除確認画面に **`challenge participation`** と英語で出ていた。
+        # field には全部付いているのに model だけ抜けていた形である。
+        verbose_name        = '月次チャレンジ参加'
+        verbose_name_plural = '月次チャレンジ参加'
         constraints = [
             models.UniqueConstraint(
                 fields=['player', 'challenge'],

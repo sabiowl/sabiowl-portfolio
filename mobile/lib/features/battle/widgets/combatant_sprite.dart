@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../constants/battle_constants.dart';
+import '../constants/battle_sprite_motion.dart';
 
 /// 【FEAT-295 Phase 1b】戦闘ユニットのドット絵 + 5 種演出を統合した widget。
 ///
@@ -44,6 +45,7 @@ class CombatantSprite extends StatefulWidget {
     this.flipHorizontal = false,
     this.attackDirection = AttackDirection.right,
     this.onActionDone,
+    this.enableMotion = false,
   });
 
   /// `assets/images/battle/<key>.webp` の key 部分。
@@ -58,6 +60,16 @@ class CombatantSprite extends StatefulWidget {
   /// - `left`: 左に動く (画面右配置の味方が敵に向かう)。
   final AttackDirection attackDirection;
   final VoidCallback? onActionDone;
+
+  /// 【FEAT-527】攻撃フレームの再生を許可する。
+  ///
+  /// **default は false**。有効にした画面でだけフレームが動き、
+  /// 他は 1 行も挙動が変わらない。素材が 1 体ずつ増える段階導入なので、
+  /// 「どこで有効か」を呼び出し側が明示する形にしている。
+  ///
+  /// true でも [BattleSpriteMotion.has] が false のキャラは
+  /// **従来どおりの Transform 演出**で動く (フォールバック)。
+  final bool enableMotion;
 
   @override
   State<CombatantSprite> createState() => _CombatantSpriteState();
@@ -76,6 +88,26 @@ class _CombatantSpriteState extends State<CombatantSprite>
 
   // フェードアウト用
   late final AnimationController _fadeCtrl;
+
+  // 【FEAT-527】攻撃フレーム送り。value 0.0〜1.0 を frameIndexFor で番号に変換。
+  late final AnimationController _frameCtrl;
+
+  /// このキャラで攻撃フレームを再生するか。
+  bool get _motionActive =>
+      widget.enableMotion && BattleSpriteMotion.has(widget.spriteKey);
+
+  /// いま攻撃フレームを描くべきか。
+  ///
+  /// `charge` (踏み込み) と `slash` (斬撃) の間だけフレームを出し、それ以外は
+  /// 立ち絵に戻す。`recoil` (被弾) は攻撃フレームではないので含めない。
+  ///
+  /// 🔴 KO のとき `BattleOrchestrator` は idle への復帰 Timer を畳むので
+  /// action は `slash` のまま残る (FEAT-526 §4.5)。その結果ここも true のままで、
+  /// **振り抜いた最終フレームで静止する** —— KO 演出の意図どおりの絵になる。
+  bool get _showingAttackFrame =>
+      _motionActive &&
+      (widget.action == SpriteAction.charge ||
+          widget.action == SpriteAction.slash);
 
   @override
   void initState() {
@@ -96,6 +128,10 @@ class _CombatantSpriteState extends State<CombatantSprite>
       vsync: this,
       duration: BattleConstants.fadeOutDuration,
       value: 1.0,
+    );
+    _frameCtrl = AnimationController(
+      vsync: this,
+      duration: BattleSpriteMotion.totalDuration,
     );
     _maybeRunAction();
   }
@@ -133,9 +169,14 @@ class _CombatantSpriteState extends State<CombatantSprite>
       case SpriteAction.idle:
         _actionCtrl.reset();
         _slashCtrl.reset();
+        // 【FEAT-527】立ち絵に戻すのでフレーム送りも巻き戻す。
+        _frameCtrl.reset();
         // 待機ループは継続中、何もしない
         break;
       case SpriteAction.charge:
+        // 【FEAT-527】攻撃フレームの再生開始。`slash` へ遷移しても止めない
+        // (400ms かけて 4 枚を送り、3 枚目が t=200ms の斬撃と重なる)。
+        if (_motionActive) _frameCtrl.forward(from: 0);
         _actionCtrl.duration = BattleConstants.chargeStepDuration;
         _actionCtrl.forward(from: 0).whenComplete(() {
           if (!mounted) return;
@@ -172,7 +213,25 @@ class _CombatantSpriteState extends State<CombatantSprite>
     _actionCtrl.dispose();
     _slashCtrl.dispose();
     _fadeCtrl.dispose();
+    _frameCtrl.dispose();
     super.dispose();
+  }
+
+  /// 描画するアセットのパス。
+  ///
+  /// フレームを持たないキャラ / [CombatantSprite.enableMotion] が false のときは
+  /// **従来と同じ `<key>.webp`** を返す (フォールバック)。
+  String _assetPath() {
+    if (!_motionActive) {
+      return 'assets/images/battle/${widget.spriteKey}.webp';
+    }
+    if (_showingAttackFrame) {
+      return BattleSpriteMotion.framePath(
+        widget.spriteKey,
+        BattleSpriteMotion.frameIndexFor(_frameCtrl.value),
+      );
+    }
+    return BattleSpriteMotion.idlePath(widget.spriteKey);
   }
 
   @override
@@ -186,7 +245,8 @@ class _CombatantSpriteState extends State<CombatantSprite>
           children: [
             // ── 1. 待機ユラユラ + 2. 突撃 + 4. のけぞり + 5. フェード ──
             AnimatedBuilder(
-              animation: Listenable.merge([_idleCtrl, _actionCtrl, _fadeCtrl]),
+              animation:
+                  Listenable.merge([_idleCtrl, _actionCtrl, _fadeCtrl, _frameCtrl]),
               builder: (_, __) {
                 // 待機 y 方向 ±2px
                 final swayY = sin(_idleCtrl.value * 2 * pi) * 2;
@@ -206,7 +266,9 @@ class _CombatantSpriteState extends State<CombatantSprite>
                     final chargeSign = widget.attackDirection == AttackDirection.right
                         ? 1.0
                         : -1.0;
-                    actionX = sin(t * pi) * 8 * chargeSign;
+                    // 【FEAT-527】フレームを持つキャラは **踏み込みを絵の中で
+                    // 描いている**ので、ここで widget ごと動かすと二重になる。
+                    actionX = _motionActive ? 0 : sin(t * pi) * 8 * chargeSign;
                     break;
                   case SpriteAction.recoil:
                     // ±4px shake、sign 反転
@@ -224,7 +286,7 @@ class _CombatantSpriteState extends State<CombatantSprite>
                           ? Matrix4.rotationY(pi)
                           : Matrix4.identity(),
                       child: Image.asset(
-                        'assets/images/battle/${widget.spriteKey}.webp',
+                        _assetPath(),
                         width:  widget.size,
                         height: widget.size,
                         // 【FEAT-405 hotfix (2026-06-01)】fit: BoxFit.contain 明示。
@@ -236,6 +298,10 @@ class _CombatantSpriteState extends State<CombatantSprite>
                         // 既存大キャンバス PNG (subaru = 1254x1254 等) は引き続き縮小表示。
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.none, // ドット絵 nearest-neighbor
+                        // 【2026-08-08】MiniBattleArena 側は `_kMiniSpriteSize` で
+                        // 拡大表示する (48 → 60)。元アセットは 92x92 〜 1254x1254 と
+                        // ばらついており、そもそも整数倍に揃っていないため、
+                        // サイズ変更で nearest-neighbor の見え方が悪化することはない。
                         errorBuilder: (_, __, ___) => Container(
                           width:  widget.size,
                           height: widget.size,

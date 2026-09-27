@@ -7,6 +7,11 @@ import 'package:hive_flutter/hive_flutter.dart';  // 【FEAT-476】Hive HTTP キ
 import 'package:sentry_flutter/sentry_flutter.dart';  // 【FEAT-470】
 import 'package:shared_preferences/shared_preferences.dart';  // FEAT-280
 import 'core/analytics/posthog_service.dart';  // FEAT-200
+import 'core/analytics/sentry_breadcrumb_scrubber.dart';  // 【BUG-160】breadcrumb の伏せ字
+import 'core/analytics/sentry_scope_tags.dart';  // 【BUG-159】environment / 属性タグ
+import 'core/api/api_client.dart';  // 【BUG-159】kApiBaseUrl / isGuestMode
+import 'core/providers/app_update_provider.dart';  // 【FEAT-543】起動時に 1 回聞く
+import 'features/auth/providers/auth_provider.dart';  // 【BUG-159】is_guest タグの追従
 import 'core/cache/cache_service.dart';  // FEAT-280
 import 'core/l10n/app_locale.dart';  // 【FEAT-489 Phase 2G-a】locale 解決 (BUG-27 防御)
 import 'core/l10n/service_l10n.dart';  // 【FEAT-489 Phase 2D】service 層の l10n 同期
@@ -16,11 +21,15 @@ import 'features/battle/providers/battle_provider.dart'
     show ambientAutoBattleEnabledProvider;  // 【FEAT-513 gameplay_review 20260803 §2-1】
 import 'features/battle/services/ambient_auto_battle_preferences.dart';  // 同上
 import 'features/challenge/services/challenge_notification_service.dart';  // 【FEAT-509】
-import 'core/services/popup_serializer.dart';  // 【gameplay_review 20260627 P2-1】popup 直列化
+import 'core/services/popup_serializer.dart';
+import 'core/widgets/account_suspended_overlay.dart';
+import 'core/widgets/app_popup_listeners.dart';  // 【gameplay_review 20260627 P2-1】popup 直列化
 import 'core/services/toast_center.dart';  // FEAT-247
 import 'core/theme/app_theme.dart';
 import 'core/widgets/boot_gate.dart';           // 【2026-07-07】起動時パラレルプローブ
 import 'core/widgets/connection_error_overlay.dart';  // 【2026-07-09】通信/サーバエラー画面
+import 'core/widgets/rate_limit_overlay.dart';  // 【BUG-158】429 専用画面 (待ち時間付き)
+import 'core/widgets/app_update_overlay.dart';  // 【FEAT-543】バージョンアップ告知
 import 'core/widgets/maintenance_overlay.dart';  // FEAT-463
 import 'features/habits/providers/habits_provider.dart';  // FEAT-438
 import 'features/habits/widgets/monthly_ticket_awarded_dialog.dart';  // FEAT-438
@@ -92,8 +101,30 @@ void main() async {
     (options) {
       options.dsn = const String.fromEnvironment('SENTRY_DSN_FLUTTER', defaultValue: '');
       options.tracesSampleRate = 0.1;
+      // 【BUG-159 (2026-09-12)】叩いている先で環境を分ける。
+      //
+      // 🔵 Sentry Flutter は未設定時に `kDebugMode ? 'debug' : 'production'`
+      // を入れるので debug / release は区別できていた。
+      // ⚠️ **しかし Android の `dev` flavor でビルドした release APK は
+      // `production` として記録される** —— 叩いている先が dev なのに、
+      // prod の事象として数えられる。
+      //
+      // 🔵 Backend は FEAT-536 で環境を分けている。Mobile だけ残っていた。
+      //
+      // ⚠️ `options.release` は触らない。package info から自動設定されるので、
+      // 書くと `appVersionProvider` (BUG-151) と真実値が二重になる。
+      options.environment = resolveSentryEnvironment(kApiBaseUrl);
       // 個人情報を Sentry に送らない (プライバシーポリシー整合)
       options.beforeSend = (event, hint) => event.copyWith(user: null);
+      // 【BUG-160 (2026-09-12)】HTTP breadcrumb の URL から識別子を伏せる。
+      //
+      // 🔴 **`beforeSend` 側で breadcrumb を触らないこと。** イベント確定時に
+      // まとめて書き換える形にすると、**breadcrumb の種類が増えるたびに
+      // 漏れる**。1 件ずつ通る本フックで処理する。
+      //
+      // 🔵 役割が別なので `beforeSend` の `user: null` は触っていない
+      // (BUG-159 の方針)。
+      options.beforeBreadcrumb = scrubHttpBreadcrumb;
     },
     appRunner: () => runApp(
       ProviderScope(
@@ -149,6 +180,16 @@ class _RestackAppState extends ConsumerState<RestackApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _onPendingDeepLinkChanged();
+      // 【BUG-159】起動直後の 1 回。以降は build の ref.listen が追従する。
+      // ⚠️ ここが無いと、認証状態が一度も変わらない起動でタグが空のままになる。
+      _syncSentryTags();
+      // 【FEAT-543 (2026-09-23)】更新告知を**起動時に 1 回だけ**聞く。
+      //
+      // ⛔ メンテと違ってヘッダーで割り込む形にはしない。
+      //    更新は「今すぐ止める必要がある事象」ではなく、毎レスポンスに
+      //    判定を載せると**メンテ告知で踏んだ誤発火の系統**を増やすだけである。
+      // ignore: discarded_futures —— fire-and-forget。起動をブロックしない。
+      ref.read(appUpdateStatusProvider.notifier).refresh();
     });
     // 【FEAT-463 → 2026-07-07】起動時 maintenance 状態確認は BootGate widget が
     // パラレルプローブ (health + maintenance、3s timeout) で実行する経路に統合済。
@@ -177,9 +218,40 @@ class _RestackAppState extends ConsumerState<RestackApp> {
     });
   }
 
+  /// 【BUG-159 (2026-09-12)】Sentry のタグを更新する**唯一のきっかけ**。
+  ///
+  /// 🔴 **`auth_provider` の遷移ごとに配ってはならない。**
+  /// `AuthStatus.authenticated` を設定している箇所は **5 箇所**あり、
+  /// そこに `setTag` を配るのは**このプロジェクトで 4 回続けて失敗したのと
+  /// 同じ形**である（BUG-152 → BUG-153 → FEAT-541 → BUG-156）。
+  ///
+  /// 🔵 きっかけが 1 つなら、**新しい遷移が増えても自動的に追従する**。
+  void _syncSentryTags() {
+    // ignore: discarded_futures — fire-and-forget。UI をブロックしない。
+    syncSentryScopeTags(
+      isGuestMode: () => ref.read(apiClientProvider).isGuestMode(),
+      languageCode: ref.read(appLocaleProvider).languageCode,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
+
+    // 【BUG-159】認証状態が動いたらタグを引き直す。
+    //
+    // ⚠️ ゲスト判定は secure storage の非同期読み出しで、**実行中に変わる**
+    // （ゲスト → ソーシャル連携で false になる）。init の時点では確定できない。
+    ref.listen<AuthState>(authProvider, (prev, next) {
+      if (prev?.status == next.status) return;
+      _syncSentryTags();
+    });
+    // 言語切替にも追従する（英語圏 launch 後に
+    // 「英語ユーザーだけで起きる」を見分けるため）。
+    ref.listen<Locale>(appLocaleProvider, (prev, next) {
+      if (prev == next) return;
+      _syncSentryTags();
+    });
 
     // P0-5: ホーム到達後の idle フレームでアセットをプリキャッシュ（初回のみ）
     if (!_precached) {
@@ -260,9 +332,38 @@ class _RestackAppState extends ConsumerState<RestackApp> {
         //                            して piece 演出発火 (全画面共通)
         //   Consumer              : 月間チケット SSR 確定 dialog の global listener
         return BootGate(
+          // 🔴 【FEAT-541 (2026-09-06)】停止 overlay は **MaintenanceOverlay の
+          // 1 段外側**。優先順位は 停止 > メンテ > 通信エラー > 通常 UI。
+          //
+          // メンテは一時的な全体事象、停止はこのアカウントに対する
+          // **確定した判定**である。停止されている人に「メンテナンス中です」と
+          // 見せると、**待てば直る**と誤解させる。
+          child: AccountSuspendedOverlay(
           child: MaintenanceOverlay(
+            // 🔴 【BUG-158 (2026-09-12)】レート制限は **ConnectionErrorOverlay の
+            // 1 段外側**。優先順位は 停止 > メンテ > レート制限 > 通信エラー。
+            //
+            // 429 は「あと N 秒」というサーバからの確定した回答で、
+            // 通信エラー (mobile 側の推測) より情報量が多い。
+            // 「通信できませんでした」を 429 のときに見せてはならない。
+            // 🔴 【FEAT-543 (2026-09-23)】更新告知は **メンテの 1 段内側 /
+            // レート制限の 1 段外側**。
+            //
+            // 🔵 メンテより下なのは、**メンテ中は更新しても直らない**から。
+            // 🔵 通信エラーより上なのは、**古い版が API 契約に合わなくて
+            //    通信に失敗している場合がある**から。そこで
+            //    「通信できませんでした」を見せても、ユーザーには打つ手が無い。
+            child: AppUpdateOverlay(
+            child: RateLimitOverlay(
             child: ConnectionErrorOverlay(
               child: PuzzlePieceListener(
+                // 【BUG-150 (2026-08-29)】レベルアップ / ログインボーナスの
+                // listener をここに移設した。旧配置は HomePage の中だけで、
+                // 素の ShellRoute はタブ切替で HomePage を unmount するため、
+                // **カレンダータブから達成すると祝われなかった**。
+                // PuzzlePieceListener を main.dart に移した FEAT-479 の
+                // global hotfix (2026-07-07) と同じ構造の積み残しである。
+                child: AppPopupListeners(
                 child: Consumer(
                   builder: (consumerContext, consumerRef, _) {
                     consumerRef.listen<bool>(
@@ -286,6 +387,8 @@ class _RestackAppState extends ConsumerState<RestackApp> {
                             context: rootNavigatorKey.currentContext ?? consumerContext,
                             useRootNavigator: false,  // navContext は既に Navigator 内側
                             barrierDismissible: true,
+                            // 【FEAT-534】3: 今月の節目。その日の節目 (2) より粒度が粗い。
+                            priority: PopupPriority.monthlyTicket,
                             builder: (_) => const MonthlyTicketAwardedDialog(),
                           );
                         });
@@ -294,8 +397,12 @@ class _RestackAppState extends ConsumerState<RestackApp> {
                     return child ?? const SizedBox.shrink();
                   },
                 ),
+                ),
               ),
             ),
+            ),
+            ),
+          ),
           ),
         );
       },

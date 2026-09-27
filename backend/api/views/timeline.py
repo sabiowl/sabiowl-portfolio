@@ -3,7 +3,7 @@ import datetime
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -48,7 +48,7 @@ class TimelineListView(APIView):
     GET  /api/timeline/?date=YYYY-MM-DD  — 指定日のイベント一覧
     POST /api/timeline/                  — イベント新規作成
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -170,7 +170,7 @@ class TimelineDetailView(APIView):
     PATCH  /api/timeline/<pk>/  — イベント部分更新
     DELETE /api/timeline/<pk>/  — イベント削除
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def _get_object(self, request, pk):
@@ -209,7 +209,7 @@ class TimelineGoogleLinkView(APIView):
     PATCH /timeline/<pk>/ では更新できない。Google への push 成功時のみ Flutter から
     本エンドポイントで一方向に書き込む設計。Google ID 上書き（再 push）は禁止しない。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):
@@ -247,7 +247,7 @@ class TimelineCompleteView(PlayerMixin, APIView):
     - すでに完了済みの予定を再度 POST しても EXP は付与しない（冪等）。
     - レスポンス: { event, exp_gain, diamond_earned }
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):
@@ -297,11 +297,14 @@ class TimelineCompleteView(PlayerMixin, APIView):
             economy      = player_obj.economy      # PlayerEconomyState (proxy)
 
             # 【FEAT-398】日次 EXP スロットル (経路 2: タイムライン予定完了)
-            # allocatable_points の配分 pt も 1pt 固定に削減 (points_gain = ALLOCATABLE_POINTS_TIMELINE の代替)
             # apply_daily_exp_throttle は内部で player.battle を参照 + save 済 (Phase 2b 適用済)。
-            allocatable_gain = GameBalance.ALLOCATABLE_POINTS_TIMELINE
-            exp_gain, allocatable_gain, daily_throttle_triggered = apply_daily_exp_throttle(
-                player_obj, exp_gain, allocatable_gain,
+            #
+            # 【FEAT-537 (2026-08-29)】旧実装はここで配分 pt も 1 に落としていた。
+            # pt のスロットルは **本経路にしか効いておらず** (習慣経路は戻り値を
+            # 捨てていた)、経路差の温存になっていたので廃止した。
+            # EXP 側の削減は従来どおり効く。
+            exp_gain, daily_throttle_triggered = apply_daily_exp_throttle(
+                player_obj, exp_gain,
             )
 
             # 【FEAT-318 (2026-06-13 再活性化)】XP ブースト有効時 ×1.5。
@@ -311,7 +314,7 @@ class TimelineCompleteView(PlayerMixin, APIView):
             while battle_state.current_exp >= battle_state.max_exp:
                 battle_state.current_exp        -= battle_state.max_exp
                 battle_state.level              += 1
-                battle_state.allocatable_points += allocatable_gain
+                battle_state.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
                 # 【FEAT-319】level_to_max_exp で単一真実値化、直書き禁止 (habit_count_service と統一)。
                 battle_state.max_exp             = GameBalance.level_to_max_exp(battle_state.level)
 
@@ -422,7 +425,7 @@ class TimelineUncompleteView(PlayerMixin, APIView):
     silently 無視されていた。専用 POST エンドポイントを設けて意図的な
     取り消しのみを許可する。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request, pk):

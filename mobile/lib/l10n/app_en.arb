@@ -1,4 +1,4 @@
-{
+﻿{
   "@@locale": "en",
   "appTitle": "Sabiowl",
   "@appTitle": {
@@ -66,6 +66,11 @@
   },
   "guildAutoBattleLabel": "Auto Battle",
   "guildAutoBattleSubtitle": "(Fights automatically when you open the app)",
+  "guildBattleSettingsTooltip": "Battle settings",
+  "battleSettingsTitle": "Battle Settings",
+  "battleSettingsSpeedLabel": "Battle Speed",
+  "battleSettingsSkipDescription": "⏭ plays the battle at maximum speed. Use it when you only want the result.",
+  "battleSettingsCloseLabel": "Close",
   "guildEnemyUnlockLevelOnly": "Unlocks at Lv.{unlockLevel}",
   "@guildEnemyUnlockLevelOnly": {
     "placeholders": { "unlockLevel": { "type": "int" } }
@@ -150,12 +155,15 @@
       "level": { "type": "int" }
     }
   },
-  "battleAmbientDefeatEnemyLabel": "(Defeated by {enemyName})",
+  "battleAmbientDefeatEnemyLabel": "(Defeated by {enemyName} — {remaining} {remaining, plural, =1{battle} other{battles}} left)",
   "@battleAmbientDefeatEnemyLabel": {
+    "placeholders": { "enemyName": { "type": "String" }, "remaining": { "type": "int" } }
+  },
+  "battleAmbientDefeatQueueDoneLabel": "(Defeated by {enemyName} — no auto battles left)",
+  "@battleAmbientDefeatQueueDoneLabel": {
     "placeholders": { "enemyName": { "type": "String" } }
   },
-  "battleAmbientDefeatRestButton": "Rest",
-  "battleAmbientDefeatContinueButton": "Continue",
+  "battleAmbientDefeatCloseButton": "Close",
   "battlePageTitle": "Battle",
   "battlePageBackTooltip": "Home (Battle continues)",
   "battlePageLoadingSabi_message": "Preparing for battle. 🪶",
@@ -239,7 +247,6 @@
   "battlePartyTitle": "Party & Equipment",
   "battlePartyCloseButton": "Close",
   "battlePartyLoadErrorSabi_message": "Unable to retrieve data. Please try again later. 🛡️",
-  "battlePartyJobHintSabi_message": "Your job is determined by your character. The proficiency system will be available in v1.1+. 🪶",
   "battlePartySectionJob": "Job",
   "battlePartyJobDetailHint": "Tap to view the job list. ⚔️",
   "battlePartySectionEquip": "Equipment",
@@ -400,7 +407,6 @@
     "placeholders": { "jobName": { "type": "String" }, "level": { "type": "int" } }
   },
   "gamifCharacterJobMasteryUnlockHint": "Will be equippable on other characters (planned for v1.1+)",
-  "gamifCharacterJobMasteryNextExpSabi_message": "{exp} more EXP until Lv {nextLevel}. 🪶",
   "@gamifCharacterJobMasteryNextExpSabi_message": {
     "placeholders": { "exp": { "type": "int" }, "nextLevel": { "type": "int" } }
   },
@@ -683,11 +689,11 @@
   "gamifStatHexagonLabelCreativity": "Creative",
   "gamifStatHexagonLabelContribution": "Social",
 
-  "gamifStatFullNameExercise": "Physical",
-  "gamifStatFullNameStudy": "Intellect",
-  "gamifStatFullNameHealth": "Vitality",
-  "gamifStatFullNameMental": "Spirit",
-  "gamifStatFullNameCreativity": "Creativity",
+  "gamifStatFullNameExercise": "Exercise",
+  "gamifStatFullNameStudy": "Study",
+  "gamifStatFullNameHealth": "Health",
+  "gamifStatFullNameMental": "Mental",
+  "gamifStatFullNameCreativity": "Creative",
   "gamifStatFullNameContribution": "Social",
   "gamifShopPurchaseFailedSabi_message": "Purchase failed. Please try again. 🪶",
 
@@ -733,7 +739,7 @@
     "placeholders": { "remaining": { "type": "int" } }
   },
   "habitWorldAmbientDailyLimitSabi_message": "Today's battles are done. Let's walk together again tomorrow 🪶",
-  "habitWorldAmbientCountdownHintSabi_message": "Auto battle begins in",
+  "habitWorldAmbientCountdownHintSabi_message": "{seconds, plural, =1{second} other{seconds}} until Auto Battle begins 🪶",
   "habitWorldAmbientCountdownCancelButton": "Cancel",
   "habitWorldAmbientCountdownStartButton": "Start Now",
 
@@ -794,6 +800,14 @@
   "habitLoginBonusTicketWeekly": "Weekly × {count}",
   "@habitLoginBonusTicketWeekly": {
     "placeholders": { "count": { "type": "int" } }
+  },
+  "habitLoginBonusStreakLine": "{streak}-day streak ({total} days total)",
+  "@habitLoginBonusStreakLine": {
+    "placeholders": { "streak": { "type": "int" }, "total": { "type": "int" } }
+  },
+  "habitLoginBonusTotalOnlyLine": "{total} days total",
+  "@habitLoginBonusTotalOnlyLine": {
+    "placeholders": { "total": { "type": "int" } }
   },
   "habitLoginBonusCloseButton": "Collect",
 
@@ -1370,6 +1384,7 @@
   "settingsUnlinkConfirmButton": "Unlink",
   "settingsUnlinkSuccessSnackbarSabi_message": "The account has been unlinked. Please link the correct one when you're ready. 🪶",
   "settingsGenericErrorSnackbarSabi_message": "Something went wrong. Please try again in a moment 🪶",
+  "settingsAccountDeleteFailedSabi_message": "Your account could not be deleted. Please check your connection and try again. 🪶",
   "settingsLogoutCheckErrorSnackbarSabi_message": "Could not verify account link status. Please try again in a moment 🪶",
   "settingsLogoutDialogTitle": "Log Out",
   "settingsLogoutDialogContent": "You will be logged out of your current account.\nYou won't be able to access your data until you sign in again.",
@@ -1550,6 +1565,32 @@
   "coreNavGuild": "Guild",
   "coreNavCalendar": "Calendar",
   "coreSplashSubtitle": "Steady effort becomes lasting strength.",
+  "coreAccountSuspendedTitle": "This account is suspended",
+  "coreAccountSuspendedSabi_message": "This account cannot be used at the moment.\nIf this seems unexpected, please reach out through support. 🪶",
+  "coreAccountSuspendedStillSabi_message": "I checked. This account is still unavailable. \ud83e\udeb6",
+  "@coreAccountSuspendedStillSabi_message": { "description": "BUG-164: shown when the retry button confirmed the account is STILL suspended. Must not imply the check failed." },
+  "coreAccountSuspendedCheckFailedSabi_message": "I could not check the status. Please check your connection and try again. \ud83e\udeb6",
+  "@coreAccountSuspendedCheckFailedSabi_message": { "description": "BUG-164: shown when the retry check could not reach the server. Distinct from still-suspended - we do NOT know the state." },
+  "coreAccountSuspendedLogoutButton": "Log out",
+  "coreRateLimitTitle": "Too many requests",
+  "@coreRateLimitTitle": { "description": "BUG-158: title on the HTTP 429 rate-limit overlay. NOT a connection failure - the server answered." },
+  "coreRateLimitBodySabi_message": "So many requests arrived at once that the server is taking a short rest. Your connection is fine. Wait just a little longer and we can continue. 🪶",
+  "@coreRateLimitBodySabi_message": { "description": "BUG-158: body on the rate-limit overlay - Sabi tone. Must state that the connection is fine." },
+  "coreRateLimitCountdown": "About {seconds} seconds to go",
+  "@coreRateLimitCountdown": {
+    "description": "BUG-158: remaining wait derived from the Retry-After header",
+    "placeholders": { "seconds": { "type": "int" } }
+  },
+  "coreAppUpdateRequiredTitle": "An update is required to continue",
+  "@coreAppUpdateRequiredTitle": { "description": "FEAT-543: title for the mandatory update notice. Fixed in ARB on purpose - do not move it to the DB." },
+  "coreAppUpdateRequiredBody": "This version can no longer run correctly. Please update from the App Store. All of your records are safe and will be waiting for you.",
+  "@coreAppUpdateRequiredBody": { "description": "FEAT-543: body for the mandatory update notice - Sabi tone. Must reassure that records carry over." },
+  "coreAppUpdateOpenStoreButton": "Open the App Store",
+  "@coreAppUpdateOpenStoreButton": { "description": "FEAT-543: button that opens the App Store" },
+  "coreAppUpdateLaterButton": "Later",
+  "@coreAppUpdateLaterButton": { "description": "FEAT-543: dismiss button. Shown for the recommended notice only." },
+  "coreAppUpdateOpenFailedMessage": "The App Store could not be opened. Please open the App Store from your home screen and update Sabiowl.",
+  "@coreAppUpdateOpenFailedMessage": { "description": "FEAT-543: shown inside the overlay when the store could not be opened (a SnackBar would be hidden under it - BUG-165)." },
   "coreRetryButton": "Retry",
   "coreLatestInfoButton": "News",
   "coreSupportButton": "Contact",
@@ -1860,6 +1901,8 @@
   "coreMaintenancePlaceholderTitle": "We're currently performing system maintenance.",
   "coreMaintenancePlaceholderBodySabi_message": "Please wait a moment and try again. 🪶",
 
+  "coreGuestSessionRecreatedSabi_message": "Your guest session has been recreated. We are sorry — you will be starting fresh from here. 🪶",
+
   "coreApiDefaultErrorSabi_message": "Something went wrong. Please wait a moment and try again. 🪶",
 
   "coreIapUnavailableSabi_message": "This is available on iOS for now. An Android version is planned for a future update. 🪶",
@@ -2028,7 +2071,7 @@
 
   "timelineTemplateWakeMemoSabi_message": "Good morning. Your time begins anew today. 🪶",
 
-  "timelineTemplateMorningTitle": "Morning Routine",
+  "timelineTemplateMorningTitle": "Breakfast",
 
   "timelineTemplateMorningMemoSabi_message": "Take your time with the first meal. A settled morning makes a settled day. 🪶",
 
@@ -2109,5 +2152,17 @@
   "gachaOddsRewardSectionTitle": "By reward",
   "gachaOddsNotesTitle": "Notes",
   "gachaOddsLoadFailedSabi_message": "Couldn't load the drop rates. Please wait a little while and try again. 🪶",
-  "gachaOddsRetry": "Try again"
+  "gachaOddsRetry": "Try again",
+  "gamifJobMasteryInfoTooltip": "About proficiency",
+  "gamifJobMasteryInfoTitle": "About job proficiency",
+  "gamifJobMasteryInfoLead": "Finishing a battle adds proficiency EXP to the job of the character you had equipped at the time.",
+  "gamifJobMasteryInfoHowToTitle": "How it goes up",
+  "gamifJobMasteryInfoHowToBattle": "Play a quest battle through to the end. Wins and losses both count",
+  "gamifJobMasteryInfoHowToEquipped": "Only the job of the character equipped at that time earns EXP",
+  "gamifJobMasteryInfoHowToAuto": "Battles played out by auto-battle count the same way",
+  "gamifJobMasteryInfoAmountTitle": "EXP earned",
+  "gamifJobMasteryInfoAmountWinLose": "Win: 5 EXP / Loss: 1 EXP",
+  "gamifJobMasteryInfoAmountTier": "The enemy's rank multiplies it (Minor Boss 1.0x / Mid-Boss 1.5x / Boss 2.5x / Hidden Boss 4.0x)",
+  "gamifJobMasteryInfoMaxTitle": "Lv 10 is the cap",
+  "gamifJobMasteryInfoMaxBody": "Lv 10 is the maximum. Equipping a maxed job on other characters is planned for a future update."
 }

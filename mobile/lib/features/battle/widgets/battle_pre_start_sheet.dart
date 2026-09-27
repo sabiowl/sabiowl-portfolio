@@ -113,19 +113,270 @@ class _BattlePreStartSheetState extends ConsumerState<BattlePreStartSheet> {
       });
     }
 
+    // 【BUG-149 (2026-08-26)】本文セクションはスクロール領域に入れる。
+    //
+    // 所持状況で advisory + 最大 4 種のポーションまで伸びるので、端末の高さや
+    // 文字サイズ設定によっては画面を超える。実測 (4 種所持 + advisory、
+    // 下部セーフエリア 34px): 375x667 で標準 80px / 文字 1.3 倍で 178px はみ出す。
+    // 下の `Flexible` + `SingleChildScrollView` がこれを受ける。
+    final sections = <Widget>[
+      // 【FEAT-302 → FEAT-439 (2026-06-17)】弱点 / 耐性のサビ口調警告。
+      // 「強さ未知数」体験維持のため、未勝利時は非表示、勝利後に解放。
+      // ギルド画面の chip 表示と一貫したルール (PM 判断)。
+      if (widget.enemy != null &&
+          widget.enemy!.defeated &&
+          _hasAnyResistanceOrWeakness(widget.enemy!))
+        _ResistanceAdvisory(enemy: widget.enemy!),
+      const SizedBox(height: 4),
+
+      // 回復薬選択ラベル
+      Row(
+        children: [
+          const Text(
+            RecoveryPotion.emoji,
+            style: TextStyle(fontSize: 20),
+          ),
+          const SizedBox(width: 6),
+          // 【BUG-149】ラベルは Flexible + ellipsis。裸の Text + Spacer だと
+          // 「防御の薬 (1 ターン被ダメージ ÷1.5)」のような長いラベルが横に溢れる
+          // (実測: 幅 390 で 46px、文字 1.3 倍で 163px)。
+          Flexible(
+            child: Text(
+              l10n.battlePreStartPotionPrompt,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Spacer(),
+          Text(
+            l10n.battlePreStartOwnedCount(ownedQty),
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+
+      // 0〜3 の選択ボタン群
+      Row(
+        children: List.generate(RecoveryPotion.maxPerBattle + 1, (n) {
+          final enabled = n <= maxSelectable;
+          final selected = _selectedPotions == n && enabled;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                right: n < RecoveryPotion.maxPerBattle ? 8 : 0,
+              ),
+              child: _PotionCountButton(
+                count: n,
+                selected: selected,
+                enabled: enabled,
+                onTap: enabled
+                    ? () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _selectedPotions = n);
+                      }
+                    : null,
+              ),
+            ),
+          );
+        }),
+      ),
+      const SizedBox(height: 8),
+
+      // ヘルパーテキスト（HP 30% 以下で自動使用）
+      Text(
+        l10n.battlePreStartAutoPotionHint,
+        style: const TextStyle(color: Colors.white38, fontSize: 11),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 16),
+
+      // 【FEAT-376】上位回復薬 (HP 全回復) セクション
+      if (maxSelectablePlus > 0 || ownedQtyPlus > 0) ...[
+        Row(
+          children: [
+            const Text(RecoveryPotionPlus.emoji,
+                style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 6),
+            // 【BUG-149】ラベルは Flexible + ellipsis (上と同じ理由)。
+            Flexible(
+              child: Text(
+                l10n.battlePreStartPotionPlusLabel,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Spacer(),
+            Text(l10n.battlePreStartOwnedCount(ownedQtyPlus),
+                style: const TextStyle(
+                    color: Colors.white54, fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(
+            RecoveryPotionPlus.maxPerBattle + 1,
+            (n) {
+              final enabled = n <= maxSelectablePlus;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: n < RecoveryPotionPlus.maxPerBattle ? 8 : 0,
+                  ),
+                  child: _PotionCountButton(
+                    count: n,
+                    selected: _selectedPotionsPlus == n && enabled,
+                    enabled: enabled,
+                    onTap: enabled
+                        ? () {
+                            HapticFeedback.selectionClick();
+                            setState(
+                                () => _selectedPotionsPlus = n);
+                          }
+                        : null,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+
+      // 【FEAT-376】攻撃の薬セクション
+      if (maxSelectableAttack > 0 || ownedQtyAttack > 0) ...[
+        Row(
+          children: [
+            const Text(AttackPotion.emoji,
+                style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 6),
+            // 【BUG-149】ラベルは Flexible + ellipsis (上と同じ理由)。
+            Flexible(
+              child: Text(
+                l10n.battlePreStartAttackPotionLabel,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Spacer(),
+            Text(l10n.battlePreStartOwnedCount(ownedQtyAttack),
+                style: const TextStyle(
+                    color: Colors.white54, fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(
+            AttackPotion.maxPerBattle + 1,
+            (n) {
+              final enabled = n <= maxSelectableAttack;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: n < AttackPotion.maxPerBattle ? 8 : 0,
+                  ),
+                  child: _PotionCountButton(
+                    count: n,
+                    selected: _selectedAttackPotions == n && enabled,
+                    enabled: enabled,
+                    onTap: enabled
+                        ? () {
+                            HapticFeedback.selectionClick();
+                            setState(
+                                () => _selectedAttackPotions = n);
+                          }
+                        : null,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+
+      // 【FEAT-432】防御の薬セクション、攻撃の薬と完全対称
+      if (maxSelectableDefense > 0 || ownedQtyDefense > 0) ...[
+        Row(
+          children: [
+            const Text(DefensePotion.emoji,
+                style: TextStyle(fontSize: 20)),
+            const SizedBox(width: 6),
+            // 【BUG-149】ラベルは Flexible + ellipsis (上と同じ理由)。
+            Flexible(
+              child: Text(
+                l10n.battlePreStartDefensePotionLabel,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Spacer(),
+            Text(l10n.battlePreStartOwnedCount(ownedQtyDefense),
+                style: const TextStyle(
+                    color: Colors.white54, fontSize: 12)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(
+            DefensePotion.maxPerBattle + 1,
+            (n) {
+              final enabled = n <= maxSelectableDefense;
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    right: n < DefensePotion.maxPerBattle ? 8 : 0,
+                  ),
+                  child: _PotionCountButton(
+                    count: n,
+                    selected: _selectedDefensePotions == n && enabled,
+                    enabled: enabled,
+                    onTap: enabled
+                        ? () {
+                            HapticFeedback.selectionClick();
+                            setState(
+                                () => _selectedDefensePotions = n);
+                          }
+                        : null,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    ];
+
     return SafeArea(
       top: false,
-      child: Container(
+      // 【BUG-149 (2026-08-26)】画面の 90% を上限にする。
+      //
+      // `isScrollControlled: true` で開いているので、この上限が無いと
+      // **内容の高さがそのままシートの高さになる**。上限を切って中身を
+      // スクロールさせることで、端末 / 文字サイズによらず
+      // 「出陣」ボタンが必ず画面内に残る。
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        child: Container(
         decoration: const BoxDecoration(
           color:        AppTheme.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        padding: EdgeInsets.fromLTRB(
-          16,
-          12,
-          16,
-          16 + MediaQuery.of(context).padding.bottom,
-        ),
+        // 🔴 【BUG-149】ここに `MediaQuery.padding.bottom` を足さないこと。
+        //
+        // 直上の `SafeArea(top: false)` が既に下部インセットを入れている。
+        // この `padding:` を評価している `context` は **SafeArea より上**なので
+        // `padding.bottom` は生の値 (ホームインジケータ端末で 34px) が取れてしまい、
+        // **同じ余白を 2 回数えていた**。実測でシートが 678.6 → 746.6 (= +34 × 2) に
+        // 膨らみ、これが実機報告「BOTTOM OVERFLOWED BY 32 PIXELS」の主因だった。
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -154,208 +405,18 @@ class _BattlePreStartSheetState extends ConsumerState<BattlePreStartSheet> {
             ),
             const SizedBox(height: 12),
 
-            // 【FEAT-302 → FEAT-439 (2026-06-17)】弱点 / 耐性のサビ口調警告。
-            // 「強さ未知数」体験維持のため、未勝利時は非表示、勝利後に解放。
-            // ギルド画面の chip 表示と一貫したルール (PM 判断)。
-            if (widget.enemy != null &&
-                widget.enemy!.defeated &&
-                _hasAnyResistanceOrWeakness(widget.enemy!))
-              _ResistanceAdvisory(enemy: widget.enemy!),
-            const SizedBox(height: 4),
-
-            // 回復薬選択ラベル
-            Row(
-              children: [
-                const Text(
-                  RecoveryPotion.emoji,
-                  style: TextStyle(fontSize: 20),
+            // 【BUG-149】本文だけがスクロールし、下の 2 ボタンは常に見えている。
+            // `Flexible` にすることで「入るなら伸びない / 入らないならスクロール」
+            // になる (`Expanded` だと内容が短くても常に最大まで伸びてしまう)。
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: sections,
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  l10n.battlePreStartPotionPrompt,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                const Spacer(),
-                Text(
-                  l10n.battlePreStartOwnedCount(ownedQty),
-                  style: const TextStyle(color: Colors.white54, fontSize: 12),
-                ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-
-            // 0〜3 の選択ボタン群
-            Row(
-              children: List.generate(RecoveryPotion.maxPerBattle + 1, (n) {
-                final enabled = n <= maxSelectable;
-                final selected = _selectedPotions == n && enabled;
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(
-                      right: n < RecoveryPotion.maxPerBattle ? 8 : 0,
-                    ),
-                    child: _PotionCountButton(
-                      count: n,
-                      selected: selected,
-                      enabled: enabled,
-                      onTap: enabled
-                          ? () {
-                              HapticFeedback.selectionClick();
-                              setState(() => _selectedPotions = n);
-                            }
-                          : null,
-                    ),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-
-            // ヘルパーテキスト（HP 30% 以下で自動使用）
-            Text(
-              l10n.battlePreStartAutoPotionHint,
-              style: const TextStyle(color: Colors.white38, fontSize: 11),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-
-            // 【FEAT-376】上位回復薬 (HP 全回復) セクション
-            if (maxSelectablePlus > 0 || ownedQtyPlus > 0) ...[
-              Row(
-                children: [
-                  const Text(RecoveryPotionPlus.emoji,
-                      style: TextStyle(fontSize: 20)),
-                  const SizedBox(width: 6),
-                  Text(l10n.battlePreStartPotionPlusLabel,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                  const Spacer(),
-                  Text(l10n.battlePreStartOwnedCount(ownedQtyPlus),
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: List.generate(
-                  RecoveryPotionPlus.maxPerBattle + 1,
-                  (n) {
-                    final enabled = n <= maxSelectablePlus;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: n < RecoveryPotionPlus.maxPerBattle ? 8 : 0,
-                        ),
-                        child: _PotionCountButton(
-                          count: n,
-                          selected: _selectedPotionsPlus == n && enabled,
-                          enabled: enabled,
-                          onTap: enabled
-                              ? () {
-                                  HapticFeedback.selectionClick();
-                                  setState(
-                                      () => _selectedPotionsPlus = n);
-                                }
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // 【FEAT-376】攻撃の薬セクション
-            if (maxSelectableAttack > 0 || ownedQtyAttack > 0) ...[
-              Row(
-                children: [
-                  const Text(AttackPotion.emoji,
-                      style: TextStyle(fontSize: 20)),
-                  const SizedBox(width: 6),
-                  Text(l10n.battlePreStartAttackPotionLabel,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                  const Spacer(),
-                  Text(l10n.battlePreStartOwnedCount(ownedQtyAttack),
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: List.generate(
-                  AttackPotion.maxPerBattle + 1,
-                  (n) {
-                    final enabled = n <= maxSelectableAttack;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: n < AttackPotion.maxPerBattle ? 8 : 0,
-                        ),
-                        child: _PotionCountButton(
-                          count: n,
-                          selected: _selectedAttackPotions == n && enabled,
-                          enabled: enabled,
-                          onTap: enabled
-                              ? () {
-                                  HapticFeedback.selectionClick();
-                                  setState(
-                                      () => _selectedAttackPotions = n);
-                                }
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-
-            // 【FEAT-432】防御の薬セクション、攻撃の薬と完全対称
-            if (maxSelectableDefense > 0 || ownedQtyDefense > 0) ...[
-              Row(
-                children: [
-                  const Text(DefensePotion.emoji,
-                      style: TextStyle(fontSize: 20)),
-                  const SizedBox(width: 6),
-                  Text(l10n.battlePreStartDefensePotionLabel,
-                      style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                  const Spacer(),
-                  Text(l10n.battlePreStartOwnedCount(ownedQtyDefense),
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: List.generate(
-                  DefensePotion.maxPerBattle + 1,
-                  (n) {
-                    final enabled = n <= maxSelectableDefense;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: n < DefensePotion.maxPerBattle ? 8 : 0,
-                        ),
-                        child: _PotionCountButton(
-                          count: n,
-                          selected: _selectedDefensePotions == n && enabled,
-                          enabled: enabled,
-                          onTap: enabled
-                              ? () {
-                                  HapticFeedback.selectionClick();
-                                  setState(
-                                      () => _selectedDefensePotions = n);
-                                }
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
 
             const SizedBox(height: 12),
 
@@ -392,6 +453,7 @@ class _BattlePreStartSheetState extends ConsumerState<BattlePreStartSheet> {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

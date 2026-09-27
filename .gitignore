@@ -130,3 +130,22 @@ doc/temp_logs/
 # GitHub Actions の画面からいつでも再取得できるうえ、1 run で ~1MB あるため追跡しない。
 # 追跡していないと `git add .` で巻き込まれるので、ここで明示的に除外する。
 doc/temp_logs/
+
+# 【2026-08-08】CI ログの一時置き場。doc/temp_logs/ に加え、
+# GitHub からダウンロードした doc/logs_<run_id>/ 形式も拾う。
+doc/logs_*/
+
+# 【2026-08-08】CI ログの一時置き場。doc/temp_logs/ に加え、
+# GitHub からダウンロードした doc/logs_<run_id>/ 形式も拾う。
+doc/logs_*/
+
+# 【2026-09-23】CI ログの一時置き場 (リポジトリ直下)。
+# doc/temp_logs/ と同じ理由で追跡しない (GitHub Actions からいつでも再取得できる)。
+temp/
+
+# 【2026-09-23】ストア用スクリーンショットの作業フォルダ。
+# 提出に使う mobile/assets/app_store_screenshot/*.PNG だけを追跡し、
+# 版ごとのアーカイブと選外分は追跡しない (合計 60 MB、clone を重くする)。
+mobile/assets/app_store_screenshot/v1.0_screenshot/
+mobile/assets/app_store_screenshot/v1.1_screenshot/
+mobile/assets/app_store_screenshot/不要/

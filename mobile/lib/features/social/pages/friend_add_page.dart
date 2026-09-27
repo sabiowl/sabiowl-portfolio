@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';  // 【FEAT-292】Clipboard / HapticFeedback
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/api/dio_error_helper.dart';  // 【2026-08-16 レビュー P2】isNetworkError
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/character_asset.dart';   // 【BUG-100】設定キャラアバター描画
 import '../../../core/utils/friend_id_formatter.dart';  // 【2026-07-02】12 桁化 + 4-4-4 表示
@@ -50,7 +51,20 @@ class _FriendAddPageState extends ConsumerState<FriendAddPage> {
       });
     } catch (e) {
       setState(() {
-        _error = l10n.socialFriendAddPageNotFoundError;
+        // 【2026-08-16 機能レビュー P2】旧実装は catch した内容に関わらず
+        // 「見つかりませんでした」を出していた。`catch (e)` はタイムアウトも
+        // DNS 失敗も 500 も掴むため、**電波の悪い場所で正しいフレンド ID を
+        // 入力したユーザーに「そのIDのユーザーは見つかりません」と表示**し、
+        // 存在しない問題を探させていた。
+        //
+        // 通信系かどうかは FEAT-402 の `isNetworkError` で判定できる
+        // (同 helper は「4xx/5xx でもオフライン帯が出る」という **方向は逆で
+        // 構造は同型** の誤判定を直すために書かれたもの)。それまで採用は
+        // SWR provider 層の 3 ファイルだけで page 層に降りていなかった。
+        // **これが page 層での最初の 1 例**で、以後の page 層 catch の参照実装。
+        _error = isNetworkError(e)
+            ? l10n.coreApiDefaultErrorSabi_message
+            : l10n.socialFriendAddPageNotFoundError;
         _loading = false;
       });
     }
@@ -73,8 +87,15 @@ class _FriendAddPageState extends ConsumerState<FriendAddPage> {
     } catch (e) {
       setState(() => _sending = false);
       if (mounted) {
+        // 【2026-08-16 機能レビュー P3】こちらは元から汎用文言なので **害は無い**
+        // (原因を断定していない)。`_search` と同じ形に揃えることで、
+        // 「page 層はこう書く」が 1 ファイルで完結する。
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.socialFriendAddPageSendErrorSabi_message)),
+          SnackBar(content: Text(
+            isNetworkError(e)
+                ? l10n.coreApiDefaultErrorSabi_message
+                : l10n.socialFriendAddPageSendErrorSabi_message,
+          )),
         );
       }
     }

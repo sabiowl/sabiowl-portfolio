@@ -8,12 +8,18 @@
 	     project.pbxproj も developmentRegion = ja に更新済 (2 重防御)。 -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ja</string>
-	<!-- 【2026-07-25】アプリがサポートする言語を明示 (日本語のみ、v1.1 で
-	     英語追加時に `<string>en</string>` を追加)。CFBundleDevelopmentRegion と
-	     整合し、App Store 表示の primary language を Japanese に確定させる。 -->
+	<!-- 【2026-07-25】アプリがサポートする言語を明示。CFBundleDevelopmentRegion と
+	     整合し、App Store 表示の primary language を Japanese に確定させる。
+	     【2026-08-09 / FEAT-489 Phase 5 (v1.1 G4)】予告どおり `en` を追加。
+	     ARB 1,474 key が en/ja 揃い `supportedLocales` に en が入ったため、
+	     **App Store に「対応言語: 日本語, 英語」と載せる**のが本追加の目的。
+	     `CFBundleDevelopmentRegion` は `ja` のまま = primary language は日本語を維持
+	     (ここを en にすると 2026-07-25 に直した「言語: 英語」表示が再発する)。
+	     `project.pbxproj` の `knownRegions` は既に (ja, en, Base) で整合済み。 -->
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>ja</string>
+		<string>en</string>
 	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Sabiowl</string>

@@ -19,6 +19,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
+from api.constants import GameBalance
 from api.models import FreeMemo, PlayerProfile
 from api.models.player_state import PlayerBattleState
 from ._error_assert import error_code, error_message  # 【FEAT-515】
@@ -368,6 +369,48 @@ class FreeMemoConvertTests(TestCase):
             exp_after, exp_before,
             'convert 後は current_exp が増加している (level up がない前提)',
         )
+
+    def test_convert_on_level_up_boundary_grants_allocatable_points(self):
+        """🔴 【FEAT-537】境界をまたいだ変換で配分ポイントが 10 入る。
+
+        本経路は **加算行が丸ごと欠落**していた (`update_fields` にも無かった)。
+        レベル / max_exp は他 6 経路と同じに更新するので、
+        **「レベルは上がったのに 0pt」が確定で発生**していた。
+
+        ⚠️ 変換 EXP は 3 と少額で、素直に呼ぶと閾値をまたぐ確率が低い。
+        「たまたま通る」ではなく **`current_exp = max_exp - 1` にして境界を
+        直接踏む** (Pre-mortem #7)。
+        """
+        battle, _ = PlayerBattleState.objects.get_or_create(player=self.player)
+        battle.current_exp = battle.max_exp - 1
+        battle.allocatable_points = 0
+        battle.save(update_fields=['current_exp', 'allocatable_points'])
+        level_before = battle.level
+
+        res = self.client.post(f'/api/free-memos/{self.memo.id}/convert-to-event/')
+        self.assertEqual(res.status_code, 200, res.content)
+
+        after = PlayerBattleState.objects.get(player=self.player)
+        self.assertEqual(after.level, level_before + 1, 'レベルが上がっていない')
+        self.assertEqual(
+            after.allocatable_points, GameBalance.ALLOCATABLE_POINTS_PER_LEVEL,
+            '🔴 レベルは上がったのに配分ポイントが入っていない。'
+            '加算行と update_fields の **両方** が必要 (片方だけでは DB に入らない)',
+        )
+
+    def test_convert_without_level_up_does_not_grant_points(self):
+        """境界をまたがない変換では pt が増えない (加算の位置がループ内)。"""
+        battle, _ = PlayerBattleState.objects.get_or_create(player=self.player)
+        battle.current_exp = 0
+        battle.allocatable_points = 0
+        battle.save(update_fields=['current_exp', 'allocatable_points'])
+
+        res = self.client.post(f'/api/free-memos/{self.memo.id}/convert-to-event/')
+        self.assertEqual(res.status_code, 200, res.content)
+
+        after = PlayerBattleState.objects.get(player=self.player)
+        self.assertEqual(after.allocatable_points, 0,
+                         'レベルアップしていないのに pt が入っている')
 
     def test_convert_to_todo_returns_correct_type(self):
         """POST /api/free-memos/<id>/convert-to-todo/ → converted_to='todo'。"""

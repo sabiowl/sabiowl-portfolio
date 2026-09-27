@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../providers/connection_error_provider.dart';
 import '../providers/maintenance_provider.dart';
+import '../providers/rate_limit_provider.dart';
 import '../services/maintenance_service.dart';
 
 /// 【2026-07-08 FEAT-483】起動時パラレルプローブによる Backend 健全性ゲート（非ブロッキング版）。
@@ -30,6 +31,13 @@ import '../services/maintenance_service.dart';
 /// | C | health=5xx (明示的 non-2xx 応答) | connectionErrorProvider | ConnectionErrorOverlay |
 /// | D | network error / 個別 probe timeout | connectionErrorProvider | ConnectionErrorOverlay |
 /// | E | 全体 timeout (10s) | connectionErrorProvider | ConnectionErrorOverlay |
+/// | F | health=429 (レート制限) | rateLimitProvider | RateLimitOverlay |
+///
+/// 【BUG-158 (2026-09-12) Case F 追加】**429 を C に混ぜてはならない。**
+/// 429 はサーバが「今は多すぎる、あと N 秒待て」と答えている = **通信は
+/// 生きている**。ConnectionErrorOverlay の「通信できませんでした」は
+/// 事実と逆であり、しかもあの画面の「再試行」が `/health/` を叩くので
+/// **脱出のためのボタンが枠をさらに消費していた**。
 ///
 /// ## overlay の分離 (2026-07-09 制定、user 要望への対応)
 ///
@@ -87,8 +95,13 @@ class BootGate extends ConsumerStatefulWidget {
   /// 【2026-07-09 緩和】旧 3s → 10s。Render Starter プランでも稀に cold-start
   /// (5-8 秒) が発生するため、3 秒 timeout は tight。10 秒なら通常条件でほぼ確実に
   /// 応答が返る。`Dio.receiveTimeout: 60s` より短くしつつ余裕を持たせている。
-  /// この時間を超えて timeout が起きても Case D/E として通常 UI 継続 (overlay 発火せず)、
-  /// 真の Backend 障害は 5xx sentinel が受け止める。
+  /// この時間を超えて timeout が起きたときは Case D/E として
+  /// `ConnectionErrorOverlay` が出る (`!health.isOk` の分岐)。
+  ///
+  /// 【FEAT-536 (2026-08-29) 訂正】旧記述は「通常 UI 継続 (overlay 発火せず)」
+  /// だったが、それは v2 (2026-07-09 早朝) の挙動である。v3 で overlay を 2 種類に
+  /// 分離したときに更新されなかった残骸で、**動作は正しい**。
+  /// 真実値はクラス冒頭の Case 表 (D / E とも ConnectionErrorOverlay)。
   static const Duration probeTimeout = Duration(seconds: 10);
 
   /// 個別 probe (health / maintenance) の receiveTimeout。
@@ -137,6 +150,15 @@ class _BootGateState extends ConsumerState<BootGate> {
       if (maintenance != null && maintenance.isEnabled) {
         ref.read(maintenanceStatusProvider.notifier).setStatusForBoot(maintenance);
       }
+      // Case F: 429 (レート制限)。🔴 **Case C/D/E より先に判定すること。**
+      // `!health.isOk` は 429 にも当たるので、順序を入れ替えると
+      // 「通信できませんでした」に戻る = BUG-158 の症状そのものである。
+      //
+      // 🔴 429 は **サーバが応答している証拠**であり、通信障害ではない。
+      // 待ち時間は `Retry-After` ヘッダから読む (DRF が必ず秒数で付ける)。
+      else if (health.retryAfter != null) {
+        ref.read(rateLimitProvider.notifier).mark(health.retryAfter!);
+      }
       // Case C / D / E: /health/ が確定 5xx を返した OR timeout / network error で
       // Backend 到達不能 → ConnectionErrorOverlay 発火 (通信接続エラー / サーバエラー)。
       //
@@ -162,9 +184,16 @@ class _BootGateState extends ConsumerState<BootGate> {
   ///
   /// 【FEAT-475 Phase 3】/api/health/ は AllowAny endpoint、認証不要。
   /// 【2026-07-07】DB + schema alignment チェック追加、503 で degraded 検知。
+  ///
+  /// 【BUG-147 Phase C (2026-08-20)】**`client.probeDio` を使う** (認証
+  /// インターセプタ非経由)。旧実装は `client.dio` だったため全リクエスト共通の
+  /// `onRequest` が認証ヘッダを付け、端末に古いトークンが残っていると
+  /// `/health/` が 401 になって overlay が出続けた。しかも
+  /// `validateStatus: (_) => true` のせいで Dio が 401 をエラー扱いせず、
+  /// **Phase B の回復経路にも乗らない**という二重の袋小路だった。
   Future<_HealthResult> _probeHealth(ApiClient client) async {
     try {
-      final response = await client.dio.get(
+      final response = await client.probeDio.get(
         '/health/',
         options: Options(
           receiveTimeout: BootGate.singleProbeTimeout,
@@ -176,6 +205,13 @@ class _BootGateState extends ConsumerState<BootGate> {
       );
       final code = response.statusCode ?? 0;
       if (code == 200) return _HealthResult.ok();
+      // 【BUG-158】429 だけは degraded に混ぜない。
+      // サーバは応答しているので「通信できませんでした」は事実と逆になる。
+      if (code == 429) {
+        return _HealthResult.rateLimited(
+          parseRetryAfter(response.headers.value('retry-after')),
+        );
+      }
       // 503 も含めて 2xx 以外は degraded 扱い
       return _HealthResult.degraded(code);
     } catch (_) {
@@ -205,28 +241,62 @@ class _BootGateState extends ConsumerState<BootGate> {
 
 /// health probe の結果を表す 3 状態値。
 ///
-/// - `isOk=true`: 200 応答 (Backend 健全)
-/// - `isDegraded=true`: 非-2xx の**確定応答** (5xx / 503 schema drift 等)、overlay 発火
-/// - **どちらも false (inconclusive)**: timeout / network error、overlay 発火せず
-///   (2026-07-09 修正、false positive 対策、boot_gate.dart docstring §Case D/E 参照)
+/// - `isOk=true`: 200 応答 (Backend 健全) → Case B、overlay なし
+/// - `isDegraded=true`: 非-2xx の**確定応答** (5xx / 503 schema drift 等) → Case C
+/// - **どちらも false (inconclusive)**: timeout / network error → Case D/E
+///
+/// 🔴 **分岐に効いているのは `isOk` だけ**。`!health.isOk` が Case C / D / E を
+/// まとめて `ConnectionErrorOverlay` へ送るため、`isDegraded` と `statusCode` は
+/// **現在どこからも読まれていない**。
+///
+/// 残しているのは、5xx (サーバは応答している) と timeout (そもそも届いていない) を
+/// 将来べつ扱いにするときの識別子がここにしか無いため。読む側を足すときは、
+/// **クラス冒頭の Case 表を先に更新すること**。
+///
+/// 【FEAT-536 (2026-08-29) 訂正】旧記述は inconclusive を「overlay 発火せず」と
+/// 書いていたが、それは v2 (2026-07-09 早朝) の挙動。v3 で overlay を 2 種類に
+/// 分離したときに更新されなかった残骸で、**動作は正しい**。
 class _HealthResult {
   final bool isOk;
   final bool isDegraded;
   final int? statusCode;
 
+  /// 【BUG-158 (2026-09-12)】429 のときだけ非 null。Case F の唯一の判定材料。
+  ///
+  /// 🔴 **`statusCode == 429` で判定しないこと。** `statusCode` は
+  /// 上の docstring のとおり**どこからも読まれていない識別子**で、
+  /// `timeout()` では null のまま残る。待ち時間を持っているかどうかを
+  /// そのまま分岐条件にするほうが、状態と分岐がずれない。
+  final Duration? retryAfter;
+
   const _HealthResult._({
     required this.isOk,
     required this.isDegraded,
     this.statusCode,
+    this.retryAfter,
   });
 
   factory _HealthResult.ok() =>
       const _HealthResult._(isOk: true, isDegraded: false);
   factory _HealthResult.degraded(int code) =>
       _HealthResult._(isOk: false, isDegraded: true, statusCode: code);
+
+  /// 【BUG-158】429。**`isDegraded` は false** —— サーバは正常に応答しており、
+  /// Backend が壊れているわけではない。ConnectionErrorOverlay には送らない。
+  factory _HealthResult.rateLimited(Duration retryAfter) => _HealthResult._(
+        isOk: false,
+        isDegraded: false,
+        statusCode: 429,
+        retryAfter: retryAfter,
+      );
   /// 【2026-07-09 修正】旧 `isDegraded: true` → `false` に変更。
-  /// タイムアウトは「Backend 状態が確定できない」= inconclusive、overlay 発火せず。
-  /// 詳細な理由は BootGate class docstring §「Case D/E で overlay を発火しない理由」参照。
+  /// タイムアウトは「Backend 状態が確定できない」= inconclusive。
+  ///
+  /// 【FEAT-536 (2026-08-29) 訂正】旧記述の「overlay 発火せず」は誤り。
+  /// `isDegraded: false` にしたのは **MaintenanceOverlay を出さない**ためで、
+  /// v3 以降は `!isOk` により `ConnectionErrorOverlay` が出る (Case D/E)。
+  /// 参照先として書かれていた §「Case D/E で overlay を発火しない理由」という節は
+  /// **存在しない** (v2 時代の節名)。真実値はクラス冒頭の Case 表。
   factory _HealthResult.timeout() =>
       const _HealthResult._(isOk: false, isDegraded: false);
 }

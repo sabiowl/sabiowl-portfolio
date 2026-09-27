@@ -18,6 +18,7 @@ import '../../battle/models/enemy.dart';                // 【FEAT-296】
 import '../../battle/providers/battle_provider.dart';   // 【FEAT-296 / FEAT-513】
 import '../../battle/services/ambient_auto_battle_preferences.dart'; // 【FEAT-513】
 import '../../battle/widgets/battle_pre_start_sheet.dart'; // 【FEAT-298】
+import '../../battle/widgets/battle_settings_dialog.dart'; // 【FEAT-528】
 import '../../battle/widgets/party_edit_dialog.dart';     // 【FEAT-304】
 import '../widgets/guild_drawer.dart';                    // 【2026-07-05】ハンバーガーメニュー
 import '../widgets/guild_reception_view.dart';            // 【FEAT-305】
@@ -81,7 +82,11 @@ class _GuildPageState extends ConsumerState<GuildPage> {
         // 直配置 → ハンバーガーメニュー 1 アイコンに集約。GuildDrawer (endDrawer)
         // で 6 項目 (ステータス / 装備・編成 / 所持品リスト / ショップ / フレンド /
         // お知らせ) に整理し、AppBar の視覚ノイズを削減しつつ動線を拡張。
+        // 【FEAT-528 (2026-08-23)】バトル設定を AppBar の actions に置く。
+        // 設定は「この画面の操作」なので leading (= iOS では戻るの場所) ではなく
+        // actions が規約。ハンバーガーの左に並べる。
         actions: [
+          const GuildBattleSettingsAction(),
           Builder(
             builder: (ctx) => IconButton(
               icon:      const Icon(Icons.menu),
@@ -110,9 +115,11 @@ class _GuildPageState extends ConsumerState<GuildPage> {
           // 背景画像 guild_reception_2.png は本 widget 内の Stack で配置（案 C 採用）。
           // 結果として「BOTTOM OVERFLOWED BY 26 PIXELS」エラーも _GuildHeader 撤廃で解消済。
           const GuildReceptionView(),
-          // 【FEAT-513】Ambient Auto Battle 切替バー
-          // (FEAT-505 の _SkipModeBar は撤去済、Skip は battle 画面速度選択 ⏭ に統合)
-          const _AutoBattleBar(),
+          // 【FEAT-528 (2026-08-23)】旧 AutoBattleBar (FEAT-513) はここにあったが撤去。
+          // オートバトルの ON/OFF はバトル設定モーダルへ移した。
+          // 🔵 ON かどうかは **各クエストカードの参加回数スピナー** で分かる
+          // (`_PresetCountRow` は `autoEnabled` のときだけ描かれる)。トグルより
+          // 情報量が多く、その場で回数まで設定できる。
           // ── 下部: 敵一覧（zako + boss、スクロール） ──
           // 案 C: 背景画像は配置せず、Scaffold.backgroundColor (AppTheme.surface) で
           // 従来通りの暗背景。_BossQuestCard 個別 UI で十分の視認性。
@@ -807,129 +814,136 @@ class _ResistanceChips extends StatelessWidget {
 // 読み書き経路ゼロのため無害 (次回 install で上書き / 永続 orphan)。
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 【FEAT-513】_AutoBattleBar — Ambient Auto Battle 切替バー
+// 【FEAT-513 → FEAT-528 (2026-08-23)】AutoBattleBar は撤去
 // ═════════════════════════════════════════════════════════════════════════════
+//
+// GuildReceptionView の直下にあったオートバトル切替バー (~120 LOC) を削除した。
+//
+// ## 経緯
+//
+// FEAT-528 でバーに速度バッジと歯車を足したところ、1 行に 4 種類の情報
+// (状態 / 説明 / 速度 / 設定) が並ぶ密度になった。英語では副題が
+// 「(Fights automatically when yo…」と切れ、押し分けのための的の確保にも
+// 苦労した。2 度の実機 QA を経て、**バーごと畳んで AppBar の歯車 1 つに
+// する**判断になった (2026-08-23 ユーザー判断)。
+//
+// ## 🔵 オートバトルの ON/OFF はどこで分かるのか
+//
+// **各クエストカードの参加回数スピナー** (`_PresetCountRow`)。
+// `if (!isLocked && autoEnabled)` で囲まれているので、**ON のときだけ現れる**。
+// トグルより情報量が多く (回数まで見える)、その場で設定もできる。
+//
+// ⚠️ ただし信号は片方向である。**OFF のときは何も出ない**ので、
+// 「オートバトルという機能がある」ことは歯車を開くまで分からない。
+// ギルドのオンボーディング (FEAT-512) も出陣 3 ステップのみで触れていない。
+// 機能の発見性を上げるなら、そちらに 1 行足すのが素直 (別 FEAT)。
+//
+// _ToggleSwitch → BattleToggleSwitch (battle/widgets/battle_toggle_switch.dart)
+// への移設はそのまま。トグル自体はバトル設定モーダルで使い続ける。
 
-/// ギルド画面の GuildReceptionView の直下に表示するオートバトル切替バー。
+/// 【FEAT-528 (2026-08-23)】AppBar actions に置く「速度バッジ + 歯車」。
 ///
-/// ambientAutoBattleEnabledProvider を toggle し、SharedPreferences に永続化する。
-/// 初期値読み込みは _GuildPageState.initState() → _loadAmbientAutoBattleEnabled()
-/// で担当 (FEAT-513 v1.1 hotfix 2 follow-up で旧 _loadSkipMode からリネーム)。
-class _AutoBattleBar extends ConsumerWidget {
-  const _AutoBattleBar();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context)!;
-    final isAuto = ref.watch(ambientAutoBattleEnabledProvider);
-    return InkWell(
-      onTap: () => _toggle(ref, !isAuto),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isAuto
-              ? AppTheme.primary.withValues(alpha: 0.08)
-              : Colors.transparent,
-          border: Border(
-            bottom: BorderSide(
-              color: Colors.white.withValues(alpha: 0.08),
-              width: 1,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Text(
-              '🔄',
-              style: TextStyle(
-                fontSize: 13,
-                color: isAuto
-                    ? AppTheme.primary
-                    : Colors.white.withValues(alpha: 0.45),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              l10n.guildAutoBattleLabel,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isAuto
-                    ? AppTheme.primary
-                    : Colors.white.withValues(alpha: 0.5),
-              ),
-            ),
-            const SizedBox(width: 6),
-            // 【FEAT-489 Phase 2G-b hotfix (2026-08-02)】Expanded 必須。
-            //
-            // 裸の Text だと副題の実測幅がそのまま Row に要求される。日本語の
-            // 「(ホーム到着時に自動で戦闘)」は 360dp 幅に収まるが、英語の
-            // "(Fights automatically when you open the app)" は 18px はみ出して
-            // RIGHT OVERFLOWED になる (2026-08-02 実機 QA で検出)。
-            // Expanded が余白を吸うので Spacer は不要 (両方置くと flex を
-            // 取り合って副題が半分に潰れる)。
-            Expanded(
-              child: Text(
-                l10n.guildAutoBattleSubtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.white.withValues(alpha: 0.35),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _ToggleSwitch(value: isAuto),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _toggle(WidgetRef ref, bool value) async {
-    ref.read(ambientAutoBattleEnabledProvider.notifier).state = value;
-    final prefs = await SharedPreferences.getInstance();
-    await AmbientAutoBattlePreferences.setEnabled(prefs, value);
-    PosthogService.instance.capture(
-      'ambient_battle_toggled',
-      properties: {'enabled': value},
-    );
-  }
-}
-
-class _ToggleSwitch extends StatelessWidget {
-  const _ToggleSwitch({required this.value});
-  final bool value;
+/// 🔵 **1 つの widget にまとめてあるのはテストのため。** ここを guild_page の
+/// `actions:` に直書きすると、テスト側で AppBar を組み直すことになり
+/// **実装のコピーが 2 つ**できる。コピーは必ず古くなる。
+///
+/// 並び（歯車がハンバーガーの左、`leading` は空のまま）は
+/// `battle_settings_dialog_test.dart` の D-3 がソース走査で縛っている。
+class GuildBattleSettingsAction extends StatelessWidget {
+  const GuildBattleSettingsAction({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 40,
-      height: 22,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(11),
-        color: value
-            ? AppTheme.primary.withValues(alpha: 0.85)
-            : Colors.white.withValues(alpha: 0.2),
-      ),
-      child: AnimatedAlign(
-        duration: const Duration(milliseconds: 200),
-        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: const EdgeInsets.all(2.5),
-          width: 17,
-          height: 17,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _SpeedBadge(),
+        IconButton(
+          icon: const Icon(Icons.settings),
+          tooltip: l10n.guildBattleSettingsTooltip,
+          onPressed: () => openBattleSettingsDialog(context),
+        ),
+      ],
+    );
+  }
+}
+
+/// 【FEAT-528】AppBar に出す現在のバトル速度バッジ。
+///
+/// 🔴 **これが「Skip の一方通行」問題の実質的な解決。** モーダル（出口）を作っても、
+/// **Skip のままだと気付けていない**という本体は解けない。開かなくても
+/// 見える場所に現在値を出すことで、初めて「戻そう」という発想が生まれる。
+///
+/// ## 🔵 等速のときは何も描かない（2026-08-23 ユーザー判断）
+///
+/// 既定値の「1x」は**情報量がゼロ**である。常時出していると見慣れてしまい、
+/// **本当に気付いて欲しい ⏭ / 3x のときに埋もれる**。出さなければ、
+/// 現れたこと自体が信号になる。
+///
+/// 副作用として、既定状態の AppBar は `⚙ ☰` だけになり、
+/// ユーザー要望の「歯車アイコンだけ」を満たす。
+class _SpeedBadge extends ConsumerWidget {
+  const _SpeedBadge();
+
+  /// 速度 → 表示ラベル。`battle_page` の `_SpeedChip` と同じ文字列を使う。
+  static String labelFor(double speed) {
+    for (final option in BattleSettingsDialog.speedOptions) {
+      if ((speed - option.value).abs() < 0.01) return option.label;
+    }
+    // 想定外の値 (将来の選択肢追加 / 壊れた pref) でも黙って落とさない。
+    return '${speed.toStringAsFixed(speed % 1 == 0 ? 0 : 1)}x';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final speed = ref.watch(battleSpeedPreferenceProvider);
+    if ((speed - 1.0).abs() < 0.01) return const SizedBox.shrink();
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          labelFor(speed),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primary,
           ),
         ),
       ),
     );
   }
 }
+
+/// 【FEAT-528】バトル設定モーダルを開く。
+///
+/// `_openPartyEditDialog` と**同じ形**で書いてある（showGeneralDialog /
+/// barrierDismissible / 200ms の Scale + Fade）。`pageBuilder` の `dialogContext`
+/// を `onClose` に束ねるのは CLAUDE.md FEAT-215 の要請で、
+/// 外側 context で pop すると ShellRoute の navigator ごと pop してしまう。
+///
+/// モーダル内では navigation を一切しないので BUG-65 系の race も起きない。
+void openBattleSettingsDialog(BuildContext context) {
+  final l10n = AppLocalizations.of(context)!;
+  showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: l10n.guildPageDrawerBarrierLabel,
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (dialogContext, __, ___) => BattleSettingsDialog(
+      onClose: () => Navigator.of(dialogContext).pop(),
+    ),
+    transitionBuilder: (_, animation, __, child) => ScaleTransition(
+      scale: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+      child: FadeTransition(opacity: animation, child: child),
+    ),
+  );
+}
+
+// 【FEAT-528 (2026-08-22)】旧 _ToggleSwitch は
+// `battle/widgets/battle_toggle_switch.dart` の `BattleToggleSwitch` に移設した。
+// バトル設定モーダルが同じ見た目を使うため、2 箇所にコピーを置かない。
 
 // ═════════════════════════════════════════════════════════════════════════════
 // 【FEAT-306】_BattleChargeSubtext — 出陣ボタン disabled 時のサブテキスト

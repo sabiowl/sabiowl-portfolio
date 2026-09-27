@@ -15,7 +15,6 @@ import '../../habits/providers/habits_provider.dart' show playerNotifierProvider
 import '../../habits/providers/home_bootstrap_provider.dart'
     show homeBootstrapRawProvider, kHomeBootstrapCacheKey;
 import '../../timeline/providers/timeline_provider.dart';  // FEAT-233: timelineAutoCreateProvider
-import '../providers/auth_provider.dart';   // isGuestModeProvider / authServiceProvider
 import '../services/onboarding_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -245,12 +244,26 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
 
   /// オンボーディング完了処理
   ///
-  /// FEAT-188: ゲスト基盤がサーバー側に移行したため、ローカルへのシードは行わず
-  ///   1. ゲストトークンがなければ `/api/auth/guest-init/` でサーバー側を初期化
-  ///   2. `PATCH /api/player/` で名前を反映
-  ///   3. `POST /api/characters/<id>/select/` でキャラ選択を反映
-  /// の順で叩く。すでに正式ユーザー（user token あり）でこの画面を通過する
-  /// 新規ソーシャル登録時のケースでも、guest-init は冪等にスキップされる。
+  ///   1. `PATCH /api/player/` で名前と性別を反映
+  ///   2. `POST /api/characters/<id>/select/` でキャラ選択を反映
+  ///
+  /// 🔴 【FEAT-542 (2026-09-23)】**トークンはここで作らない。**
+  ///
+  /// 旧実装は「ゲストトークンが無ければ `guest-init` を呼ぶ」を持っており、
+  /// それが 3 つの不具合の共通の根だった:
+  ///
+  /// | | 何が起きたか |
+  /// |---|---|
+  /// | BUG-161 | `authProvider` を通さないので status が古く、完了直後にログイン画面へ弾かれた |
+  /// | BUG-166 | 連携済みユーザーが再インストールしただけで「新しいゲスト」にされた |
+  /// | 計測欠落 | `guest_session_started` が新規ユーザーに送られていなかった |
+  ///
+  /// 🔵 **トークンを作るのは `authProvider` だけになった。**
+  /// ゲストは認証画面の「ゲストとして始める」→ `startAsGuest()` を通り、
+  /// `justRegistered=true` → `AuthPage` の `ref.listen` 経由でここへ来る
+  /// （ソーシャルの新規ユーザーと**同じ経路**）。
+  /// 🔴 **「状態が古いまま `/home` へ行く」経路は、ガードで防がれるのではなく
+  /// 存在しなくなった。** だから BUG-161 の `refreshAuthStatus()` も要らない。
   Future<void> _complete() async {
     if (_isCompleting) return;
     setState(() => _isCompleting = true);
@@ -261,19 +274,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
           : _nameController.text.trim();
 
       final apiClient = ref.read(apiClientProvider);
-      final authService = ref.read(authServiceProvider);
 
-      // ── 1. ゲストトークンがなければ guest-init を呼ぶ ───────────
-      // 既に通常ユーザートークンがある場合（新規ソーシャル登録経由）は呼ばない。
+      // 🔵 計測の `path` を決めるためだけに読む。
+      //    **トークンの有無で分岐する処理はもう無い。**
       final hasUserToken  = (await apiClient.getToken())?.isNotEmpty ?? false;
-      final hasGuestToken = (await apiClient.getGuestToken())?.isNotEmpty ?? false;
-      if (!hasUserToken && !hasGuestToken) {
-        final result = await authService.guestInit();
-        await apiClient.saveGuestToken(result.token);
-        await apiClient.setGuestMode(true);
-      }
 
-      // ── 2. プレイヤー名 + 性別を即時反映 ────────────────────────
+      // ── 1. プレイヤー名 + 性別を即時反映 ────────────────────────
       // 【FEAT-221】性別もここで PATCH。`PlayerProfileSerializer.fields` には
       // `gender` が writable で含まれている（backend/api/serializers.py L255）。
       try {
@@ -285,7 +291,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         // 失敗してもログイン/ホーム遷移は止めない（ユーザーは後で編集可能）
       }
 
-      // ── 3. キャラクター選択を反映 ──────────────────────────────
+      // ── 2. キャラクター選択を反映 ──────────────────────────────
       // GET /characters/ で key→id のマッピングを取得して POST /characters/<id>/select/
       //
       // 【FEAT-221】防御的ハードニング: 旧実装は `on DioException` のみキャッチしていたが、
@@ -331,7 +337,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         debugPrint('[Onboarding] character selection swallowed: $e\n$stack');
       }
 
-      // ── 4. ローカルにも名前・キャラを保存（既存挙動を維持）─────
+      // ── 3. ローカルにも名前・キャラを保存（既存挙動を維持）─────
       await OnboardingService.saveName(name);
       // 【FEAT-194】_selectedCharKey は nullable 化したが、本フローに到達した時点で
       // 「はじめよう」ボタンの活性条件により null ではないことが保証されている。
@@ -341,7 +347,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         await OnboardingService.saveCharacterKey(charKey);
       }
 
-      // ── 5. 【FEAT-233】当日のデフォルトタイムライン予定を確実に自動作成 ──
+      // ── 4. 【FEAT-233】当日のデフォルトタイムライン予定を確実に自動作成 ──
       // 旧実装は TimelineDashboard の initState postFrameCallback に任せていたが、
       // Render コールドスタート時に初回呼び出しが失敗すると失敗時も createdIds に
       // 記録されて当日中 blacklist 化される（BUG-T workaround）。ユーザーが
@@ -358,12 +364,22 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage>
         debugPrint('[Onboarding] timelineAutoCreate failed: $e');
       }
 
-      // ── 6. チュートリアル済みフラグ ────────────────────────────
-      await apiClient.markTutorialShown();
-      // 認証状態の再計算
-      ref.invalidate(isGuestModeProvider);
+      // ── 5. 🔴 プロフィール設定の完了を、**持ち主付きで**記録する ────
+      //
+      // 🔴 【FEAT-542 (2026-09-23)】旧 `markTutorialShown()` の後継である。
+      // 旧キーは「チュートリアルを見たか」と「プロフィール設定が終わったか」を
+      // 兼任しており、**分岐に使われていたのは後者だけ**だった。
+      //
+      // ⚠️ **値には持ち主（いまの資格情報の指紋）が入る。** 端末に
+      // 付いた真偽値のままだと、**古い「設定済み」を新しいゲストが引き継ぐ** ——
+      // 連携済みユーザーのトークンが消える -> ゲストとして始める ->
+      // 設定の途中で kill -> 再起動でホームへ（名前「ゲスト」+ キャラ未選択）。
+      //
+      // ⚠️ **ここに置く。** 上の PATCH とキャラ選択より前に書くと、
+      //    途中で落ちたときに「設定済みだが名前もキャラも無い」が残る。
+      await apiClient.markProfileSetupCompleted();
 
-      // ── 7. player scoped provider を invalidate (2026-07-02 BUG hotfix) ──
+      // ── 6. player scoped provider を invalidate (2026-07-02 BUG hotfix) ──
       // 【症状】ゲストモードで onboarding を完了して home に到達した直後、
       // 画面上部のステータス枠に name='ゲスト' + キャラ画像=ゼノン (fallback)
       // が表示されてしまう。画面遷移して戻る等の再読み込みで正しい値

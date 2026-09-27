@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -394,6 +394,115 @@ class HabitSummaryView(PlayerMixin, APIView):
         })
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 【FEAT-525 (2026-08-21)】チェックリスト項目の宣言的更新
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# `set_checklist_items` は「いまの完全なリストを順序どおりに送る」形式で、
+# **追加・削除・並び替えを 1 往復で表現する**。
+#
+#     id あり          → 残す。text を更新し、order = 配列の index
+#     id なし          → 新規作成。order = 配列の index
+#     配列に現れない id → 削除
+#
+# ## なぜ add / delete / reorder の 3 本立てにしないのか
+#
+# 編集画面は「既存項目 (id 付き)」と「新規追加分 (id 未確定)」を **同じリストとして**
+# 表示する。ユーザーは両者を区別せず混ぜて並べ替えるので、3 本立てにすると
+# 「新規項目を id が決まる前に順序へ混ぜる」問題が残り、**追加 → 採番 → 並び替えの
+# 2 往復** か、**text で新規項目を突き合わせる** かになる。後者は同じ文言の項目が
+# 2 つあると壊れる。宣言的な 1 本ならどちらも要らない。冪等でもある。
+#
+# ## 🔴 旧 2 フィールドは残すこと
+#
+# v1.0.5 が公開中、1.1.0+6 が審査中で、**どちらも `add_checklist_items` /
+# `delete_checklist_items` を送る**。消すと既存ユーザーの項目追加・削除が壊れる。
+# `set_` への一本化は旧バージョンが十分に入れ替わってから別 FEAT で行う。
+# 両方が同時に来たら 400 (意味が競合するので黙ってどちらかを優先しない)。
+
+# ChecklistItem.text の max_length。超過は Postgres では DataError = 500 になるので
+# ここで 400 に落とす (SQLite だと黙って通るため、ローカルでは再現しない)。
+_CHECKLIST_TEXT_MAX_LENGTH = 200
+
+
+class _ChecklistPayloadError(Exception):
+    """`set_checklist_items` のバリデーション失敗を 400 レスポンスに変換する。
+
+    view から深い位置 (正規化 / 適用) で発生するので、戻り値で運ばず例外にする。
+    受け側は `patch()` の `except` で、統一形式の helper を使って 400 を返す。
+    (docstring に `error_response` を**呼び出しの形で書かない**こと ——
+    `test_error_response_format.py` はソースを正規表現で走査するので、
+    コメント内の呼び出し形が誤検出になる。)
+    `transaction.atomic()` の中で送出されるとロールバックされるため、
+    **習慣本体の更新だけが適用された中途半端な状態にはならない**。
+    """
+
+    def __init__(self, code: str, message: str):
+        super().__init__(code)
+        self.code = code
+        self.message = message
+
+
+def _normalize_set_checklist_items(raw) -> list[dict]:
+    """`set_checklist_items` を `[{'id': int|None, 'text': str}, ...]` に正規化する。
+
+    - list でなければ 400
+    - 要素は `{'text': ...}` / `{'id': ..., 'text': ...}` の dict、
+      または文字列 (= text のみの新規項目。`POST /habits/` の `checklist_items` と同じ受け口)
+    - `id` は int のみ (bool は除外)。文字列 id は 400
+    - **空文字 text の要素はリストから落とす** (既存 POST / PATCH と同じ「空文字は無視」)。
+      `ChecklistItem.text` は必須なので「空の項目」は表現できない。id 付きで
+      送られた場合も同様に落ちる → 宣言的な意味 (送ったリストに存在しない) のとおり削除される
+    - **重複 id は先勝ち**。`HabitOrderView` の `dict.fromkeys` と同じ扱いに揃える
+    """
+    if not isinstance(raw, list):
+        raise _ChecklistPayloadError(
+            'habit_update_checklist_items_invalid',
+            'チェックリストの項目を読み取れませんでした。'
+            '少し時間をおいて、もう一度お試しください 🪶',
+        )
+
+    entries: list[dict] = []
+    seen_ids: set[int] = set()
+    for element in raw:
+        if isinstance(element, str):
+            item_id, text = None, element
+        elif isinstance(element, dict):
+            item_id = element.get('id')
+            text = element.get('text', '')
+        else:
+            raise _ChecklistPayloadError(
+                'habit_update_checklist_items_invalid',
+                'チェックリストの項目を読み取れませんでした。'
+                '少し時間をおいて、もう一度お試しください 🪶',
+            )
+
+        if item_id is not None:
+            # bool は int のサブクラスなので明示的に除外する
+            if isinstance(item_id, bool) or not isinstance(item_id, int):
+                raise _ChecklistPayloadError(
+                    'habit_update_checklist_items_invalid',
+                    'チェックリストの項目を読み取れませんでした。'
+                    '少し時間をおいて、もう一度お試しください 🪶',
+                )
+            if item_id in seen_ids:
+                continue  # 重複 id は先勝ち
+            seen_ids.add(item_id)
+
+        text = (text if isinstance(text, str) else str(text)).strip()
+        if not text:
+            continue  # 空文字は無視 (作成しない)
+        if len(text) > _CHECKLIST_TEXT_MAX_LENGTH:
+            raise _ChecklistPayloadError(
+                'habit_update_checklist_items_invalid',
+                f'チェックリストの項目は {_CHECKLIST_TEXT_MAX_LENGTH} 文字までですね。'
+                '短くしてから、もう一度お試しください 🪶',
+            )
+        entries.append({'id': item_id, 'text': text})
+
+    return entries
+
+
 class HabitDetailView(PlayerMixin, APIView):
     permission_classes = [IsAuthenticatedOrGuest]
 
@@ -432,38 +541,144 @@ class HabitDetailView(PlayerMixin, APIView):
         habit = self._get_habit(request, pk)
         if habit is None:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
-        # BUG-J: ToDo の priority / due_date が PATCH で silently 無視されていた。
-        # HabitSerializer.Meta.fields には含まれているが allowed の whitelist が
-        # 古いまま放置されていたため、フロント編集画面の保存が成功 200 でも DB が変わらなかった。
-        # habit_type は仕様上「作成後に変更不可」のため意図的に追加しない。
-        # 【FEAT-205】due_time は UI 未接続 + 通知発火経路でも未参照の死パイプラインだったため削除。
-        allowed = {k: v for k, v in request.data.items() if k in (
-            'name', 'category', 'frequency', 'reset_cycle', 'difficulty', 'order',
-            'memo', 'is_public',
-            'priority', 'due_date',
-        )}
-        serializer = HabitSerializer(habit, data=allowed, partial=True)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        serializer.save()
 
-        if habit.habit_type == 'checklist':
-            from django.db.models import Max
-            delete_ids = request.data.get('delete_checklist_items', [])
-            if delete_ids:
-                ChecklistItem.objects.filter(habit=habit, id__in=delete_ids).delete()
+        # 【FEAT-525】新形式 `set_checklist_items` と旧形式 `add_/delete_` の競合は
+        # habit_type によらず **最初に** 弾く。意味が競合するので黙ってどちらかを
+        # 優先しない (旧クライアントは `set_` を送らないので実害なく共存する)。
+        has_set_items = 'set_checklist_items' in request.data
+        has_legacy_items = (
+            'add_checklist_items' in request.data
+            or 'delete_checklist_items' in request.data
+        )
+        if has_set_items and has_legacy_items:
+            return error_response(
+                code='habit_update_checklist_payload_conflict',
+                message='チェックリストの更新指定が重なっています。'
+                        'アプリを最新版に更新してから、もう一度お試しください 🪶',
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-            add_items = request.data.get('add_checklist_items', [])
-            if add_items:
-                max_order = habit.checklist_items.aggregate(Max('order'))['order__max'] or 0
-                for item_data in add_items:
-                    text = (item_data.get('text', '') if isinstance(item_data, dict) else str(item_data)).strip()
-                    if text:
-                        max_order += 1
-                        ChecklistItem.objects.create(habit=habit, text=text, order=max_order)
+        try:
+            # 【FEAT-525】習慣本体とチェックリストを 1 トランザクションにまとめる。
+            # 項目側が 400 になったときに「名前だけ変わってリストは元のまま」という
+            # 中途半端な状態を残さないため。
+            with transaction.atomic():
+                # BUG-J: ToDo の priority / due_date が PATCH で silently 無視されていた。
+                # HabitSerializer.Meta.fields には含まれているが allowed の whitelist が
+                # 古いまま放置されていたため、フロント編集画面の保存が成功 200 でも DB が変わらなかった。
+                # habit_type は仕様上「作成後に変更不可」のため意図的に追加しない。
+                # 【FEAT-205】due_time は UI 未接続 + 通知発火経路でも未参照の死パイプラインだったため削除。
+                allowed = {k: v for k, v in request.data.items() if k in (
+                    'name', 'category', 'frequency', 'reset_cycle', 'difficulty', 'order',
+                    'memo', 'is_public',
+                    'priority', 'due_date',
+                )}
+                serializer = HabitSerializer(habit, data=allowed, partial=True)
+                if not serializer.is_valid():
+                    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                serializer.save()
+
+                if habit.habit_type == 'checklist':
+                    if has_set_items:
+                        self._apply_set_checklist_items(
+                            habit,
+                            _normalize_set_checklist_items(
+                                request.data.get('set_checklist_items'),
+                            ),
+                        )
+                    else:
+                        self._apply_legacy_checklist_items(habit, request.data)
+        except _ChecklistPayloadError as exc:
+            return error_response(
+                code=exc.code,
+                message=exc.message,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         updated = Habit.objects.prefetch_related('checklist_items').get(pk=pk)
         return Response(HabitSerializer(updated, context={'request': request}).data)
+
+    def _apply_legacy_checklist_items(self, habit, data):
+        """【後方互換】旧クライアントの `delete_checklist_items` / `add_checklist_items`。
+
+        🔴 **消さないこと。** v1.0.5 が公開中、`1.1.0+6` が審査中で、どちらも
+        この 2 フィールドを送る。挙動を変えるのも不可 (追加は必ず末尾)。
+        `test_checklist_set_items.py` の後方互換テストがこの契約を縛っている。
+        """
+        from django.db.models import Max
+
+        delete_ids = data.get('delete_checklist_items', [])
+        if delete_ids:
+            ChecklistItem.objects.filter(habit=habit, id__in=delete_ids).delete()
+
+        add_items = data.get('add_checklist_items', [])
+        if add_items:
+            max_order = habit.checklist_items.aggregate(Max('order'))['order__max'] or 0
+            for item_data in add_items:
+                text = (item_data.get('text', '') if isinstance(item_data, dict) else str(item_data)).strip()
+                if text:
+                    max_order += 1
+                    ChecklistItem.objects.create(habit=habit, text=text, order=max_order)
+
+    def _apply_set_checklist_items(self, habit, entries):
+        """【FEAT-525】`set_checklist_items` を適用する (id あり = 更新 / id なし = 作成)。
+
+        ## 🔴 id あり項目は必ず `update` する
+
+        `delete` + `create` にすると `done_date` が失われ、ユーザーから見ると
+        **「並べ替えたらチェックが全部外れた」** という明確な退行になる。
+        並び順だけを見るテストでは通ってしまうので、`done_date` 保持は
+        `test_checklist_set_items.py` が明示的に assert している。
+
+        ## 他 habit の id は黙って無視せず 400
+
+        `set_checklist_items` は id を受け取るので、他 habit の id を混ぜられる。
+        `habit=habit` で絞ったうえで、**取りこぼした id があれば 400** にする。
+        黙って無視するとクライアント側のバグを隠す。
+
+        ## ロック順序
+
+        2 端末同時保存を直列化するため、対象行を **pk 昇順** で
+        `select_for_update` してから書き換える (`HabitOrderView` と同じ
+        レンデブー順序。CLAUDE.md「select_for_update のレンデブー順序統一」)。
+        last-writer-wins でよいが、中途半端に混ざった順序にはしない。
+        """
+        existing = {
+            item.pk: item
+            for item in ChecklistItem.objects
+            .select_for_update()
+            .filter(habit=habit)
+            .order_by('pk')
+        }
+
+        keep_ids = [e['id'] for e in entries if e['id'] is not None]
+        unknown_ids = [i for i in keep_ids if i not in existing]
+        if unknown_ids:
+            raise _ChecklistPayloadError(
+                'habit_update_checklist_item_not_found',
+                'その項目は見つかりませんでした。'
+                '画面を開き直してから、もう一度お試しください 🪶',
+            )
+
+        # 配列に現れなかった既存項目 = 削除
+        ChecklistItem.objects.filter(habit=habit).exclude(pk__in=keep_ids).delete()
+
+        # 項目数は数十なので Case/When 一括 UPDATE までは要らない。
+        # 既存は bulk_update、新規は create で index を order に写す。
+        to_update = []
+        for index, entry in enumerate(entries):
+            if entry['id'] is None:
+                ChecklistItem.objects.create(
+                    habit=habit, text=entry['text'], order=index,
+                )
+                continue
+            item = existing[entry['id']]
+            item.text = entry['text']
+            item.order = index
+            to_update.append(item)
+
+        if to_update:
+            ChecklistItem.objects.bulk_update(to_update, ['text', 'order'])
 
     def delete(self, request, pk):
         habit = self._get_habit(request, pk)
@@ -534,7 +749,7 @@ class ArchivedHabitListView(PlayerMixin, APIView):
 
 class TrashHabitListView(PlayerMixin, APIView):
     # FEAT-190: ゴミ箱（archived の派生表示）もゲストで参照可能にする。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):

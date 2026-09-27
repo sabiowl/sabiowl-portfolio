@@ -245,8 +245,36 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '60/hour',
-        'user': '300/hour',
+        # 【BUG-158 (2026-09-12)】anon 60 → 300 / user 300 → 1200。
+        #
+        # 🔴 **旧値は通常利用で枯れていた。** 実測 (Sentry 2026-09-11):
+        # 知人テスターの `GachaService.pullGacha` が 429。枯れたのは user である。
+        #
+        # 1 時間あたりの消費見積もり:
+        #   ガチャ 43 連 (Daily 30 / Weekly 10 / Monthly 3) × 3 本  ≈ 130
+        #   ホーム cold start 10 回 × 10 本以上                     ≈ 100-150
+        #   バトル 10 戦 × 3 本                                     ≈  30
+        #                                                     合計 ≈ 310
+        # 旧 user の 300/hour は **5 リクエスト/分**で、この実測レンジそのもの。
+        # 濫用ではなく**通常利用で当たる**。プロダクトが「Daily 30 枚をまとめて
+        # 引く」を促しているのに、上限がそれを許していなかった。
+        # → 見積もり 310 に対して約 4 倍の余裕を取り user 1200 とする。
+        # anon (ゲスト / 未認証、IP キー) も同じ比率で 300 に引き上げる。
+        #
+        # ⚠️ **これは濫用防止を弱める判断である。** 承知の上で採る根拠:
+        #   1. 実効的な防御は**個別 scope とゲームロジック側**にある ——
+        #      下の contact / habit_action / friend_search / social_auth /
+        #      guest_init + 日次バトル上限 10 戦 + ガチャチケット上限
+        #   2. グローバル throttle は**粗い backstop** であり、通常利用を
+        #      妨げてまで厳しくする価値がない
+        #   3. 1200/hour = **20 リクエスト/分**。スクリプトによる大量アクセスは
+        #      依然として止まる
+        #
+        # 🔴 **「緩すぎる」と判断して戻さないこと。** 戻すと BUG-158 が再発する。
+        # 下げるなら先に上の見積もりを更新すること。不変条件は
+        # `api/tests/test_throttle_rates.py` が縛っている (値と本コメントの整合も)。
+        'anon': '300/hour',
+        'user': '1200/hour',
         # 【SEC-15 L-01 (2026-05-30)】magic_link scope 削除 (FEAT-178 で MagicLink 撤去済、参照ゼロ)
         # 【SEC-11】sabi_navigate scope は SabiNavigate(LLM) 廃止（2026-05-15）で削除
         'contact': '3/hour',
@@ -320,14 +348,76 @@ ADMIN_MFA_REQUIRED = os.environ.get('ADMIN_MFA_REQUIRED', 'True').lower() in ('t
 # 設定した値と完全一致する文字列を Render 環境変数に登録する。
 # 未設定時は webhook が 500 (server_misconfigured) を返すため、Phase 2 リリース
 # 前に必ず Render dashboard で設定すること (sync: false でリポジトリに含めない)。
+#
+# 🔵 【2026-08-28 確認済、改名しないこと】この値はデバッグページで伏せ字になる。
+# `SafeExceptionReporterFilter.hidden_settings` は
+# `API|AUTH|TOKEN|KEY|SECRET|PASS|SIGNATURE|HTTP_COOKIE` (Django 6.0) を
+# **settings の属性名**に当てており、"AUTH" が含まれるので掛かる。
+# 一度 `REVENUECAT_WEBHOOK_SECRET` への改名を検討したが、**改名しても結果は同じ**で、
+# 移行期の後方互換読みと env var 差し替えのコストだけが残るため見送った。
+#
+# ⚠️ ただし判定は **属性名だけ**で、値は見ない。ここの左辺に秘密らしい語が
+# 入らない名前 (例: `..._HEADER`) を付けると平文で出る。新しい秘密を足すときは
+# 上の正規表現に掛かる名前にすること。
 REVENUECAT_WEBHOOK_AUTH = os.environ.get('REVENUECAT_WEBHOOK_AUTH', '')
 # オプション: 失敗 receipt の手動再確認等で RevenueCat REST API を叩く場合に使用
 # (v1.0.1 では未使用、v1.1+ で導入検討)
 REVENUECAT_REST_API_KEY = os.environ.get('REVENUECAT_REST_API_KEY', '')
 
 
+# ── 【FEAT-536 Phase 0-a (2026-08-28)】ログ出力 ────────────────────────────
+#
+# 🔴 **これが無いと `DEBUG=False` にした瞬間、500 のトレースバックが消える。**
+#
+# Django の既定 LOGGING (`DEFAULT_LOGGING`) は console ハンドラに
+# `require_debug_true` フィルタを付けている。つまり `DEBUG=False` では console に
+# 何も出ず、`django.request` の ERROR は `mail_admins` にしか流れない
+# (ADMINS も EMAIL も webhook 用途では未設定なので、事実上どこにも出ない)。
+#
+# 2026-08-28 に dev を `DEBUG=False` へ倒す際に判明した。それまで dev の
+# トレースバックが Render Logs で読めていたのは `DEBUG=True` だったからで、
+# 本設定が無いまま倒すと「黄色いデバッグページ」を「沈黙」と交換することになる。
+#
+# `api` ロガーも明示する。従来 `api.*` は親に handler が無く Python の
+# `logging.lastResort` (stderr / WARNING 以上) 経由でしか出ておらず、
+# `_logger.info(...)` が本番で見えなかった (`api/views/player.py` の
+# 冒頭コメントがその不便を記録している)。ここで INFO を既定にして解消する。
+#
+# レベルは環境変数で上下できる。ノイズが増えたら Render 側で
+# `API_LOG_LEVEL=WARNING` を入れれば、デプロイなしで絞れる。
+_DJANGO_LOG_LEVEL = os.environ.get('DJANGO_LOG_LEVEL', 'WARNING').upper()
+_API_LOG_LEVEL    = os.environ.get('API_LOG_LEVEL', 'INFO').upper()
+
+LOGGING = {
+    'version': 1,
+    # 既存ロガーを殺さない。サードパーティ (dj_database_url / sentry_sdk 等) が
+    # 自前で取得したロガーを黙らせないため。
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '[{levelname}] {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        # 🔴 `filters` を付けない。既定の `require_debug_true` を外すことが本設定の目的。
+        'console': {'class': 'logging.StreamHandler', 'formatter': 'simple'},
+    },
+    # 明示していないロガー (サードパーティ) の受け皿。lastResort と同じ WARNING。
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        # `django.request` は本ロガーの子なので、ここの handler に届く
+        # (4xx = WARNING / 5xx = ERROR + traceback)。個別定義は不要。
+        'django': {'handlers': ['console'], 'level': _DJANGO_LOG_LEVEL, 'propagate': False},
+        'api':    {'handlers': ['console'], 'level': _API_LOG_LEVEL,    'propagate': False},
+    },
+}
+
+
 # ── FEAT-470: Sentry エラー監視 ──────────────────────────────────────────────
 # DSN は Render 環境変数 SENTRY_DSN_BACKEND で注入 (未設定 or DEBUG=True なら skip)
+# 【FEAT-536 Phase 0-a (2026-08-28)】environment を env 変数化した。旧実装は
+# `'production'` のハードコードで、**dev を `DEBUG=False` にした瞬間に dev の
+# エラーが prod のストリームへ混ざる**構造だった (dev は 2026-08-28 まで
+# `DEBUG=True` だったため Sentry 自体が init されず、表面化していなかった)。
+# Render の dev サービスには `SENTRY_ENVIRONMENT=dev` を設定すること。
 # send_default_pii=False: IP / user info を Sentry に送らない (プライバシーポリシー整合)
 # traces_sample_rate=0.1: 10% のトランザクションをパフォーマンス計測に使う
 _SENTRY_DSN = os.environ.get('SENTRY_DSN_BACKEND', '')
@@ -338,6 +428,6 @@ if _SENTRY_DSN and not DEBUG:
         dsn=_SENTRY_DSN,
         integrations=[DjangoIntegration()],
         traces_sample_rate=0.1,
-        environment='production',
+        environment=os.environ.get('SENTRY_ENVIRONMENT', 'production'),
         send_default_pii=False,
     )

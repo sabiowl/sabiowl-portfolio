@@ -23,7 +23,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -106,7 +106,7 @@ class BattleFinishView(PlayerMixin, APIView):
     # の対応漏れ修正。バトル系 4 View (BattleStartView / BattleFinishView /
     # BattleLogListView / EnemyListView) を IsAuthenticated → IsAuthenticatedOrGuest に。
     # PlayerMixin.get_player() は既にゲスト対応済 (request.auth.player_profile 経路)。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes = [IsAuthenticatedOrGuest]
 
     def post(self, request):
@@ -281,7 +281,8 @@ class BattleFinishView(PlayerMixin, APIView):
                 while battle_state.current_exp >= battle_state.max_exp:
                     battle_state.current_exp        -= battle_state.max_exp
                     battle_state.level              += 1
-                    battle_state.allocatable_points += 3
+                    # 【FEAT-537】旧リテラル 3。経路差は撤回し全経路で共通定数を使う。
+                    battle_state.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
                     # 【FEAT-319】level_to_max_exp で単一真実値化、直書き禁止。
                     battle_state.max_exp             = GameBalance.level_to_max_exp(battle_state.level)
                 leveled_up = battle_state.level > old_level

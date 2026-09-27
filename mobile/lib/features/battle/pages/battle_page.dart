@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';  // 【FEAT-416】倍速永続化
 
 import '../../../core/constants/preferences_keys.dart';  // 【FEAT-462】戻るヒント抑制
 import '../../../core/router/app_router.dart';  // FEAT-295: AppRoutes.home
@@ -21,6 +20,7 @@ import '../widgets/battle_log_text.dart';
 import '../widgets/combatant_sprite.dart';
 import '../widgets/floating_damage_text.dart';  // 【FEAT-385】Floating Damage
 import '../widgets/hp_atb_combined_bar.dart';  // 【FEAT-387】_CombatantPanel 用
+import '../widgets/ko_effect_overlay.dart';  // 【FEAT-526】KO 演出
 import '../widgets/potion_count_indicator.dart';
 import '../widgets/ult_gauge.dart';
 import '../widgets/ultimate_button.dart';
@@ -52,6 +52,69 @@ class _BattlePageState extends ConsumerState<BattlePage> {
   final UltimateHitEffectController _ultimateHitEffect =
       UltimateHitEffectController();
 
+  // ── 【FEAT-526 (2026-08-21)】KO 演出 ────────────────────────────────────
+
+  /// KO 演出の発火 controller (戦闘エリアを wrap する overlay に繋がる)。
+  final KoEffectController _koEffect = KoEffectController();
+
+  /// 🔴 **KO 演出の状態は battle_page のローカル state に置く。**
+  ///
+  /// `BattleSession` などの共有 state に置くと、**アンビエントバトル
+  /// (ホーム額縁) の終了処理まで待たされて止まる** —— 額縁側は KO 演出を
+  /// 描画しないのでフラグが永久に立たず、報酬処理も次の戦闘も始まらない。
+  /// しかも「静かに止まる」ので気付きにくい (指示書 Pre-mortem #2)。
+  ///
+  /// **このページが自分で開始した演出**が再生中かどうか、だけを持つ。
+  bool _koPlaying = false;
+
+  /// すでに演出を発火した `KoEvent` (二重発火防止)。
+  ///
+  /// `koEvent` は勝利後もクリアされないので、session が動くたびに
+  /// `_maybeFireKo` が呼ばれる。同じイベントで 2 回目を撃たないための記録。
+  KoEvent? _firedKoEvent;
+
+  /// KO 演出のゲートが開いているか (= 敵の fadeOut と報酬モーダルを許すか)。
+  ///
+  /// 🔴 **「koEvent があるかどうか」で判定してはいけない**
+  /// (2026-08-22 実機報告)。`battleSessionProvider` は autoDispose ではないので、
+  /// **前のバトルの決着済み state がそのまま残っている**ことがある。
+  /// それを見て閉じると、次のバトルに入った瞬間に「もう終わっている他人の KO」を
+  /// 待つことになり、敵が消えず報酬モーダルも出ない。
+  ///
+  /// 閉じるのは **自分が今まさに演出を再生している間だけ**。
+  bool get _koGateOpen => !_koPlaying;
+
+  /// KO 演出を 1 回だけ発火する。
+  ///
+  /// overlay が居なくて再生できなかったときは **その場でゲートを開ける**。
+  /// 演出のために本編 (撃破 → 報酬) を止めてはいけない。
+  void _maybeFireKo(BattleState? state) {
+    if (!mounted || state == null) return;
+    final event = state.koEvent;
+    if (event == null || event == _firedKoEvent) return;
+    _firedKoEvent = event;
+
+    final started = _koEffect.fire(speedMultiplier: state.speedMultiplier);
+    if (!started) return; // ゲートは元から開いている (閉じるのは再生中だけ)
+    setState(() => _koPlaying = true);
+    // ハプティクスは視覚演出と同フレームで打つ (fire-and-forget)。
+    // 専用 SE は本 FEAT のスコープ外なので、**手応えはここで補う**。
+    //
+    // 【2026-08-22】`playUltimateHit` (「強く当たった」= 減衰する余韻) から
+    // `playKoFinish` (「勝った」=「一撃 → 間 → 祝祭」) に差し替えた。
+    BattleHapticsService.instance.playKoFinish();
+  }
+
+  /// KO 演出が終わった → 敵の fadeOut と報酬モーダルを解禁する。
+  void _onKoFinished() {
+    if (!mounted || !_koPlaying) return;
+    setState(() => _koPlaying = false);
+    // 🔴 `ref.listen` は **state が動いたときにしか走らない**。
+    // 演出中に `finishCompleted` が true になっていた場合、ゲートが開いた
+    // 本メソッド側で再評価しないと **モーダルが永久に出ない**。
+    _maybeShowBattleEnd(ref.read(battleSessionProvider));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +125,18 @@ class _BattlePageState extends ConsumerState<BattlePage> {
       // `BattleSessionNotifier.startBattle` 側で `if (_orchestrator != null) return`
       // で no-op となり、既存セッション (state / token) はそのまま継続表示される。
       ref.read(battleSessionProvider.notifier).startBattle();
+
+      // 🔴 **ここで `_maybeFireKo` を呼んではいけない** (2026-08-22 実機報告)。
+      //
+      // 旧実装は「mount 時点で既に決着していた state を拾う」ために呼んでいたが、
+      // `battleSessionProvider` は autoDispose ではないので、ここで読める state は
+      // **たいてい前のバトルの決着済み state** である。しかも `startBattle()` は
+      // await されておらず、session のリセットは API 往復の後なので、直後に読むと
+      // 確実に古い state が返る。
+      //
+      // 結果、アンビエント (ホーム額縁) で勝った直後にギルドからバトルを始めると
+      // **前のバトルの KO 演出が流れてから新しいバトルが始まる**という症状になった。
+      // KO の発火は `ref.listen` の遷移検知だけに任せる。
 
       // 【FEAT-462】初回バトル時のみ「戻る = バトル継続」ヒントを表示。
       // 戦闘開始演出 (sprite フェードイン等) と被らないよう 1.5 秒遅延。
@@ -90,6 +165,22 @@ class _BattlePageState extends ConsumerState<BattlePage> {
       final nextEvent = next.state?.ultimateHitEvent;
       // null → non-null、または別 timestamp の event に切り替わったとき発火
       if (nextEvent != null && nextEvent != prevEvent) {
+        // 🔴 【FEAT-526 / 2026-08-22 実機報告】**必殺技がとどめだったときは
+        // 視覚もハプティクスも出さない。**
+        //
+        // 撃墜エフェクトは全画面に **白フラッシュ (alpha 0.6 / 350ms)** を掛ける。
+        // KO 演出はその裏で ヒットストップ → ズーム → 「K.O.」と進むので、
+        // **前半がまるごと白飛びする**。3 倍速では KO 演出 (約 230ms) が
+        // フラッシュ (350ms、倍速非追従) に**完全に飲み込まれて一度も見えない**。
+        //
+        // 額縁に撃墜エフェクトが無いのはこのためで、
+        // 「額縁では KO が見えるのに全画面では見えない」の正体でもある。
+        //
+        // ハプティクス側は FEAT-526 で既に同じ判断をしていた
+        // (`koFinish` の先頭に強い一撃が入っており、重ねると濁るだけ)。
+        // **視覚に同じガードを掛け忘れていた**のがこの不具合である。
+        if (next.state?.status == BattleStatus.won) return;
+
         // 視覚エフェクト + ハプティクスを同フレームで発火 (fire-and-forget)。
         _ultimateHitEffect.fire();
         // ハプティクスは async だが await しない (UI スレッドをブロックしない)。
@@ -122,30 +213,18 @@ class _BattlePageState extends ConsumerState<BattlePage> {
       }
     });
 
+    // 【FEAT-526】KO 演出の発火。
+    //
+    // 【Pre-mortem #6】オートバトルの連戦でゲートを閉じ直す処理は要らない ——
+    // ゲートは「再生中だけ閉じる」ので、演出が終わった時点で自動的に開き、
+    // 次のバトルのとどめでまた閉じる。**前バトルのフラグが残る余地が無い。**
+    ref.listen<BattleSession>(battleSessionProvider, (prev, next) {
+      _maybeFireKo(next.state);
+    });
+
     // 戦闘終了検知 → モーダル表示 + ホーム戻り（caller-decides-navigation）
     ref.listen<BattleSession>(battleSessionProvider, (prev, next) {
-      if (next.state == null) return;
-      final status = next.state!.status;
-      // 【FEAT-296 hotfix 2026-05-24】_sendFinish の API 応答完了
-      // （finishCompleted = true）を待ってからモーダル発火。
-      // 旧実装は status == won/lost だけで即発火していたため、
-      // rewardCoinsGained = 0 のまま「+0 coins / +0 EXP」表示される
-      // バグがあった。Backend 失敗時も catch 経路で finishCompleted
-      // = true に設定されるためフリーズしない設計。
-      // 【FEAT-297 Pre-mortem #3】BattlePage と WorldFrameSection の二重発火を防ぐため、
-      // `markModalShown()` で「最初の listener が独占的に true を取りに行く」設計。
-      // 既に true ならスキップ（他で発火済）。
-      if ((status == BattleStatus.won || status == BattleStatus.lost)
-          && next.finishCompleted) {
-        final won = ref
-            .read(battleSessionProvider.notifier)
-            .markModalShown();
-        if (!won) return; // 他で発火済 → BattlePage 側はスキップ
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _handleBattleEnd(status, next);
-        });
-      }
+      _maybeShowBattleEnd(next);
     });
 
     // 【新規 (2026-06-26)】UltimateHitEffectOverlay で全画面を wrap。
@@ -249,78 +328,109 @@ class _BattlePageState extends ConsumerState<BattlePage> {
         // ── 上半分: 対峙バトルエリア ──────────────────────
         Expanded(
           flex: 6,
-          child: Stack(
-            children: [
-              // 【FEAT-381 経路維持】バトルエリア内に背景を閉じ込める。
-              // MiniArena alpha 0.25 より薄い 0.15 で全画面の迫力を演出。
-              if (bgPath.isNotEmpty) ...[
-                Positioned.fill(
-                  child: Image.asset(
-                    bgPath,
-                    fit: BoxFit.cover,
-                    filterQuality: FilterQuality.none,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: AppTheme.background),
+          // 【FEAT-526】KO 演出は **戦闘エリアだけ** を wrap する。
+          // 画面全体を wrap すると下半分のログ / 作戦パネルまで拡大されて
+          // レイアウトが崩れる (`UltimateHitEffectOverlay` は画面シェイクだけ
+          // なので全画面 wrap でよいが、ズームは事情が違う)。
+          child: KoEffectOverlay(
+            controller: _koEffect,
+            onFinished: _onKoFinished,
+            child: Stack(
+              // 【2026-08-08 ユーザー要望】対峙ブロックをバトルエリアの中央高さへ下げる。
+              //
+              // MiniBattleArena と**同一の原因**。Stack の既定 alignment は
+              // `AlignmentDirectional.topStart` で、非 Positioned な子 (下の
+              // `Padding` > `Row`) は**上端に貼り付く**。`Expanded(flex: 6)` から
+              // tight 制約を受けて Stack はエリアいっぱいに広がる一方、中身の
+              // `_CombatantPanel` は `MainAxisSize.min` なので余白が全部下に落ちていた。
+              //
+              // なお `_CombatantPanel` の `mainAxisAlignment: center` は
+              // **min サイズの Column には効かない** (分配する余白が無い) ため、
+              // 「中央寄せは指定済み」に見えて実際は効いていなかった。
+              //
+              // `Positioned` な子 (背景 / 暗幕) は alignment の影響を受けない。
+              alignment: Alignment.center,
+              children: [
+                // 【FEAT-381 経路維持】バトルエリア内に背景を閉じ込める。
+                // MiniArena alpha 0.25 より薄い 0.15 で全画面の迫力を演出。
+                if (bgPath.isNotEmpty) ...[
+                  Positioned.fill(
+                    child: Image.asset(
+                      bgPath,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.none,
+                      errorBuilder: (_, __, ___) =>
+                          Container(color: AppTheme.background),
+                    ),
                   ),
-                ),
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.black.withValues(alpha: 0.15),
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.15),
+                    ),
+                  ),
+                ],
+                // ── 対峙構図 (横並び Row) ──────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 24),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 左: 敵 (sprite は PixelLab で既に右向き生成のため flipHorizontal: false 維持)
+                      // 【FEAT-387 hotfix 2026-05-30】真因: 敵 sprite (enemy_*.png) は全 14 体
+                      // 右向き生成済 (Read で確認: goblin_king / dragon / griffin / giant_slime /
+                      // armored_knight)、flipHorizontal: true で逆に左向きへ反転 = 味方から離れる
+                      // 方向になり対峙構図が崩れていた。default false で元の右向きを維持し、
+                      // 味方 (left-facing) と正しく向き合う。
+                      Expanded(
+                        child: _CombatantPanel(
+                          combatant: state.enemy,
+                          spriteSize: 128,
+                          flipHorizontal: false,
+                          attackDirection: AttackDirection.right,
+                          // 【FEAT-526】🔴 `status == won` **ではなく**
+                          // 「KO 演出が終わった」で判定する。旧実装は死んだ瞬間に
+                          // 500ms かけて消え始めていたので、**ズームする対象が
+                          // 残らなかった**。ここを遅らせるのが本 FEAT の中核。
+                          action: (state.status == BattleStatus.won &&
+                                  _koGateOpen)
+                              ? SpriteAction.fadeOut
+                              : state.enemyAction,
+                          damageEvent: state.enemyDamageEvent,
+                          isEnemy: true,  // 【FEAT-403】敵側は ATB 廃止 + HP 全幅化
+                        ),
+                      ),
+                      // 中央: 対峙の象徴アイコン (MiniArena より大きく迫力)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Icon(
+                          Icons.flash_on,
+                          size: 32,
+                          color: Colors.amber,
+                        ),
+                      ),
+                      // 右: 味方 (flipHorizontal: false で左向き = 敵を見る)
+                      Expanded(
+                        child: _CombatantPanel(
+                          combatant: state.player,
+                          spriteSize: 128,
+                          flipHorizontal: false,
+                          attackDirection: AttackDirection.left,
+                          action: state.status == BattleStatus.lost
+                              ? SpriteAction.fadeOut
+                              : state.playerAction,
+                          damageEvent: state.playerDamageEvent,
+                          // 【FEAT-527】味方側だけ攻撃フレームを再生する。
+                          // 素材を持たないキャラは CombatantSprite 側で
+                          // 従来の Transform 演出にフォールバックする。
+                          enableMotion: true,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
-              // ── 対峙構図 (横並び Row) ──────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 24),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // 左: 敵 (sprite は PixelLab で既に右向き生成のため flipHorizontal: false 維持)
-                    // 【FEAT-387 hotfix 2026-05-30】真因: 敵 sprite (enemy_*.png) は全 14 体
-                    // 右向き生成済 (Read で確認: goblin_king / dragon / griffin / giant_slime /
-                    // armored_knight)、flipHorizontal: true で逆に左向きへ反転 = 味方から離れる
-                    // 方向になり対峙構図が崩れていた。default false で元の右向きを維持し、
-                    // 味方 (left-facing) と正しく向き合う。
-                    Expanded(
-                      child: _CombatantPanel(
-                        combatant: state.enemy,
-                        spriteSize: 128,
-                        flipHorizontal: false,
-                        attackDirection: AttackDirection.right,
-                        action: state.status == BattleStatus.won
-                            ? SpriteAction.fadeOut
-                            : state.enemyAction,
-                        damageEvent: state.enemyDamageEvent,
-                        isEnemy: true,  // 【FEAT-403】敵側は ATB 廃止 + HP 全幅化
-                      ),
-                    ),
-                    // 中央: 対峙の象徴アイコン (MiniArena より大きく迫力)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      child: Icon(
-                        Icons.flash_on,
-                        size: 32,
-                        color: Colors.amber,
-                      ),
-                    ),
-                    // 右: 味方 (flipHorizontal: false で左向き = 敵を見る)
-                    Expanded(
-                      child: _CombatantPanel(
-                        combatant: state.player,
-                        spriteSize: 128,
-                        flipHorizontal: false,
-                        attackDirection: AttackDirection.left,
-                        action: state.status == BattleStatus.lost
-                            ? SpriteAction.fadeOut
-                            : state.playerAction,
-                        damageEvent: state.playerDamageEvent,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         // ── 下半分: ログ + 作戦切替 + 必殺 ───────────────
@@ -330,6 +440,45 @@ class _BattlePageState extends ConsumerState<BattlePage> {
         ),
       ],
     );
+  }
+
+  /// 戦闘終了モーダルを出してよいか判定して、出す。
+  ///
+  /// **2 箇所から呼ばれる**:
+  ///   1. `ref.listen` (session の state が動いたとき)
+  ///   2. `_onKoFinished` (KO 演出が終わってゲートが開いたとき)
+  ///
+  /// 🔴 2 が要る理由: `ref.listen` は session が動いたときにしか走らない。
+  /// `_sendFinish` は `status = won` の時点で即発火するので、**API が
+  /// 300ms で返れば `finishCompleted` は演出の途中で true になる**。その通知を
+  /// ゲートで弾いた後、ゲートが開いた側から再評価しないとモーダルが永久に出ない。
+  /// ローカルの速い backend ほど再現しやすく、本番で初めて直るように見える
+  /// 種類のバグなので、経路を 2 本明示しておく (指示書 Pre-mortem #1)。
+  void _maybeShowBattleEnd(BattleSession session) {
+    final state = session.state;
+    if (state == null) return;
+    final status = state.status;
+    // 【FEAT-296 hotfix 2026-05-24】_sendFinish の API 応答完了
+    // （finishCompleted = true）を待ってからモーダル発火。
+    // 旧実装は status == won/lost だけで即発火していたため、
+    // rewardCoinsGained = 0 のまま「+0 coins / +0 EXP」表示される
+    // バグがあった。Backend 失敗時も catch 経路で finishCompleted
+    // = true に設定されるためフリーズしない設計。
+    if (status != BattleStatus.won && status != BattleStatus.lost) return;
+    if (!session.finishCompleted) return;
+    // 【FEAT-526】KO 演出が終わるまでモーダルを出さない。
+    // 敗北時は KO 演出そのものが無い (`koEvent` を立てない) ので再生されず、
+    // ゲートは常に開いている = 従来どおり即座に出る。
+    if (!_koGateOpen) return;
+    // 【FEAT-297 Pre-mortem #3】BattlePage と WorldFrameSection の二重発火を防ぐため、
+    // `markModalShown()` で「最初の listener が独占的に true を取りに行く」設計。
+    // 既に true ならスキップ（他で発火済）。
+    final won = ref.read(battleSessionProvider.notifier).markModalShown();
+    if (!won) return; // 他で発火済 → BattlePage 側はスキップ
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _handleBattleEnd(status, session);
+    });
   }
 
   Future<void> _handleBattleEnd(BattleStatus status, BattleSession session) async {
@@ -387,6 +536,7 @@ class _CombatantPanel extends StatelessWidget {
     required this.action,
     required this.damageEvent,
     this.isEnemy = false,
+    this.enableMotion = false,
   });
 
   final Combatant combatant;
@@ -399,10 +549,18 @@ class _CombatantPanel extends StatelessWidget {
   /// 【FEAT-403 (2026-06-01)】敵側 (ボス) パネルは ATB 表示を廃止し HP 全幅化。
   final bool isEnemy;
 
+  /// 【FEAT-527】攻撃フレームの再生を許可する。**味方側のみ true**。
+  /// 敵側の素材は未着手 (味方が固まってから着手する方針)。
+  final bool enableMotion;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      // 【2026-08-08】`MainAxisSize.min` との組み合わせなので、この
+      // `mainAxisAlignment` は**実質効いていない** (分配する余白が無い)。
+      // 縦位置は呼び出し元 `_buildBattleArena` の `Stack(alignment: center)` が
+      // 決めている。`MainAxisSize.max` に変えるときだけ意味を持つので残置。
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Sprite + Floating Damage (FEAT-385 既パターン、top -16 でサイズ 128 に合わせ)
@@ -419,6 +577,7 @@ class _CombatantPanel extends StatelessWidget {
                 flipHorizontal: flipHorizontal,
                 attackDirection: attackDirection,
                 action: action,
+                enableMotion: enableMotion,
               ),
               if (damageEvent != null)
                 Positioned(
@@ -569,7 +728,11 @@ class _BattleLogAndTacticsPanel extends ConsumerWidget {
 ///
 /// タップ時:
 /// 1. `battleSessionProvider.notifier.setSpeedMultiplier` で Orchestrator に伝搬
-/// 2. `SharedPreferences` に永続化（次回バトル開始時に restore される）
+/// 2. `battleSpeedPreferenceProvider.setSpeed` で永続化（次回バトル開始時に restore）
+///
+/// 【FEAT-528】表示側 (`isSelected`) は変更しない。**バトル中は
+/// `battleSessionProvider.state.speedMultiplier` が実際に走っている値**であり、
+/// そちらが真実値（永続設定はまだ次のバトルの話でしかない）。
 class _SpeedChip extends ConsumerWidget {
   const _SpeedChip({required this.value, required this.label});
 
@@ -584,9 +747,10 @@ class _SpeedChip extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         ref.read(battleSessionProvider.notifier).setSpeedMultiplier(value);
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setDouble('battle_speed_multiplier', value);
-        });
+        // 🔴 【FEAT-528】直接 prefs.setDouble を書かない。
+        // 書き手が 2 つあると BUG-79 と同型の「二重の真実値」に戻る
+        // (「1x をハイライトしているのに実速度は 3x」)。永続化は notifier に一本化。
+        ref.read(battleSpeedPreferenceProvider.notifier).setSpeed(value);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),

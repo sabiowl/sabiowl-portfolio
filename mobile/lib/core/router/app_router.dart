@@ -132,7 +132,16 @@ class AppRoutes {
 class _SessionExpiredNotifier extends ChangeNotifier {
   _SessionExpiredNotifier(Ref ref) {
     ref.listen<AuthState>(authProvider, (prev, next) {
-      if (prev?.sessionExpired != next.sessionExpired) {
+      // 【BUG-156 (2026-09-11)】`status` の変化も拾う。
+      //
+      // `sessionExpired` は**ワンショット**で、AuthPage が表示直後に
+      // クリアする。それだけを見張っていると、クリア後にホームへ戻った
+      // ユーザーを誰も止められない —— **401 を受けてもホームに留まれる**。
+      //
+      // ⚠️ **`sessionExpired` と `status` の 2 つだけ**にすること。
+      //    `isLoading` 等の頻繁な変化まで拾うと redirect が暴走する。
+      if (prev?.sessionExpired != next.sessionExpired ||
+          prev?.status != next.status) {
         notifyListeners();
       }
     });
@@ -161,6 +170,68 @@ class _SessionExpiredNotifier extends ChangeNotifier {
 /// で本 hotfix 前に null crash 観測 (2026-07 v1.0.2)。
 final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'rootNavigator');
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 【BUG-156 (2026-09-11)】未認証でも到達してよいルート
+// ──────────────────────────────────────────────────────────────────────────────
+//
+// 🔴 **このリストは load-bearing になった。**
+//
+// 以前は `sessionExpired` という**稀な条件のときだけ**使われていたが、
+// 「未認証なら常に redirect」に広げたことで**常時効く**ようになった。
+// ここから漏れた public ルートは**未認証ユーザーから到達不能**になる ——
+// onboarding / register / login のどれかが漏れれば
+// **新規ユーザーが登録できない**。
+//
+// ⚠️ 手で数えたリストを信用しない。`test/core/router_public_routes_test.dart`
+//    が `AppRoutes` の全定数を走査し、**下の 2 つの箱のどちらかに
+//    分類済みであること**を縛っている (BUG-153 と同じ形)。
+//
+// 🔵 【FEAT-542 (2026-09-23)】**`/onboarding` がここから消えた。**
+//
+// BUG-156 は「未認証なら `/login`」を規則にしたが、成立させるために
+// `/onboarding` を public 例外として登録する必要があった ——
+// **オンボーディングが認証より先に来て、途中で黙ってゲストを作っていた**
+// からである。認証を先に済ませる順序では、あの画面に着いた時点で
+// **必ずトークンがある**。
+//
+// 🔴 **規則と現実が一致した。** 未認証のユーザーは実際に認証画面にいる。
+const kPublicRoutePrefixes = <String>[
+  AppRoutes.splash,           // '/'
+  AppRoutes.auth,
+  AppRoutes.register,
+  AppRoutes.login,
+];
+
+// 「認証が要る」と**意図して**分類したルート。
+//
+// 🔵 空の箱ではなく明示列挙にしているのは、新しいルートを足した人に
+//    「public か / 認証必須か」を**必ず 1 回考えさせる**ためである。
+//    どちらにも入れなければテストが名前を出して落ちる。
+const kAuthRequiredRoutes = <String>[
+  // 🔵 【FEAT-542】プロフィール設定は**認証の後**に来る。
+  //    ここに着く人は必ずトークンを持っている。
+  AppRoutes.onboarding,
+  AppRoutes.home,
+  AppRoutes.addHabit, AppRoutes.editHabit, AppRoutes.habitDetail,
+  AppRoutes.archivedHabits, AppRoutes.todoDone,
+  AppRoutes.addTodo, AppRoutes.editTodo,
+  AppRoutes.addEvent, AppRoutes.editEvent,
+  AppRoutes.timelineDefaults, AppRoutes.addTemplate, AppRoutes.editTemplate,
+  AppRoutes.calendar, AppRoutes.calendarAdd,
+  AppRoutes.stats, AppRoutes.character, AppRoutes.achievements,
+  AppRoutes.shop, AppRoutes.diamondPack,
+  AppRoutes.gacha, AppRoutes.gachaOdds,
+  AppRoutes.guild, AppRoutes.challenges, AppRoutes.puzzleWorld,
+  AppRoutes.friendList, AppRoutes.friendAdd, AppRoutes.friendProfile,
+  AppRoutes.notifications,
+  AppRoutes.settings, AppRoutes.profileEdit, AppRoutes.reminderSettings,
+  AppRoutes.accountDelete, AppRoutes.help, AppRoutes.contact,
+  // 🔵 この 2 件は手書きのリストから**漏れていた**。
+  //    走査テストが名前を出して落としてくれた —— 手で数えたリストは
+  //    書いた瞬間から腐る、という前提で作った仕組みが実際に効いた形である。
+  AppRoutes.battle, AppRoutes.memos,
+];
+
 @riverpod
 GoRouter appRouter(Ref ref) {
   final sessionNotifier = _SessionExpiredNotifier(ref);
@@ -173,23 +244,32 @@ GoRouter appRouter(Ref ref) {
     debugLogDiagnostics: true,
     refreshListenable: sessionNotifier,
     redirect: (context, state) {
-      // BUG-01: 401 によるセッション失効発生時のみ /auth/login へ強制遷移。
-      // 通常のログアウトや初回起動は対象外（個別ナビゲーションが既存）。
       final auth = ref.read(authProvider);
-      if (!auth.sessionExpired) return null;
+
+      // 🔴 【BUG-156 (2026-09-11)】判定中は動かさない。
+      //
+      // 起動直後は `checking` なので、除外しないと**必ずログイン画面を
+      // 経由して**ちらつく。
+      if (auth.status == AuthStatus.checking) return null;
+
+      // BUG-01: 401 によるセッション失効。
+      // 【BUG-156】`unauthenticated` でも飛ばす。
+      //
+      // `sessionExpired` は**ワンショット**で AuthPage が即クリアするため、
+      // これだけを見ていると**クリア後にホームへ戻ったユーザーを誰も
+      // 止められない**。実際、401 を受けても読み込みエラーだらけの
+      // ホームに留まり続ける状態になっていた。
+      if (!auth.sessionExpired &&
+          auth.status != AuthStatus.unauthenticated) {
+        return null;
+      }
 
       // 認証フロー / スプラッシュは遷移させない（無限ループ防止）
       final loc = state.matchedLocation;
-      const publicPrefixes = <String>[
-        AppRoutes.splash,           // '/'
-        AppRoutes.onboarding,
-        AppRoutes.auth,
-        AppRoutes.register,
-        AppRoutes.login,
-      ];
       // splash パス '/' は startsWith では他ルートと衝突するため等価比較
       if (loc == AppRoutes.splash) return null;
-      if (publicPrefixes.any((p) => p != AppRoutes.splash && loc.startsWith(p))) {
+      if (kPublicRoutePrefixes
+          .any((p) => p != AppRoutes.splash && loc.startsWith(p))) {
         return null;
       }
       return AppRoutes.login;
@@ -637,38 +717,90 @@ class _SplashScreenState extends ConsumerState<_SplashScreen> {
     final apiClient = ref.read(apiClientProvider);
 
     // A. 通常ユーザートークンあり → サーバー検証（24時間キャッシュ付き）
+    //
+    // ⚠️ 【FEAT-542】**ここでは設定完了を見ない。** 見ると、既存ユーザーが
+    // 端末を替えた / 入れ直したときに `profile_setup_completed_for` が
+    // 無いので**設定済みの人をオンボーディングへ送り、名前とキャラを
+    // 上書きする** —— BUG-167 と同じ事故になる。
+    // 🔵 ソーシャルの新規ユーザーは `justRegistered` で
+    // `AuthPage._onAuthenticated` が設定へ送るので、この分岐は要らない。
     final token = await apiClient.getToken();
     if (token != null && token.isNotEmpty) {
       final isValid = await _validateTokenWithServer(ref, apiClient);
       return isValid ? AppRoutes.home : AppRoutes.login;
     }
 
-    // B. FEAT-188: ゲストトークンあり → tutorial 表示状況で分岐。
+    // B. FEAT-188: ゲストトークンあり → プロフィール設定の完了状況で分岐。
     // 【BUG (2026-07-02)】旧実装は無条件に home に飛ばしていたため、
     // OnboardingPage の途中で app を kill して再起動すると、名前 = 'ゲスト' +
     // active_character = null (fallback で zenon 画像) のまま home に到達
-    // してしまう問題があった。tutorial 未表示なら onboarding に戻して
+    // してしまう問題があった。未完了なら onboarding に戻して
     // 名前入力 + キャラ選択を確実に完了させる。
+    //
+    // 🔴 【FEAT-542 (2026-09-23)】判定を `has_seen_tutorial` から
+    // `profile_setup_completed_for` に替えた。**持ち主を見る**ので、
+    // 「古い設定済みを新しいゲストが引き継ぐ」経路が消える:
+    //
+    //   連携済みユーザーのトークンが消える -> 「ゲストとして始める」
+    //   -> 新しいゲスト -> 設定の途中で kill -> 再起動
+    //   -> 旧実装はフラグを見てホームへ（名前「ゲスト」+ キャラ未選択）
+    //   -> 新実装は**持ち主が違う**ので「未設定」と読み、設定へ戻す
+    //
+    // ⚠️ **新順序では「トークンあり + 設定未完了」が通常の中間状態である。**
+    //    ゲストは認証画面で `startAsGuest` を通ってからここへ来るので、
+    //    旧順序より頻繁にこの分岐を通る。
     final guestToken = await apiClient.getGuestToken();
     if (guestToken != null && guestToken.isNotEmpty) {
-      final tutorialShown = await apiClient.hasTutorialBeenShown();
-      return tutorialShown ? AppRoutes.home : AppRoutes.onboarding;
+      final setupDone = await apiClient.isProfileSetupCompleted();
+      return setupDone ? AppRoutes.home : AppRoutes.onboarding;
     }
 
-    // B'. ゲストモードフラグだけ立っているがトークンがない（旧バージョン互換）→
-    //     tutorial 未表示なら onboarding、既表示なら home。
-    //     startAsGuest 経路の二重呼び出し対策として ApiClient 経由で
-    //     guest-init を呼ぶ責務は Notifier 側に任せる。
-    final isGuest = await apiClient.isGuestMode();
-    if (isGuest) {
-      final tutorialShown = await apiClient.hasTutorialBeenShown();
-      return tutorialShown ? AppRoutes.home : AppRoutes.onboarding;
-    }
+    // ⛔ 【FEAT-542】旧 case B'（`guest_mode` だけ立っていてトークンが無い）は
+    //    削除した。**オンボーディングはもうトークンを作らない**ので、
+    //    あそこへ送ると認証ヘッダー無しで `PATCH /player/` を叩いて 401 になる。
+    //    フラグだけでは身元にならない —— 下の case C が認証画面へ送り、
+    //    ユーザーに「サインインするか、新しく始めるか」を選ばせる。
 
-    // C. 未認証 → チュートリアル表示状況で分岐
-    final tutorialShown = await apiClient.hasTutorialBeenShown();
-    if (!tutorialShown) return AppRoutes.onboarding;
-
+    // C. 🔴 【BUG-166 (2026-09-12)】トークンが無ければ**必ず認証画面**へ。
+    //
+    // ## 旧実装は何をしていたか
+    //
+    // ```dart
+    // final tutorialShown = await apiClient.hasTutorialBeenShown();
+    // if (!tutorialShown) return AppRoutes.onboarding;   // ← これ
+    // ```
+    //
+    // 🔴 **認証済みユーザーが再インストールすると、ここを通っていた。**
+    // BUG-156 の掃除が `has_seen_tutorial` ごと消すので `tutorialShown` は
+    // false になり、**オンボーディングへ送られていた**。
+    //
+    // ⚠️ さらに悪いことに、`OnboardingPage._complete()` は
+    // 「トークンが無ければ `guest-init` を呼ぶ」ので、
+    // **Google 連携済みのユーザーが再インストールしただけで
+    // 「新しいゲスト」になっていた** —— 入力した名前とキャラの、
+    // 習慣が 1 つも無いプロフィールに着く（dev 実機確認 2026-09-12）。
+    //
+    // 🔵 What's New の「既存ユーザーが一度だけログアウトされる」は
+    // **ログイン画面が出る前提の文言**である。
+    //
+    // ## なぜ「認証画面へ」が正しいのか
+    //
+    // 🔴 **トークンが無いユーザーに必要なのは「サインインするか、
+    // 新しく始めるか」の選択であり、それを提示できるのは認証画面だけである。**
+    // オンボーディングは**黙ってゲストを作る**ので、選択の機会が無い。
+    //
+    // 🔵 保存先に依存しないのも利点である。`has_seen_tutorial` は
+    // secure storage にあり、**iOS では再インストールで残るが Android では
+    // 消える**。フラグの生存を当てにした分岐は**プラットフォームで挙動が
+    // 分かれる**。
+    //
+    // ⚠️ **新規ユーザーの最初の画面が認証の選択になる。** 世界観を見せる前に
+    // 決めさせる形なので、登録率が下がる方向に働く ——
+    // **ユーザー判断 2026-09-12 で、払う価値があると確認済み**。
+    // 🔵 チュートリアルを認証画面から開く形は FEAT-542 で作る。
+    //
+    // ⚠️ **case B の設定完了判定は残す。** あちらは
+    // 「ゲストトークンはあるが設定が途中」の再開判定で、役目が別である。
     final registered = await apiClient.isRegistered();
     return registered ? AppRoutes.login : AppRoutes.register;
   }

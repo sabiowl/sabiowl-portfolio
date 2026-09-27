@@ -1,5 +1,5 @@
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -18,7 +18,7 @@ class NotificationListView(PlayerMixin, APIView):
     生成されないため、実質的にゲストは "アプリからの通知 (自分宛)" のみを
     見ることになる。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -61,7 +61,7 @@ class NotificationListView(PlayerMixin, APIView):
 
 class NotificationReadView(PlayerMixin, APIView):
     """【FEAT-479 hotfix (2026-07-06)】ゲストモード表示対応 (NotificationListView 同措置)。"""
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def patch(self, request, pk):

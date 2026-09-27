@@ -24,6 +24,19 @@
 2 の形にしておくと、機能追加でベースラインが +1 されても
 「N+1 かどうか」の判定は独立して生き続ける。
 
+## 【2026-08-16 機能レビュー P1】測っていた URL が実路ではなかった
+
+本テストは `GET /api/home/` を測っていたが、**実アプリは必ず
+`GET /api/home/?time_segment=<segment>` を叩く**
+(`home_bootstrap_provider.dart:90`)。`home.py:201` の `if time_segment:` の中で
+`period_summary()` と `_load_dialogue()` が走るため、**この分岐が丸ごと
+測定外**だった。現に BUG-145 で +3 クエリが入っても何も鳴らなかった。
+
+契約テスト (`test_home_bootstrap_sabi.py`) は `?time_segment=` の有無を
+きちんと叩き分けていたので、パラメータの存在を忘れていたわけではない。
+**「契約は両方の形で、効率は非実路の形だけで」測っていた**という
+取り合わせの問題だった。→ `_home_query_count` を実路に向けた。
+
 ## 実測した内訳 (2026-08-05 時点、習慣 5 件で 27 クエリ)
 
 N+1 は無い (件数を増やしてもクエリ数は不変)。コストは **件数に依らない定数**。
@@ -84,11 +97,56 @@ class HomeBootstrapQueryEfficiencyTest(TestCase):
         for i in range(n):
             Habit.objects.create(player=self.player, name=f'{prefix}-{i}')
 
-    def _home_query_count(self) -> int:
+    # 【2026-08-16 機能レビュー P1】実アプリは **必ず `?time_segment=` を付けて**
+    # 叩く (`home_bootstrap_provider.dart:90` の `ref.read(timeSegmentProvider)` は
+    # 常に有効な segment を返し、`fetchHomeBootstrap` が非空なら必ず query に載せる)。
+    #
+    # 旧実装は `GET /api/home/` を測っていたため、`home.py:201` の `if time_segment:`
+    # 分岐 —— period_summary / locale 解決 / サビ台詞プールの DB 読み —— が
+    # **丸ごと測定外**だった。実測 (習慣 5 件):
+    #
+    #     GET /api/home/                      = 26 クエリ  ← 旧テストが測っていた
+    #     GET /api/home/?time_segment=morning = 30 クエリ  ← アプリが叩く形
+    #
+    # 現に BUG-145 (2026-08-16) で period_summary の 3 本が入ったが、
+    # **測定外だったので何も鳴らなかった**。
+    DEFAULT_PARAMS = {'time_segment': 'morning'}
+
+    def _home_query_count(self, params: dict | None = None) -> int:
         with CaptureQueriesContext(connection) as ctx:
-            res = self.client.get('/api/home/')
+            res = self.client.get('/api/home/',
+                                  self.DEFAULT_PARAMS if params is None else params)
         self.assertEqual(res.status_code, 200)
         return len(ctx.captured_queries)
+
+    # ── 0. 測定対象そのもののガード ───────────────────────────────
+
+    def test_measures_the_sabi_message_branch(self):
+        """**測っている URL が実路であること**を縛る。
+
+        本テストの上限を守っているかどうかは、`_home_query_count` が
+        どの URL を叩くかで決まる。**その選択自体は、他のどのテストも
+        縛っていなかった** —— だから `?time_segment=` 無しを測っていた間、
+        `home.py:201` の分岐が丸ごと測定外なのに全部緑だった。
+
+        「`time_segment` を渡している」と直接書くと、キー名を変えただけで
+        素通りする。そこで **測定値に分岐のコストが実際に含まれているか**
+        を見る: 分岐を通る形と通らない形でクエリ数が違うことを確かめる。
+
+        (負の検証: `DEFAULT_PARAMS` を `{}` に戻すと両者が一致して赤くなる)
+        """
+        self._make_habits(5, 'branch')
+
+        with_branch = self._home_query_count()
+        without_branch = self._home_query_count({})
+
+        self.assertGreater(
+            with_branch, without_branch,
+            f'測定対象が sabi_message 分岐を含んでいない '
+            f'(実路 {with_branch} / 非実路 {without_branch})。'
+            '_home_query_count が実アプリの叩き方 (?time_segment=) を'
+            '再現しているか確認すること',
+        )
 
     # ── 1. ベースライン ──────────────────────────────────────────
 
@@ -99,7 +157,23 @@ class HomeBootstrapQueryEfficiencyTest(TestCase):
         機械的に数字を書き換えると本テストはガードとして死ぬ。
 
         含まれるもの: token 認証 / player 解決 / I18nMiddleware の
-        PlayerSettings / maintenance (cache 済) / 本体の集約クエリ群。
+        PlayerSettings / maintenance (cache 済) / 本体の集約クエリ群 /
+        **sabi_message 分岐** (`?time_segment=` 付きで測るようになったため)。
+
+        ## 上限 30 → 32 に引き上げた理由 (2026-08-16)
+
+        **数字だけを黙って書き換えていない。** 内訳は以下のとおり:
+
+        | | クエリ数 | 出来事 |
+        |---|---:|---|
+        | 旧測定 (`?time_segment=` なし) | 26 | sabi_message 分岐が測定外だった |
+        | 実路の測定に変更 | **33** | +7 = period_summary 3 + locale 1 + サビ台詞プール 1 + ほか 2 |
+        | `period_summary` を OR 1 本に畳む | **31** | -2 |
+
+        +5 は **BUG-145 (サビが週次・月次の達成を見落とす) を直すために必要な
+        コスト**で、支払う価値がある。問題は「支払ったことに誰も気づけなかった」
+        ことで、それは測る URL を実路に向けたことで解消した。上限は現状 31 に
+        対して +1 の余裕を持たせて **32** とする。
         """
         self._make_habits(5, 'base')
 
@@ -107,7 +181,7 @@ class HomeBootstrapQueryEfficiencyTest(TestCase):
 
         # 上限として縛る。下振れ (最適化) では落とさない。
         self.assertLessEqual(
-            count, 30,
+            count, 32,
             f'ホーム bootstrap のクエリ数が {count} 件に増えている。'
             'アプリ起動時に必ず叩かれる経路なので、増加が意図的か確認すること。',
         )

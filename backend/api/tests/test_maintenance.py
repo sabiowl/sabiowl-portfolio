@@ -25,6 +25,13 @@ from rest_framework.test import APIClient
 from api.middleware.maintenance import MaintenanceMiddleware
 from api.models import MaintenanceConfig
 from api.services.maintenance_cache import invalidate_maintenance_cache
+from api.views.maintenance import _EN_FALLBACK
+
+# 日本語判定 (ひらがな / カタカナ / 漢字)。
+# `test_i18n_api_response_no_japanese.py` の `_CJK` と同じ用途だが、
+# あちらは endpoint 走査用の広い集合。ここは「fallback が日本語でない」
+# ことだけを見るので最小限に留める。
+_CJK = '[぀-ゟ゠-ヿ一-鿿]'
 
 
 class MaintenanceMiddlewareTests(TestCase):
@@ -99,6 +106,147 @@ class MaintenanceMiddlewareTests(TestCase):
         self.assertEqual(response.data['title'], 'テスト中')
         self.assertEqual(response.data['body'], 'テスト本文 🪶')
         self.assertIsNotNone(response.data['expires_at'])
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 【FEAT-536 Phase 2-3 (2026-08-29)】locale 解決の振る舞い
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class MaintenanceStatusLocaleTests(TestCase):
+    """`/api/maintenance/` が `Accept-Language` を読む。
+
+    ## なぜ必要か —— 障害中の唯一の画面が読めなかった
+
+    本 view は `_en` を持つ他のどの view とも違い、`get_i18n_field` を
+    **1 回も呼んでいなかった**。`Accept-Language` は届いており
+    (`I18nMiddleware` が `request.locale` を立てている)、
+    **読めるのに読んでいない**だけだった (FEAT-536 §2.1)。
+
+    2026-08-29 の dev 実機検証で再現済み。英語端末の overlay は
+    `Retry` / `News` / `Contact` / 日付書式まで英語なのに、
+    **Backend が返したタイトルと本文だけが日本語**だった。
+
+    ## `_EN_FALLBACK` を持つ理由 (他の view と違う点)
+
+    通常の master data は ja fallback で十分だが、この行を書くのは
+    **障害対応の最中**であり、`_en` が空のまま ON にされる確率が構造的に高い。
+    実際 Phase 0 では **既定値のまま ON にされた**。
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        cache.clear()
+        self.expires = timezone.now() + timedelta(hours=4)
+
+    def _enable(self, **kwargs):
+        defaults = dict(
+            pk=1, is_enabled=True,
+            title='現在、システムに手当てをしております',
+            body='少し時間をおいて、もう一度お試しください 🪶',
+            expires_at=self.expires,
+        )
+        defaults.update(kwargs)
+        MaintenanceConfig.objects.create(**defaults)
+        invalidate_maintenance_cache()
+
+    def test_l1_english_returns_english_when_en_filled(self):
+        """L-1: `Accept-Language: en` + `title_en` あり → 英語が返る。"""
+        self._enable(
+            title_en='Scheduled maintenance in progress.',
+            body_en='We will be back shortly.',
+        )
+        res = self.client.get('/api/maintenance/', HTTP_ACCEPT_LANGUAGE='en')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['title'], 'Scheduled maintenance in progress.')
+        self.assertEqual(res.data['body'], 'We will be back shortly.')
+
+    def test_l2_japanese_is_unchanged(self):
+        """L-2: ヘッダ無し / `ja` → 日本語のまま。
+
+        英語対応が「日本語を壊して英語にした」ではないことを縛る。
+        """
+        self._enable(
+            title_en='Scheduled maintenance in progress.',
+            body_en='We will be back shortly.',
+        )
+        for headers in ({}, {'HTTP_ACCEPT_LANGUAGE': 'ja'}):
+            with self.subTest(headers=headers):
+                res = self.client.get('/api/maintenance/', **headers)
+                self.assertEqual(res.status_code, 200)
+                self.assertEqual(res.data['title'], '現在、システムに手当てをしております')
+                self.assertEqual(res.data['body'], '少し時間をおいて、もう一度お試しください 🪶')
+
+    def test_l3_empty_english_falls_back_to_english_default(self):
+        """L-3: `en` + `_en` 空 → `_EN_FALLBACK` が返る (🔴 日本語ではない)。
+
+        他の view は ja に落とすが、**ここだけは英文の既定値に落とす**。
+        Phase 0 の実機検証で「既定値のまま ON」が実際に起きており、
+        ja fallback では英語ユーザーが**障害中の唯一の画面を読めない**。
+        """
+        self._enable()  # `_en` は既定の空文字のまま
+        res = self.client.get('/api/maintenance/', HTTP_ACCEPT_LANGUAGE='en')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['title'], _EN_FALLBACK['title'])
+        self.assertEqual(res.data['body'], _EN_FALLBACK['body'])
+        for key in ('title', 'body'):
+            self.assertNotRegex(
+                res.data[key], _CJK,
+                f'英語ロケールなのに {key} に日本語が出ている: {res.data[key]!r}',
+            )
+
+    def test_l4_disabled_returns_empty_strings_in_english(self):
+        """L-4: `en` + `is_enabled=False` → 空文字 (現行契約の維持)。
+
+        OFF のときは fallback を返さない。`_EN_FALLBACK` を無条件に返すと、
+        **メンテしていないのに英文が入った payload** が飛ぶ。
+        """
+        MaintenanceConfig.objects.create(pk=1, is_enabled=False)
+        invalidate_maintenance_cache()
+        res = self.client.get('/api/maintenance/', HTTP_ACCEPT_LANGUAGE='en')
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(res.data['is_enabled'])
+        self.assertEqual(res.data['title'], '')
+        self.assertEqual(res.data['body'], '')
+        self.assertIsNone(res.data['expires_at'])
+
+    def test_en_fallback_has_no_japanese(self):
+        """`_EN_FALLBACK` 自体に日本語が混ざっていない。
+
+        ここが日本語だと L-3 が「日本語が返る」のに緑になる。
+        """
+        for key, value in _EN_FALLBACK.items():
+            self.assertNotRegex(value, _CJK, f'_EN_FALLBACK[{key!r}] に日本語がある')
+
+
+class MaintenanceConfigSoloTests(TestCase):
+    """【FEAT-536 Phase 1-3】`get_solo()` は runbook の緊急経路として使う。
+
+    呼び出し 0 件のデッドコードだったが、**削除ではなく用途を与えた**。
+    `get_maintenance_config()` は `.filter(pk=1).first()` で**行を作らない**ため、
+    行がまだ無い状態（prod の現状）で **admin UI が使えないとき**に
+    ON にする手段が他に無い。`doc/runbook/maintenance_mode.md` の
+    「admin が開けないときの緊急 ON」がこれを使う。
+
+    runbook が依存する以上、**振る舞いはテストで固定しておく**
+    （デッドコードのまま放置すると、次に誰かが消す）。
+    """
+
+    def test_creates_row_at_pk_1(self):
+        self.assertFalse(MaintenanceConfig.objects.exists())
+        obj = MaintenanceConfig.get_solo()
+        self.assertEqual(obj.pk, 1)
+        self.assertFalse(obj.is_enabled, '作成しただけでメンテが始まってはいけない')
+
+    def test_is_idempotent(self):
+        first = MaintenanceConfig.get_solo()
+        first.is_enabled = True
+        first.save(update_fields=['is_enabled'])
+
+        second = MaintenanceConfig.get_solo()
+        self.assertEqual(second.pk, first.pk)
+        self.assertEqual(MaintenanceConfig.objects.count(), 1)
+        self.assertTrue(second.is_enabled, '既存行を作り直して設定を消していない')
 
 
 class HealthCheckViewTests(TestCase):

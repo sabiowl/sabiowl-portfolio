@@ -140,6 +140,14 @@ class PlayerStreakState(models.Model):
     login_streak_days = models.IntegerField(
         default=0, verbose_name='連続ログイン日数',
     )
+    # 【FEAT-539 (2026-09-05)】最長連続達成日数。
+    # ⚠️ v1.1.2 では **表示しない** (指示書 決定 4)。migration を 2 度切らないために
+    # 今入れている。ただし **書き込みは Phase 2 で必ず行う** ——
+    # 表示しないからと書き込みも省くと、`login_streak_days` が FEAT-331 以降
+    # 陥っていた「誰も更新しない field」がもう 1 本増える (指示書 §2 / Pre-mortem 9)。
+    best_task_streak_days = models.IntegerField(
+        default=0, verbose_name='最長連続達成日数',
+    )
     # フレンドプレゼント popup 判定 (FEAT-452)
     daily_task_count = models.IntegerField(
         default=0, verbose_name='当日タスク完了数',

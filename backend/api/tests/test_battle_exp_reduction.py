@@ -17,6 +17,7 @@ from rest_framework.test import APITestCase
 
 import datetime
 
+from api.constants import GameBalance
 from api.models import Enemy, PlayerProfile, WeaponMaster
 
 User = get_user_model()
@@ -103,6 +104,57 @@ class BattleExpReductionTest(APITestCase):
         # coins は変更なし
         self.assertEqual(res.data['coins_gained'], 10,
                          'coins は変更なし (経済主役)')
+
+    # ─────────────────────────────────────────────────────────────────────
+    # 【FEAT-537 (2026-08-29)】バトル勝利のレベルアップで配分 pt が 10 入る
+    # ─────────────────────────────────────────────────────────────────────
+    def test_win_on_level_up_boundary_grants_allocatable_points(self):
+        """🔴 境界をまたぐ勝利で `allocatable_points` が 10 増える。
+
+        ユーザー実機報告「レベルアップしたのにステータスポイントが 10 ポイント
+        付与されなかった」の経路。旧実装は **リテラル 3** が直書きされており、
+        習慣経路 (10) との差は「EXP の出どころ」ではなく
+        **「閾値をまたいだ瞬間の経路」** で決まっていた。
+
+        ⚠️ 「たまたま通る」を避けるため `current_exp = max_exp - 1` にして
+        境界を直接踏む (Pre-mortem #7)。
+        """
+        battle = self.player.battle
+        battle.current_exp = battle.max_exp - 1
+        battle.allocatable_points = 0
+        battle.save(update_fields=['current_exp', 'allocatable_points'])
+        level_before = battle.level
+
+        res = self._start_and_finish(result='win')
+        self.assertEqual(res.status_code, 200, res.content)
+
+        after = PlayerProfile.objects.get(pk=self.player.pk).battle
+        self.assertEqual(after.level, level_before + 1, 'レベルが上がっていない')
+        self.assertEqual(
+            after.allocatable_points, GameBalance.ALLOCATABLE_POINTS_PER_LEVEL,
+            '🔴 バトル勝利のレベルアップで 10pt 入っていない '
+            '(旧実装はリテラル 3 だった)',
+        )
+
+    def test_lose_does_not_grant_allocatable_points(self):
+        """🔴 敗北では pt が入らない (Pre-mortem #8)。
+
+        `finish.py` の加算は `if result == 'win':` の中にあり、
+        `save(update_fields=...)` も win / lose で分岐している。
+        統一のついでに敗北経路へ漏れ出していないことを縛る。
+        """
+        battle = self.player.battle
+        battle.current_exp = battle.max_exp - 1
+        battle.allocatable_points = 0
+        battle.save(update_fields=['current_exp', 'allocatable_points'])
+        level_before = battle.level
+
+        res = self._start_and_finish(result='lose')
+        self.assertEqual(res.status_code, 200, res.content)
+
+        after = PlayerProfile.objects.get(pk=self.player.pk).battle
+        self.assertEqual(after.level, level_before, '敗北でレベルが上がっている')
+        self.assertEqual(after.allocatable_points, 0, '敗北で pt が入っている')
 
     # ─────────────────────────────────────────────────────────────────────
     # シナリオ 2: lose → EXP 0 (変わらず)

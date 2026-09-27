@@ -15,7 +15,7 @@ re-export 経路で 100% 維持されており、`from api.views import calendar
 from collections import defaultdict
 from datetime import date, timedelta
 
-from rest_framework.authentication import TokenAuthentication
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -35,7 +35,7 @@ from .aggregations import CalendarView, StreakView
 
 class CalendarHeatmapView(PlayerMixin, APIView):
     # FEAT-190: ヒートマップはカレンダー画面の基本表示要素のためゲストでも閲覧可能。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -258,7 +258,7 @@ class Stats30DayView(PlayerMixin, APIView):
         }
     """
 
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     _MILESTONES = [7, 30, 100, 365]

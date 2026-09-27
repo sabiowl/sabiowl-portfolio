@@ -137,28 +137,23 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   /// 【FEAT-513】敗北 dialog 表示。BUG-65 準拠 (300ms delay + mounted チェック)。
-  Future<void> _showAmbientDefeatDialog(String enemyName) async {
+  ///
+  /// 🔴 【BUG-148 (2026-08-24)】ボタンは「閉じる」1 つで、**ここから
+  /// オートバトルを再開しない**。回数が残っていれば次にホームへ来たときに
+  /// 自然に再開する。旧「続ける」は同じ敵に戻ってまた負けるだけだった
+  /// (理由は `AmbientBattleDefeatDialog` の doc コメント)。
+  Future<void> _showAmbientDefeatDialog(
+    String enemyName,
+    int remainingBattles,
+  ) async {
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AmbientBattleDefeatDialog(
         enemyName: enemyName,
-        onRest: () => Navigator.of(dialogContext).pop(),
-        onContinue: () {
-          Navigator.of(dialogContext).pop();
-          // 【gameplay_review 20260803 要素 A-4】「続ける」は明示的な再開意思なので、
-          // countdown (= 意図しない発火を止めるための猶予) の目的は既に満たされている。
-          // ここで再度 10 秒待たせるのは「今まさに続けると言ったのに待たされる」
-          // という一番いらない待ちになるため、次回 1 回だけ countdown を省略する。
-          ref
-              .read(ambientAutoBattleProvider.notifier)
-              .requestSkipNextCountdown();
-          // 300ms 後に再試行 (dialog dispose 完了を待つ)
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) _maybeStartAutoBattle();
-          });
-        },
+        remainingBattles: remainingBattles,
+        onClose: () => Navigator.of(dialogContext).pop(),
       ),
     );
   }
@@ -232,6 +227,9 @@ class _HomePageState extends ConsumerState<HomePage>
     final l10n = AppLocalizations.of(context)!;
     // P0-1: ホームブートストラップ結線
     ref.watch(homeBootstrapControllerProvider);
+    // 【FEAT-530】「ホームが今ここに居る」ことを autoDispose の element 1 つで表す。
+    // 値は使わない —— バトル終了時の再取得分岐が `ref.exists` で見るためだけの標識。
+    ref.watch(homeIsLiveProvider);
 
     // 【FEAT-513】Ambient Auto Battle の UI シグナルを受信して dialog / SnackBar を表示。
     ref.listen<AmbientBattleState>(ambientAutoBattleProvider, (_, next) {
@@ -249,7 +247,9 @@ class _HomePageState extends ConsumerState<HomePage>
       if (summary != null) _showAmbientSummaryToast(summary);
 
       if (defeatName != null) {
-        _showAmbientDefeatDialog(defeatName);
+        // 【BUG-148】queue 全体の `remainingBattles` ではなく、
+        // **この敵の**残り回数 (`defeatRemainingBattles`) を渡す。
+        _showAmbientDefeatDialog(defeatName, next.defeatRemainingBattles);
       } else if (next.showEmptyPresetSnackBar) {
         _showAmbientEmptyPresetSnackBar();
       }

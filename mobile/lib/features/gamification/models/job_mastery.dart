@@ -17,8 +17,28 @@ class JobMastery {
   final String jobId;
   final String jobName;
   final int level;
+
+  /// **現在の Lv 内での進捗 EXP** (累計ではない)。
+  ///
+  /// Backend は Lv アップのたびに必要量を差し引く
+  /// (`battle_finish_service.py`: `mastery.exp -= calc_job_mastery_exp_to_next(...)`)
+  /// ため、常に `0 <= exp < expToNext` の範囲に収まる。
   final int exp;
+
+  /// 🔴 **現在の Lv を突破するのに必要な EXP の「総量」**。**残量ではない。**
+  ///
+  /// Backend が返すのは `calc_job_mastery_exp_to_next(level)` = `Lv²×2 + Lv×4 + 4`
+  /// そのもので、**すでに貯めた [exp] は引かれていない**
+  /// (`views/job_mastery.py` / `services/battle_finish_service.py`)。
+  ///
+  /// 名前が「to next」なので**残量と読み間違えやすい**。実際 2026-08-09 まで
+  /// [expProgress] が `exp / (exp + expToNext)` と書かれており、
+  /// Lv 1 で 1 勝した状態 (exp=5, expToNext=10) のバーが **50% ではなく 33%**
+  /// を指していた。表示文言も「あと 10 EXP」(正しくは 5) と出ていた。
+  ///
+  /// 残量が欲しい場合は **`expToNext - exp`** で求めること。
   final int expToNext;
+
   final bool isMaxed;
 
   /// battle/finish/ レスポンス専用 field (list API では 0/false)。
@@ -40,8 +60,16 @@ class JobMastery {
     );
   }
 
+  /// バーの進捗率 (0.0 - 1.0)。
+  ///
+  /// 【2026-08-09 修正】旧: `exp / (exp + expToNext)`。
+  /// [expToNext] を**残量**と誤解した式で、実際は総量なので分母が二重に
+  /// 膨らんでいた (exp=5 / expToNext=10 で 33%、正しくは 50%)。
   double get expProgress {
     if (isMaxed || expToNext <= 0) return 1.0;
-    return (exp / (exp + expToNext)).clamp(0.0, 1.0);
+    return (exp / expToNext).clamp(0.0, 1.0);
   }
+
+  /// 次の Lv までの残り EXP。表示に使うならこちら。
+  int get expRemaining => isMaxed ? 0 : (expToNext - exp).clamp(0, expToNext);
 }

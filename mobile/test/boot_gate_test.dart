@@ -15,12 +15,18 @@ import 'package:sabiowl/core/widgets/boot_gate.dart';
 
 /// /health/ に 200 を返す fake adapter。
 class _HealthOkAdapter implements HttpClientAdapter {
+  /// 【BUG-147 Phase C】**実際に叩かれたか**を数える。
+  /// probe の経路 (`dio` → `probeDio`) が変わったとき、fake が呼ばれないまま
+  /// 「ネットワーク失敗 → degraded」で偶然緑になる事故を検出するための counter。
+  int calls = 0;
+
   @override
   Future<ResponseBody> fetch(
     RequestOptions options,
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    calls++;
     return ResponseBody.fromString('{"status":"ok"}', 200,
         headers: {Headers.contentTypeHeader: [Headers.jsonContentType]});
   }
@@ -96,12 +102,22 @@ class _MaintenanceNeverResolve extends MaintenanceService {
 /// ApiClient を最小構成で差し替えるための test-only サブクラス。
 /// parent constructor は _dio を初期化するが、_testDio で getter をオーバーライド
 /// するため、parent の _dio は一切使われない。
+///
+/// 【BUG-147 Phase C (2026-08-20)】**`probeDio` も必ず override すること。**
+/// BootGate の health probe は `client.dio` から `client.probeDio` に移った。
+/// override を忘れると parent が実 base URL の Dio を作り、fake adapter が
+/// 一度も呼ばれないまま「ネットワーク失敗 → degraded」で**テストが偶然緑になる**
+/// (実際に一度その状態になった)。probe 経路を差し替えるテストは、
+/// **どちらの getter を見ているか**を常に確認すること。
 class _FakeApiClient extends ApiClient {
   _FakeApiClient(super.ref, this._testDio);
   final Dio _testDio;
 
   @override
   Dio get dio => _testDio;
+
+  @override
+  Dio get probeDio => _testDio;
 }
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -154,14 +170,23 @@ void main() {
     });
 
     testWidgets('Case B: health=200 + maintenance.isEnabled=false → overlay 非表示', (tester) async {
+      final adapter = _HealthOkAdapter();
       await tester.pumpWidget(
         _buildWidget(
-          healthAdapter: _HealthOkAdapter(),
+          healthAdapter: adapter,
           maintenanceService: _MaintenanceOff(),
         ),
       );
       // probe 完了まで settle
       await tester.pumpAndSettle();
+
+      // 【BUG-147 Phase C】fake が実際に叩かれたことを先に確認する。
+      // ここが 0 だと、以降の assert は「probe が届いていない」状態を
+      // 見ているだけになる (probe を probeDio へ移したとき実際に起きた)。
+      expect(adapter.calls, greaterThan(0),
+          reason: 'health probe が fake adapter に届いていない。'
+              'BootGate が見ている getter と _FakeApiClient の override が'
+              '一致しているか確認すること');
 
       // maintenanceStatusProvider は off のまま → 子だけ表示
       expect(find.text('child_widget'), findsOneWidget);

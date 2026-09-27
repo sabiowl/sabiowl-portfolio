@@ -9,7 +9,8 @@ import '../../battle/models/job.dart';  // 【FEAT-430】Job (ジョブ修飾子
 import '../../habits/providers/habits_provider.dart';  // 【FEAT-427】playerNotifierProvider
 import '../models/gamification_models.dart';
 import '../providers/gamification_provider.dart';
-import '../services/job_mastery_service.dart';    // 【FEAT-511 Phase A】
+import '../widgets/job_mastery_bar.dart';          // 【FEAT-511 Phase A / 2026-08-09 共有化】
+import '../widgets/job_mastery_info_dialog.dart';  // 【2026-08-09】熟練度の説明 ⓘ
 import '../widgets/character_fullscreen_view.dart';  // 【新規 2026-06-26】全画面表示
 import '../widgets/character_zoom_indicator.dart';   // 【新規 2026-06-26】ズームアイコン
 
@@ -680,13 +681,12 @@ class _JobModifierSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Row(
-            children: [
-              const Icon(Icons.shield, size: 14, color: Colors.white60),
-              const SizedBox(width: 6),
-              Text(
+        Row(
+          children: [
+            const Icon(Icons.shield, size: 14, color: Colors.white60),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
                 l10n.gamifCharacterJobModifierPrefix(job.jobName),
                 style: const TextStyle(
                   color: Colors.white60,
@@ -695,8 +695,12 @@ class _JobModifierSection extends StatelessWidget {
                   letterSpacing: 1.0,
                 ),
               ),
-            ],
-          ),
+            ),
+            // 【2026-08-09】熟練度の説明 ⓘ。見出し側に置く理由は
+            // `JobSelectionOverlay` 側のコメントと同じ (バーは未バトルだと
+            // 何も描画しないため、中に入れると説明が消える)。
+            const JobMasteryInfoButton(),
+          ],
         ),
         const SizedBox(height: 8),
         Container(
@@ -717,77 +721,8 @@ class _JobModifierSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        _JobMasteryBar(job: job),
+        JobMasteryBar(jobId: job.jobId, jobName: job.jobName),
       ],
-    );
-  }
-}
-
-/// ジョブ熟練度バー (read-only)。
-///
-/// 【FEAT-511 Phase A (2026-07-30)】S8 対策として `jobMasteriesProvider` は
-/// 1 request で全ジョブ分を一括取得する。未バトルのジョブは何も表示しない
-/// (サビ哲学「押し付けない」)。
-class _JobMasteryBar extends ConsumerWidget {
-  const _JobMasteryBar({required this.job});
-
-  final Job job;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final masteryAsync = ref.watch(jobMasteriesProvider);
-    final l10n = AppLocalizations.of(context)!;
-
-    return masteryAsync.when(
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-      data: (masteries) {
-        final matching = masteries.where((x) => x.jobId == job.jobId);
-        if (matching.isEmpty) return const SizedBox.shrink();
-        final m = matching.first;
-
-        return Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (m.isMaxed)
-                    const Text('👑 ', style: TextStyle(fontSize: 13)),
-                  Text(
-                    m.isMaxed
-                        ? l10n.gamifCharacterJobMasteryMax(job.jobName)
-                        : l10n.gamifCharacterJobMasteryProgress(job.jobName, m.level),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: m.isMaxed ? AppTheme.primary : Colors.white70,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              LinearProgressIndicator(
-                value: m.expProgress,
-                minHeight: 4,
-                backgroundColor: Colors.white.withValues(alpha: 0.1),
-                valueColor: AlwaysStoppedAnimation(
-                  m.isMaxed ? AppTheme.primary : Colors.white70,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                m.isMaxed
-                    ? l10n.gamifCharacterJobMasteryUnlockHint
-                    : l10n.gamifCharacterJobMasteryNextExpSabi_message(
-                        m.expToNext, m.level + 1),
-                style: const TextStyle(fontSize: 10, color: Colors.white54),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

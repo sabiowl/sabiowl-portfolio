@@ -22,7 +22,7 @@ from rest_framework import status as http_status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from api.models import Habit, HabitLog, PlayerProfile
+from api.models import DailyAchievement, Habit, HabitLog, PlayerProfile
 
 User = get_user_model()
 
@@ -227,8 +227,28 @@ class StreakProtectionIndependenceTest(APITestCase):
     # シナリオ 7: login_streak は保護発動で影響しない (Pre-mortem #2)
     # ─────────────────────────────────────────────────────────────────
     def test_protection_does_not_affect_login_streak(self):
-        """ストリーク保護発動時に login_streak_days は変わらない。"""
+        """ストリーク保護発動は login_streak_days に影響しない。
+
+        🔴 【FEAT-539 (2026-09-05)】**このテストの前提が変わった。**
+
+        FEAT-377 当時、この assert は「値が変わらないこと」を見ていた。
+        それが成立していたのは保護が独立していたからではなく、
+        **`login_streak_days` を書くコードが本番に 1 行も無かった**ためである
+        (FEAT-539 指示書 §2)。つまり当時の緑は**空振りでも同じ緑**だった。
+
+        FEAT-539 でその日の初回タスク達成が `login_streak_days` を書くように
+        なったので、`+1` は**正しい変化**になった。守るべき不変条件は
+        「変わらない」ではなく「**FEAT-539 の規則どおりにしか変わらない**」
+        —— 保護が余計に足したり据え置いたりしないこと —— である。
+
+        ここでは昨日の `DailyAchievement` を置いて「継続」を成立させ、
+        5 → 6 になることを見る。保護が関与すれば 6 以外になる。
+        """
         before_login_streak = self.player.login_streak_days  # 5
+        # 昨日は達成済 → FEAT-539 の規則では連続が 1 伸びる
+        DailyAchievement.objects.create(
+            player=self.player, date=timezone.localdate() - timedelta(days=1),
+        )
 
         # streak 保護発動させる (streak=7 の習慣を昨日なしで today plus)
         res = self.client.post(
@@ -238,10 +258,15 @@ class StreakProtectionIndependenceTest(APITestCase):
         )
         self.assertEqual(res.status_code, http_status.HTTP_200_OK)
 
+        self.habit.refresh_from_db()
         self.player.refresh_from_db()
+        # 保護は発動している (習慣ストリークが 1 に落ちていない)
+        self.assertEqual(self.habit.streak, 8)
+        # login_streak は FEAT-539 の +1 のみ。保護は 1 も足していない。
         self.assertEqual(
-            self.player.login_streak_days, before_login_streak,
-            msg='ストリーク保護発動は login_streak_days に影響しないはず',
+            self.player.login_streak_days, before_login_streak + 1,
+            msg='ストリーク保護は login_streak_days に影響しないはず '
+                '(変化は FEAT-539 の「昨日も達成 → +1」だけ)',
         )
 
     # ─────────────────────────────────────────────────────────────────

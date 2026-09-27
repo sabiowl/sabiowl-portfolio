@@ -469,6 +469,57 @@ void main() {
       expect(offenders, isEmpty, reason: offenders.join('\n'));
     });
   });
+
+  // ── 【機能レビュー 20260822 A-1】レイアウトで分割された文 ──────────────
+  //
+  // 🔴 **語順が言語ごとに違うものを、レイアウトで分割してはいけない。**
+  //
+  // `ambient_battle_overlays.dart` のカウントダウンは 56pt の数字 `Text` と
+  // 説明の `Text` を縦に積んでいる。日本語は「数値 → 助数詞 + 述語」なので
+  // 「10」「秒後に自動出陣しますよ」で 1 文になるが、英語をそのまま同じ形に
+  // 置くと **前置詞で終わって何も続かない文**になる。
+  //
+  //   ja: 10 / 秒後に自動出陣しますよ 🪶        ← 文として閉じている
+  //   en: 10 / Auto battle begins in            ← 🔴 "in" の後ろが無い
+  //
+  // 直し方は 2 つある。プレースホルダに畳んで `Text.rich` で数字だけ大きく
+  // するか、**英語側も「数値 → 単位 → 述語」の語順で書ける言い回しにする**か。
+  // 後者を採った (2026-08-23): 隣の `habitWorldAmbientIndicatorCharging` が
+  // 既に "until Auto Battle begins" を使っており、同じ言い回しに揃うため。
+  //
+  // このテストは**この 1 キーだけ**を見る。「en の台詞が前置詞で終わらない」を
+  // 全 key に広げると、"Reply to" / "Convert this memo to…" / "What is this
+  // time for?" のような**正当に前置詞で終わるラベル**まで落ちる (実測 7 件)。
+  group('E: レイアウトで分割された文 (機能レビュー 20260822 A-1)', () {
+    const key = 'habitWorldAmbientCountdownHintSabi_message';
+
+    test('🔴 カウントダウンの説明文が前置詞で終わっていない', () {
+      final value = en[key];
+      expect(value, isNotNull, reason: '$key が app_en.arb から消えている');
+
+      final words = RegExp(r"[A-Za-z']+").allMatches(value!).toList();
+      expect(words, isNotEmpty);
+      const danglingPreps = {'in', 'on', 'at', 'for', 'to', 'until', 'after'};
+
+      expect(
+        danglingPreps.contains(words.last[0]!.toLowerCase()),
+        isFalse,
+        reason: '🔴 前置詞で終わる = 画面上で文が閉じていない。'
+            '56pt の数字は別の Text なので、英語では数字が前置詞の後ろに'
+            '来られない。現在値: "$value"',
+      );
+    });
+
+    test('ja / en どちらも 🪶 で終わる (サビの寄り添いマーカー)', () {
+      // 🔴 A-1 と同時に見つかった: 本キーは **ja にあって en に無い唯一の 🪶**
+      // だった (機能レビュー 20260822 A-3 の 32 キーのうちの 1 つ)。
+      for (final entry in {'ja': ja[key], 'en': en[key]}.entries) {
+        expect(entry.value, isNotNull, reason: '${entry.key} に $key が無い');
+        expect(entry.value!.trimRight().endsWith('\u{1FAB6}'), isTrue,
+            reason: '${entry.key}: "${entry.value}" が 🪶 で終わっていない');
+      }
+    });
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

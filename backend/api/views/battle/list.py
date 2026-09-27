@@ -4,7 +4,7 @@
 独立 module 化。他の battle module に依存しない (weapon_drop / start / finish のいずれからも import されない)。
 """
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -25,7 +25,7 @@ class BattleLogListView(PlayerMixin, APIView):
     # の対応漏れ修正。バトル系 4 View (BattleStartView / BattleFinishView /
     # BattleLogListView / EnemyListView) を IsAuthenticated → IsAuthenticatedOrGuest に。
     # PlayerMixin.get_player() は既にゲスト対応済 (request.auth.player_profile 経路)。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -47,7 +47,11 @@ class BattleLogListView(PlayerMixin, APIView):
             'logs': [
                 {
                     'battle_id':          log.battle_id,
-                    'enemy_name':         log.battle.enemy.name,
+                    # 【2026-08-09 修正】BattleStartView と同じ locale 解決漏れ。
+                    # 同ファイルの EnemyListView (L120) は get_i18n_field を使えており、
+                    # 履歴一覧だけ生の日本語名を返していた。
+                    'enemy_name':         get_i18n_field(
+                        log.battle.enemy, 'name', getattr(request, 'locale', 'ja')),
                     'result':             log.battle.result,
                     'summary_text':       log.summary_text,
                     'rounds':             log.rounds,
@@ -92,7 +96,7 @@ class EnemyListView(PlayerMixin, APIView):
     # の対応漏れ修正。バトル系 4 View (BattleStartView / BattleFinishView /
     # BattleLogListView / EnemyListView) を IsAuthenticated → IsAuthenticatedOrGuest に。
     # PlayerMixin.get_player() は既にゲスト対応済 (request.auth.player_profile 経路)。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes = [IsAuthenticatedOrGuest]
 
     def get(self, request):

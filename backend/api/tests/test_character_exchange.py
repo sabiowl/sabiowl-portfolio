@@ -9,10 +9,12 @@
 6. 並列リクエスト → select_for_update により 1 回のみ成功
 """
 import threading
+import traceback
+from unittest import skipUnless
 
 from django.contrib.auth import get_user_model
 from django.db import connection
-from django.test import TransactionTestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from rest_framework import status as http_status
 from rest_framework.authtoken.models import Token
@@ -150,9 +152,61 @@ class CharacterExchangeContractTest(APITestCase):
         self.assertEqual(self.player.character_exchange_tickets, 1)
 
 
+def should_run_race_test(vendor: str) -> bool:
+    """DB vendor 名から「並列 race テストを実行してよいか」を返す。
+
+    【BUG-144】**skip 条件を純関数に切り出してある**のは、これ自体をテストで
+    縛るため (`RaceTestSkipConditionTest`)。判定を誤って PostgreSQL まで skip
+    すると、**誰も気付かないまま race guard が無検証になる**。skip したまま
+    緑になるのが最も危険な壊れ方なので、条件そのものを固定する。
+    """
+    return vendor == 'postgresql'
+
+
+@skipUnless(
+    should_run_race_test(connection.vendor),
+    'SQLite はテーブル / DB 単位でロックするため、2 本目の writer が '
+    '"database table is locked" で落ちて worker thread が例外死する (BUG-144)。'
+    'CI は PostgreSQL なのでそちらで検証される。',
+)
 @override_settings(REST_FRAMEWORK=_TEST_REST_FRAMEWORK_OVERRIDE)
 class CharacterExchangeRaceTest(TransactionTestCase):
-    """FEAT-427 シナリオ 6: 並列リクエスト → select_for_update により 1 回のみ成功。"""
+    """FEAT-427 シナリオ 6: 並列リクエスト → select_for_update により 1 回のみ成功。
+
+    ## 【BUG-144 (2026-08-11)】SQLite では実行しない
+
+    ローカル (SQLite fallback) で **12 回中 3 回 (25%) 失敗**していた。真因は
+    production コードではなく **テストの worker thread**:
+
+        sqlite3.OperationalError: database table is locked: api_playereconomystate
+
+    SQLite はテーブル / DB 単位でロックするので 2 本目の writer が落ち、
+    `results` に何も append されないまま assertion に到達していた。
+    出るメッセージは `1 回だけ成功するはず: []` だけで、真因は stderr にしか
+    出ないため、辿り着くのに時間がかかる。
+
+    さらに **緑になった回も信用できない**。ロックで落ちなかったということは
+    2 本のリクエストが実質直列に流れた可能性があり、その場合
+    「1 回成功 / 1 回 400」は当然の結果で `select_for_update` が効いた証明に
+    ならない。SQLite 上では**赤も緑も情報量が乏しい**。
+
+    CI は PostgreSQL 15 (`.github/workflows/ci.yml`) なので、**検証は失われない**。
+
+    ## なぜ test_iap_webhook のように「削除」しなかったか
+
+    同型の問題は 2026-06-17 に `test_iap_webhook.py` S7 でも起きており、
+    そちらは threading テストを**削除して連続 POST に書き換え**ている
+    (同ファイル L12-17 に判断が記録済)。本テストで同じ判断を採らないのは、
+    **守っている対象の保証機構が違う**ため:
+
+    | | 排他の保証 | アプリ層テストの価値 |
+    |---|---|---|
+    | IAP webhook S7 | **DB の UNIQUE 制約** | 構造的に保証済 → 限定的 |
+    | 本テスト | **アプリコードの `select_for_update`** | **DB は守ってくれない → 高い** |
+
+    `select_for_update` は書き忘れれば静かに消える。PostgreSQL で実行できる
+    以上、検証を捨てる理由が無い。
+    """
 
     reset_sequences = True
 
@@ -178,19 +232,44 @@ class CharacterExchangeRaceTest(TransactionTestCase):
         from rest_framework.test import APIClient
 
         results = []
+        errors = []
 
         def _do_request():
-            client = APIClient()
-            client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
-            res = client.post(reverse('character-exchange', args=[self.ssr_char.pk]))
-            results.append(res.status_code)
-            connection.close()
+            # 【BUG-144】thread 内の例外は unittest から見えない。捕まえて
+            # traceback ごと持ち帰らないと、失敗時に `results` が空という
+            # 結果だけが見えて真因が分からない (実際 stderr を捕まえるまで
+            # `database table is locked` に辿り着けなかった)。
+            try:
+                client = APIClient()
+                client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+                res = client.post(reverse('character-exchange', args=[self.ssr_char.pk]))
+                results.append(res.status_code)
+            except BaseException:
+                errors.append(traceback.format_exc())
+            finally:
+                # 【BUG-144】`finally` に置く。例外で抜けたときに閉じ損ねると
+                # worker thread の connection がリークし、test DB を destroy
+                # できなくなる (test_iap_webhook.py L12-17 が踏んだ形)。
+                connection.close()
 
         threads = [threading.Thread(target=_do_request) for _ in range(2)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
+
+        # 件数より先に検査する。例外が出ているなら、そちらが真因。
+        #
+        # `assertEqual(errors, [])` にしないのは、unittest の list diff
+        # (`Lists differ: [...] != []` + `First extra element 0:` …) が先に出て
+        # **traceback が埋もれる**ため。真因をすぐ読めるようにするのが本修正の
+        # 目的なので、`fail()` で traceback だけを出す。
+        if errors:
+            self.fail(
+                f'worker thread で {len(errors)} 件の例外が発生した '
+                '(assertion の件数ずれより、こちらが真因):\n\n'
+                + '\n\n'.join(errors)
+            )
 
         self.assertEqual(results.count(200), 1, f'1 回だけ成功するはず: {results}')
         self.assertEqual(results.count(400), 1, f'1 回は in_ticket 不足で 400 のはず: {results}')
@@ -202,4 +281,41 @@ class CharacterExchangeRaceTest(TransactionTestCase):
                 player=self.player, character=self.ssr_char,
             ).count(),
             1,
+        )
+
+
+class RaceTestSkipConditionTest(TestCase):
+    """【BUG-144 Pre-mortem S1】skip 条件そのものを縛る。
+
+    `CharacterExchangeRaceTest` は SQLite では skip する。この判定を誤って
+    **PostgreSQL まで skip してしまうと、誰も気付かないまま race guard が
+    無検証になる**。skip したまま緑になるのが最も危険な壊れ方なので、
+    条件を純関数に切り出したうえで固定する。
+
+    本クラス自体は skip しない (常に走る)。
+    """
+
+    def test_runs_on_postgresql(self):
+        self.assertTrue(
+            should_run_race_test('postgresql'),
+            'PostgreSQL で race テストが skip される。CI (PostgreSQL 15) で '
+            'select_for_update が無検証になる',
+        )
+
+    def test_skipped_on_sqlite(self):
+        self.assertFalse(
+            should_run_race_test('sqlite'),
+            'SQLite で race テストを実行すると "database table is locked" で '
+            '25% 失敗する (BUG-144)',
+        )
+
+    def test_decoration_follows_the_condition(self):
+        """判定関数とクラスの skip 状態が一致している。
+
+        関数だけ直してデコレータを付け替え忘れる / その逆を防ぐ。
+        """
+        skipped = getattr(CharacterExchangeRaceTest, '__unittest_skip__', False)
+        self.assertEqual(
+            skipped, not should_run_race_test(connection.vendor),
+            f'vendor={connection.vendor} での skip 状態が判定関数と食い違っている',
         )

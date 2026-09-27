@@ -62,6 +62,10 @@ import CoreHaptics
         result(self.playNormalHit())
       case "criticalHit":
         result(self.playCriticalHit())
+      // 【FEAT-526】とどめの一撃。ultimateHit と違い **上昇して終わる**
+      // (「強く当たった」ではなく「勝った」を返すため)。
+      case "koFinish":
+        result(self.playKoFinish())
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -263,6 +267,89 @@ import CoreHaptics
     }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.27) {
       light.impactOccurred()
+    }
+    return true
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 【FEAT-526 (2026-08-22)】とどめの一撃 (380ms「一撃 → 間 → 祝祭」)
+  //
+  // ultimateHit との違いは **終わり方**。ultimateHit は減衰して消える
+  // (「強く当たった」)。こちらは上昇して終わる (「勝った」)。
+  //
+  // 波形設計:
+  //   t=0.00s  transient  intensity 1.00 / sharpness 1.00  ← とどめの一撃「ドン」
+  //     (0.06 - 0.18s は無音 = ヒットストップの「間」。ここがいちばん大事で、
+  //      詰めるとただの連打になって「決めた」感が消える)
+  //   t=0.18s  transient  intensity 0.55 / sharpness 0.70  ← 祝祭 1「タ」
+  //   t=0.24s  transient  intensity 0.75 / sharpness 0.70  ← 祝祭 2「タ」
+  //   t=0.31s  continuous 0.07s intensity 1.00 / sharpness 0.55 ← 祝祭 3「ターン」
+  //
+  // 合計 ~380ms。最後だけ continuous にして「ン」の伸びを作っている。
+  // ──────────────────────────────────────────────────────────────────────────
+  private func playKoFinish() -> Bool {
+    if #available(iOS 13.0, *), let engine = hapticEngine {
+      do {
+        let finishingBlow = CHHapticEvent(
+          eventType: .hapticTransient,
+          parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0),
+          ],
+          relativeTime: 0
+        )
+        let celebration1 = CHHapticEvent(
+          eventType: .hapticTransient,
+          parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.55),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7),
+          ],
+          relativeTime: 0.18
+        )
+        let celebration2 = CHHapticEvent(
+          eventType: .hapticTransient,
+          parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.75),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7),
+          ],
+          relativeTime: 0.24
+        )
+        let celebration3 = CHHapticEvent(
+          eventType: .hapticContinuous,
+          parameters: [
+            CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+            CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.55),
+          ],
+          relativeTime: 0.31,
+          duration: 0.07
+        )
+        let pattern = try CHHapticPattern(
+          events: [finishingBlow, celebration1, celebration2, celebration3],
+          parameters: []
+        )
+        let player = try engine.makePlayer(with: pattern)
+        try player.start(atTime: 0)
+        return true
+      } catch {
+        NSLog("[BattleHaptics] koFinish failed: \(error.localizedDescription)")
+      }
+    }
+    // Fallback: 一撃 → 間 → 上昇 3 連 を UIImpactFeedbackGenerator で近似する。
+    let heavy = UIImpactFeedbackGenerator(style: .heavy)
+    let medium = UIImpactFeedbackGenerator(style: .medium)
+    let light = UIImpactFeedbackGenerator(style: .light)
+    heavy.prepare()
+    medium.prepare()
+    light.prepare()
+    heavy.impactOccurred()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+      light.impactOccurred()
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+      medium.impactOccurred()
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.31) {
+      heavy.impactOccurred()
     }
     return true
   }

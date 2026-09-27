@@ -77,6 +77,54 @@ class UltimateHitEvent {
   int get hashCode => Object.hash(damage, isCritical, timestamp);
 }
 
+/// 【FEAT-526 (2026-08-21)】敵を倒した **最後の一撃** が命中した瞬間のイベント。
+///
+/// `BattleOrchestrator` が `status = won` を確定させる **同じ `copyWith`** で設定する。
+/// UI 側 (battle_page) が `ref.listen` で null → non-null 遷移を検知し、
+/// ヒットストップ + ズーム + 暗転 +「K.O.」+ シェイクを同期発火する。
+///
+/// ## なぜ `BattleStatus` に値を足さないのか
+///
+/// 出典 (`doc/instructions_from_gemini/KO.md`) は `finalHit` / `hitStop` / `koZoom`
+/// といった状態を提案しているが、`BattleStatus.running` を見ているガードは
+/// `battle_orchestrator` だけで 6 箇所あり、`battle_provider._finishSent` /
+/// `ambient_auto_battle_orchestrator` の終了判定 / backend への finish payload まで
+/// 波及する。**KO 演出中かどうかは表示レイヤーの関心事**なので、モデルに足すのは
+/// 「いつ killing blow が入ったか」を伝える本イベント 1 つだけにする。
+///
+/// ## 重複発火が構造的に起きない理由
+///
+/// 設定箇所は `status = won` と 1 対 1。`status` が一度 `won` になると
+/// `running` ガードで以降の tick が入らないので、**1 バトルにつき 1 回しか立たない**。
+/// 敗北時 (`lost`) には設定しない ——「決めた」と「やられた」は演出の意味が逆で、
+/// 別設計が要る (指示書 決定事項 3)。
+class KoEvent {
+  KoEvent({
+    required this.damage,
+    required this.isCritical,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  /// とどめの一撃で与えたダメージ量。
+  final int damage;
+
+  /// とどめがクリティカルだったか (演出強度のブースト判定用)。
+  final bool isCritical;
+
+  /// イベント発生時刻 ([UltimateHitEvent] / [DamageEvent] と同じ一意性設計)。
+  final DateTime timestamp;
+
+  @override
+  bool operator ==(Object other) =>
+      other is KoEvent &&
+      other.damage == damage &&
+      other.isCritical == isCritical &&
+      other.timestamp == timestamp;
+
+  @override
+  int get hashCode => Object.hash(damage, isCritical, timestamp);
+}
+
 /// 【FEAT-295 Phase 1a】戦闘状態の immutable スナップショット。
 ///
 /// 設計ノート §4.2。freezed は **使わない**（仕様変更追従コストを下げるため、
@@ -108,6 +156,9 @@ class BattleState {
     // 敵に当てた瞬間に non-null となり、UI 側で撃墜エフェクト + 強化ハプティクス
     // を同期発火。発火後 ~400ms で _clearUltimateHitEvent() により null に戻る。
     this.ultimateHitEvent,
+    // 【FEAT-526】とどめの一撃イベント。`status = won` と同時に non-null になり、
+    // **クリアされない** (バトルが終わるまで立ちっぱなし)。
+    this.koEvent,
   });
 
   final Combatant player;
@@ -167,6 +218,13 @@ class BattleState {
   /// 画面シェイク + 白フラッシュ + 爆発リング を同一フレームで開始する。
   final UltimateHitEvent? ultimateHitEvent;
 
+  /// 【FEAT-526】とどめの一撃イベント (KO 演出の発火キー)。
+  ///
+  /// `ultimateHitEvent` と違い **自動クリアしない**。KO は 1 バトルに 1 回きりで、
+  /// 次のバトルは新しい `BattleOrchestrator` が新しい `BattleState` を作るため、
+  /// クリア用の Timer を持つ必要がない (= 消し忘れ / 消しすぎの事故が起きない)。
+  final KoEvent? koEvent;
+
   BattleState copyWith({
     Combatant? player,
     Combatant? enemy,
@@ -190,6 +248,10 @@ class BattleState {
     double? speedMultiplier,
     // 【新規 (2026-06-26)】撃墜イベントも同様に明示 null 化サポート
     Object? ultimateHitEvent = _unset,
+    // 【FEAT-526】koEvent は **_unset センチネルを使わない**。明示 null 化する
+    // 用途が無いうえ、`?? this.koEvent` にしておけば「うっかり null を渡して
+    // とどめイベントを消す」経路が構造的に存在しなくなる。
+    KoEvent? koEvent,
   }) =>
       BattleState(
         player:              player              ?? this.player,
@@ -218,6 +280,7 @@ class BattleState {
         ultimateHitEvent: identical(ultimateHitEvent, _unset)
             ? this.ultimateHitEvent
             : ultimateHitEvent as UltimateHitEvent?,
+        koEvent: koEvent ?? this.koEvent,
       );
 
   /// `duration_sec` 計算（Backend `/battle/finish/` 送信用）。

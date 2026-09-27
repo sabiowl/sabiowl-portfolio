@@ -20,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sabiowl/l10n/app_localizations.dart';
 
 import 'package:sabiowl/features/battle/models/job.dart';
+import 'package:sabiowl/features/gamification/services/job_mastery_service.dart';
 import 'package:sabiowl/features/battle/widgets/party_edit_dialog.dart';
 import 'package:sabiowl/features/gamification/models/gamification_models.dart';
 import 'package:sabiowl/features/gamification/providers/gamification_provider.dart';
@@ -273,6 +274,15 @@ void main() {
         overrides: [
           statsNotifierProvider.overrideWith(() => _MockStatsNotifier(_mockStats())),
           playerNotifierProvider.overrideWith(() => _MockPlayerNotifier(player)),
+          // 【2026-08-09】シナリオ 2/3 は `JobSelectionOverlay` を開く。同 overlay は
+          // `JobMasteryBar` (ConsumerWidget) を含むようになったため、override しないと
+          // **本物の provider が apiClient chain を起動する**。
+          //
+          // `JobMasteryBar` は `error:` を `SizedBox.shrink()` で握るので描画は通るが、
+          // その非同期エラーが `dispose` より先に届くかどうかで成否が変わる flaky に
+          // なる (`world_frame_mini_battle_test` が踏んでいるのと同じ型。v1.1
+          // チェックリスト G1 参照)。**通っているうちに塞ぐ。**
+          jobMasteriesProvider.overrideWith((ref) async => const []),
         ],
         child: MaterialApp(
           locale: const Locale('ja'),

@@ -60,8 +60,41 @@ class HealthCheckView(APIView):
         - Schema drift: 503 `{"status": "degraded", "checks": {"schema": false, ...}}`
 
     permission_classes = [AllowAny]: BootGate が認証前に叩くため必須。
+
+    【BUG-147 (2026-08-20)】authentication_classes = [] も必須。
+    **`AllowAny` だけでは不十分**である —— DRF は permission より先に
+    authentication を走らせるため、**無効な `Authorization` ヘッダが付いていると
+    `AllowAny` でも 401 になる**。
+
+    Mobile の `ApiClient` は onRequest で全リクエストにトークンを付けるので、
+    Keychain に残った古いゲストトークンが `AuthenticationFailed` を引き起こし、
+    本 endpoint が 401 を返していた (2026-08-20、iOS 実機で発覚)。
+    `BootGate` は 200 以外を degraded と判定するため「通信できませんでした」が
+    出続け、**再試行も同じトークンを送るので永久に回復しない**状態になっていた。
+
+    ヘルスチェックは**認証状態に関係なく到達できなければ意味がない**。
+    認証が壊れているときこそ使いたい endpoint が、認証に引きずられて
+    使えなくなっていた。不変条件は `test_health_check_ignores_auth.py` が縛る。
     """
+    # 【BUG-147】認証を一切走らせない。上の docstring を読まずに消さないこと。
+    authentication_classes: list = []
     permission_classes = [AllowAny]
+
+    # 【BUG-158 (2026-09-12)】throttle も一切走らせない。
+    #
+    # 🔴 本 view は認証を通らないので `AnonRateThrottle` (IP キー) が適用されて
+    # いた。つまり**アプリを開くたびに、認証済みユーザーであっても anon
+    # バケットから 1 本消費していた** (`/maintenance/` と合わせて 2 本)。
+    #
+    # ⚠️ **ヘルスチェックは障害時にこそ叩けなければならない。**
+    # 枠が枯れると**障害の確認そのものができなくなる** —— BUG-147 で
+    # 「認証が壊れているときこそ使いたい endpoint が認証に引きずられて
+    # 使えなくなっていた」のを直したのと、まったく同じ形である。
+    #
+    # 🔵 濫用リスクは低い。読み取り専用で、DB 負荷は `SELECT 1` +
+    # `PlayerProfile.objects.first()` の 2 本のみ。
+    # ⚠️ ただし**無制限にするので、Render 側のレート制御に依存する形になる**。
+    throttle_classes: list = []
 
     def get(self, request):
         checks = {'process': True, 'db': False, 'schema': False}
@@ -122,7 +155,18 @@ class ContactView(APIView):
     【FEAT-366 (2026-05-27)】スクリーンショット添付 (最大 5 枚 / 2MB / 枚 / JPEG/PNG/WebP)
     対応。multipart/form-data 経由で受信し、EmailMultiAlternatives.attach() で
     メール添付して送信、Backend には永続化しない (Q3 案 P)。
+
+    【BUG-147 (2026-08-20)】`authentication_classes = []` が必須。
+    DRF は permission より先に authentication を走らせるため、`AllowAny` だけでは
+    **無効な `Authorization` ヘッダが付いていると 401 になる**。
+
+    問い合わせは**アプリが壊れているときにこそ使われる** endpoint である。
+    古いトークンが原因で全 API が 401 になっているユーザーが、その状況を
+    報告する手段まで同じ原因で失う —— という構造になっていた。
+    救済経路が救済対象と同じ理由で死ぬのは設計として成立しない。
     """
+    # 【BUG-147】認証を一切走らせない。上の docstring を読まずに消さないこと。
+    authentication_classes: list = []
     permission_classes = [AllowAny]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]  # FEAT-366: multipart 受信対応
     throttle_classes   = [ScopedRateThrottle]

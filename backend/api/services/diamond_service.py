@@ -225,9 +225,15 @@ def award_daily_first_task_bonus(player: PlayerProfile, today: date) -> dict | N
         today:  当日の日付 (呼び出し側で `timezone.localdate()` JST を使うこと)
 
     Returns:
-        dict: {amount, days_count, granted_daily_tickets, granted_weekly_tickets}
+        dict: {amount, days_count, granted_daily_tickets, granted_weekly_tickets,
+               streak_days, total_days}
               当日初回タスク達成で報酬を付与した場合
         None: 当日既処理 or エラー (no-op)
+
+    【FEAT-539 (2026-09-05)】`streak_days` / `total_days` を追加。
+    ⚠️ `days_count` (= 登録日からの経過日数) とは**別物**である。
+       `days_count` は 1 日も達成していなくても増える値で、報酬 tier の判定用。
+       ユーザーに見せる「何日目か」は `total_days` の方である。
     """
     # 早期 return (lock 取らずに済む高速パス)
     if player.streak.last_login_diamond_at == today:
@@ -236,6 +242,7 @@ def award_daily_first_task_bonus(player: PlayerProfile, today: date) -> dict | N
     from datetime import timedelta
     from django.utils import timezone as _tz
     from ..constants import GachaBalance
+    from .daily_achievement import STREAK_UPDATE_FIELDS, record_daily_achievement
 
     # 【BUG-130 (2026-06-17)】timezone-aware に変換してから .date() を取る。
     # `player.created_at` は USE_TZ=True により UTC で格納されているため、
@@ -273,8 +280,20 @@ def award_daily_first_task_bonus(player: PlayerProfile, today: date) -> dict | N
         locked_eco.diamonds              += amount
         locked_eco.diamonds_total        += amount
         locked_streak.last_login_diamond_at = today
+        # 【FEAT-539 (2026-09-05)】その日の達成を 1 行記録し、連続 / 累計を算出する。
+        # 🔴 ロックの**内側**であることが重要 (Pre-mortem 5)。外に出すと並列
+        #    リクエストで連続が 2 回加算される。
+        streak_days, total_days = record_daily_achievement(
+            locked, locked_streak, today,
+        )
         locked_eco.save(update_fields=['diamonds', 'diamonds_total'])
-        locked_streak.save(update_fields=['last_login_diamond_at'])
+        # 🔴 `update_fields` に `login_streak_days` / `best_task_streak_days` が
+        #    入っていないと、値は代入されるのに**黙って保存されない**。
+        #    FEAT-537 の `free_memo` がまさにこの形で 1 経路だけ 0pt になっていた。
+        #    定数を使うのは、片方だけ書き足して片方を忘れる余地を消すため。
+        locked_streak.save(update_fields=(
+            ['last_login_diamond_at'] + STREAK_UPDATE_FIELDS
+        ))
 
         # Day 1 special: PlayerGachaStatus にチケット直接付与 + gacha auto-grant 抑制
         if granted_daily > 0 or granted_weekly > 0:
@@ -307,10 +326,20 @@ def award_daily_first_task_bonus(player: PlayerProfile, today: date) -> dict | N
         'total_balance_after': locked_eco.diamonds,
     })
     return {
+        # ⚠️ 既存キーは 1 つも変えていない (指示書 Phase 2)。
+        #    `days_count` は「登録日からの経過日数」のままで、報酬 tier の判定と
+        #    Mobile 側のカレンダー登録日算出が依存している。**追加であって置換ではない**。
         'amount': amount,
         'days_count': days_count,
         'granted_daily_tickets': granted_daily,
         'granted_weekly_tickets': granted_weekly,
+        # 【FEAT-539 (2026-09-05)】ここから追加。
+        #   streak_days … 連続達成日数 (今日を含む)
+        #   total_days  … 累計達成日数 (DailyAchievement の COUNT)
+        # Mobile は `streak_days == 1 && total_days > 1` を「途切れた翌日」と
+        # 判定するので、Backend 側にフラグは持たせない (指示書 Phase 5)。
+        'streak_days': streak_days,
+        'total_days': total_days,
     }
 
 

@@ -15,6 +15,21 @@ class HabitsPage {
   });
 }
 
+/// 【FEAT-524 Phase 2 (2026-08-08)】POST レスポンスの `player` を Player に起こす。
+///
+/// `Player.fromJson` は `id` 欠落時に `FormatException` を投げる (BUG-K の防御)。
+/// player の取り込みは**最適化であって機能ではない**ため、ここで失敗しても
+/// タップ自体を失敗させてはいけない。null を返すと呼び出し側が従来どおり
+/// `invalidate(playerNotifierProvider)` にフォールバックする。
+Player? _tryParsePlayer(Map<String, dynamic>? json) {
+  if (json == null) return null;
+  try {
+    return Player.fromJson(json);
+  } catch (_) {
+    return null;
+  }
+}
+
 class HabitsService {
   final ApiClient _apiClient;
   HabitsService(this._apiClient);
@@ -173,6 +188,9 @@ class HabitsService {
     final newLevel = playerJson?['level'] as int? ?? prevLevel;
     return HabitLogResult(
       habit: Habit.fromJson(data['habit'] as Map<String, dynamic>),
+      // 【FEAT-524 Phase 2】level だけ抜いて捨てていた player を丸ごと持ち帰る。
+      // 呼び出し側が setFromBootstrap で注入するので GET /player/ が不要になる。
+      player: _tryParsePlayer(playerJson),
       diamondEarned: data['diamond_earned'] as bool? ?? false,
       expGain: data['exp_gain'] as int? ?? 0,
       bonusExp: data['bonus_exp'] as int? ?? 0,
@@ -234,6 +252,9 @@ class HabitsService {
     // 動作させるため、サーバから返る各フィールドを忠実にマッピングする。
     return HabitLogResult(
       habit: Habit.fromJson(data['habit'] as Map<String, dynamic>),
+      // 【FEAT-524 Phase 2】checklist toggle も `habits.py:852` で count 経路と
+      // **同じ serializer / 同じ context** の player を返している。
+      player: _tryParsePlayer(playerJson),
       diamondEarned: data['diamond_earned'] as bool? ?? false,
       expGain: data['exp_gain'] as int? ?? 0,
       bonusExp: data['bonus_exp'] as int? ?? 0,

@@ -39,11 +39,18 @@ from django.utils import timezone
 
 from ..constants import GameBalance
 from ..models import ChallengeParticipation, PlayerProfile
+from ..serializers import get_i18n_field  # 【2026-08-11】challenge_title の locale 解決
 from .posthog_capture import capture_for_player
 
 
-def grant_pending_rewards(player: PlayerProfile) -> list[dict]:
+def grant_pending_rewards(player: PlayerProfile, locale: str = 'ja') -> list[dict]:
     """終了済 + 未完全配布の participation を集約し、tier 別に判定 + EXP 配布する。
+
+    Args:
+        locale: `challenge_title` の解決に使う。**既定 'ja' で従来挙動と同一**
+            なので、渡していない呼び出し元があっても壊れない。
+            【2026-08-11】ここが locale を取らず生の `challenge.title` を返して
+            いたため、英語 UI の報酬 SnackBar だけ日本語のチャレンジ名が出ていた。
 
     Returns:
         [{'challenge_id', 'challenge_title', 'granted_tiers', 'total_reward_exp',
@@ -147,7 +154,7 @@ def grant_pending_rewards(player: PlayerProfile) -> list[dict]:
             ])
             results.append({
                 'challenge_id': challenge.id,
-                'challenge_title': challenge.title,
+                'challenge_title': get_i18n_field(challenge, 'title', locale),
                 'granted_tiers': granted_tiers,
                 'total_reward_exp': total_reward_exp,
                 'achieved_any': bool(granted_tiers),
@@ -182,7 +189,7 @@ def _award_challenge_exp(
     while locked_battle.current_exp >= locked_battle.max_exp:
         locked_battle.current_exp -= locked_battle.max_exp
         locked_battle.level += 1
-        locked_battle.allocatable_points += GameBalance.ALLOCATABLE_POINTS_CHALLENGE_EXP
+        locked_battle.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
         locked_battle.max_exp = GameBalance.level_to_max_exp(locked_battle.level)
     locked_battle.save(update_fields=['current_exp', 'level', 'max_exp', 'allocatable_points'])
 

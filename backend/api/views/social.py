@@ -1,7 +1,7 @@
 import logging
 
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -428,7 +428,7 @@ class GiftView(PlayerMixin, APIView):
     追加する場合の実装接続点は `CATEGORY_STAT_MAP` の貢献力軸 (+1〜2 EXP)
     が最も自然だが、v1.0 では追加しない。
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication]
     # 【2026-06-29】ゲストモード開放: フレンド機能はゲスト (user=null) の
     # PlayerProfile でも動作するため、IsAuthenticatedOrGuest に変更。
     # 悪用対策は既存の Throttle + 重複申請ガードで担保 (追加 Throttle は入れない)。

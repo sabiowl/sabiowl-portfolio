@@ -18,7 +18,7 @@ re-export 経路で 100% 維持されており、`from api.views import calendar
 関連: FEAT-244 / FEAT-253 / FEAT-255 / FEAT-256 / FEAT-263 (旧双方向同期系、廃止)。
 """
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -41,7 +41,7 @@ class ExternalCalendarImportView(APIView):
     ローカル DB (`LocalGoogleEventStore`) で完結するため、本エンドポイントは
     410 Gone を返す。
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication]
     permission_classes     = [IsAuthenticated]
 
     def post(self, request):
@@ -56,7 +56,7 @@ class GoogleCalendarUnsyncView(APIView):
     【FEAT-426 (2026-06-11)】廃止。Backend に Google 予定本文を保持しなく
     なったため、本エンドポイントは 410 Gone を返す。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def delete(self, request):

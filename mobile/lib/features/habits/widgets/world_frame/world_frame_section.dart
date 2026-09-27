@@ -55,6 +55,21 @@ class _WorldFrameSectionState extends ConsumerState<WorldFrameSection>
   late final AnimationController _idleGlowCtrl;
   late final Animation<double>   _idleGlowAnim;
 
+  /// 額縁の KO 演出を「出し終えた」`KoEvent`。
+  ///
+  /// これと `state.koEvent` が一致するまでは、決着後でも額縁を残す
+  /// (build の `koPending` 参照)。`MiniBattleArena` からしか更新されない。
+  KoEvent? _koDoneFor;
+
+  /// 子から「KO 演出の後片付けが済んだ」と伝えられた。
+  ///
+  /// ⚠️ 子の build 中には呼ばれない (`ref.listen` / 演出完了 callback からのみ)
+  /// ので、ここで `setState` してよい。
+  void _onKoDone(KoEvent event) {
+    if (!mounted || _koDoneFor == event) return;
+    setState(() => _koDoneFor = event);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -279,8 +294,27 @@ class _WorldFrameSectionState extends ConsumerState<WorldFrameSection>
     // 【FEAT-297】戦闘進行状態を監視。running 中は MiniBattleArena をオーバーレイ。
     // 戦闘終了 (won/lost/abandoned) 後はオーバーレイを外し、時間帯 WebP に戻る。
     final session = ref.watch(battleSessionProvider);
-    final inBattle = session.state != null
-        && session.state!.status == BattleStatus.running;
+    // 🔴 **決着した瞬間に額縁を畳んではいけない** (2026-08-22 ユーザー報告)。
+    //
+    // 旧実装は `status == running` だけを見ていた。ところが KO 演出は
+    // **`status` が `won` になるのと同じ state 更新**で始まる。つまり演出の
+    // 開始と同時に `MiniBattleArena` ごと unmount され、**額縁の KO 演出は
+    // 一度も描かれなかった** (FEAT-526 の額縁対応が実機で効いていなかった真因)。
+    //
+    // ここでは「まだ後片付けが終わっていない `KoEvent` があるか」を見る。
+    // 終わったかどうかは `MiniBattleArena` が [MiniBattleArena.onKoDone] で
+    // 教えてくる —— **子が「もう畳んでよい」と言うまで残す**。
+    //
+    // 順序に依存しない: 決着フレームでは `_koDoneFor` はまだ古いままなので
+    // 必ず残る。子の listener が先に走ろうが後に走ろうが結果は変わらない。
+    //
+    // 敗北 (`lost`) は `koEvent` が立たない (演出が無い) ので、従来どおり
+    // その場で畳まれる。
+    final battleState = session.state;
+    final koPending = battleState?.koEvent != null
+        && battleState!.koEvent != _koDoneFor;
+    final inBattle = battleState != null
+        && (battleState.status == BattleStatus.running || koPending);
 
     // 【FEAT-487 (2026-07-08)】旧 ref.listen 3 系統 (worldFrameGlowProvider /
     // battleSessionProvider / auto-startBattle inline check) は全て
@@ -520,6 +554,7 @@ class _WorldFrameSectionState extends ConsumerState<WorldFrameSection>
                   Positioned.fill(
                     child: MiniBattleArena(
                       onTap: () => context.push(AppRoutes.battle),
+                      onKoDone: _onKoDone,
                     ),
                   ),
                 ],

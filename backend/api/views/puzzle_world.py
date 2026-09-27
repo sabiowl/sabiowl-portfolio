@@ -14,7 +14,7 @@
 - ゲスト + 通常ユーザー両対応 (IsAuthenticatedOrGuest)
 """
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -101,7 +101,7 @@ class PuzzleWorldStatusView(PlayerMixin, APIView):
     - アクティブシーンの詳細 (piece_states + progress)
     - 完成履歴 (最新順)
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -183,7 +183,7 @@ class PuzzleWorldSceneListView(PlayerMixin, APIView):
     シーン) は SceneSelectionPage から除外。silent auto-activate 経路でのみ user に
     出現し、選択画面には出さない = 「選ぶ選択肢を増やさず、静かに始まる」体験。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -232,7 +232,7 @@ class PuzzleWorldActiveSelectView(PlayerMixin, APIView):
     - 無料・無制限 (Sabi「聖域」原則)
     - 対象は is_active=True かつ未完成のシーンのみ
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request):
@@ -292,7 +292,7 @@ class PuzzleWorldDisplayedSelectView(PlayerMixin, APIView):
     - scene_key=null → 自動 fallback (active → 静止画)
     - scene_key 指定 → アクティブシーン or 完成済シーンのみ
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request):

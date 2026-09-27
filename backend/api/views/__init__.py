@@ -69,6 +69,7 @@ from .battle import (
 )
 from .iap import RevenueCatWebhookView  # FEAT-436 Phase 2
 from .maintenance import MaintenanceStatusView  # FEAT-463
+from .app_update import AppUpdateStatusView  # FEAT-543
 from .challenge import ChallengeListView  # FEAT-465
 from .task_suggestion import TaskSuggestionListView  # 【FEAT-467 (2026-07-02)】タスク候補 Backend 化
 from .feature_flags import FeatureFlagsView  # 【FEAT-477 (2026-07-03)】Feature Flag 一覧
@@ -141,6 +142,7 @@ __all__ = [
     'RevenueCatWebhookView',
     # 【FEAT-463】緊急メンテナンスモード
     'MaintenanceStatusView',
+    'AppUpdateStatusView',
     # 【FEAT-465】月次カテゴリチャレンジ
     'ChallengeListView',
     # 【FEAT-467】タスク候補 Backend 化

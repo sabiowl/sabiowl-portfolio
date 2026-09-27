@@ -3,7 +3,7 @@ import random as _random
 from datetime import date, timedelta
 
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +12,7 @@ from ..authentication import GuestTokenAuthentication  # FEAT-190
 from ..constants import GachaBalance, GameBalance  # 【BUG-62】単一ソース化（shop.py と共通参照）/ 【FEAT-285】GACHA_EXP 経路別 pt
 from ..permissions import IsAuthenticatedOrGuest  # FEAT-187
 from ._error_helpers import error_response  # 【FEAT-475 Phase 3b】新形式統一
+from ..serializers import get_i18n_field  # 【BUG-146 Phase 2】master data の _en を読む
 
 from django.db import transaction
 from django.db.models import F
@@ -254,7 +255,7 @@ def _apply_reward(player: PlayerProfile, reward: GachaReward):
             locked_battle.level += 1
             # 【FEAT-319】level_to_max_exp で単一真実値化、直書き禁止。
             locked_battle.max_exp = GameBalance.level_to_max_exp(locked_battle.level)
-            locked_battle.allocatable_points += GameBalance.ALLOCATABLE_POINTS_GACHA_EXP
+            locked_battle.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
         locked_battle.save(update_fields=['current_exp', 'level', 'max_exp', 'allocatable_points'])
 
     elif reward.reward_type == 'diamond' and reward.value > 0:
@@ -360,7 +361,7 @@ class GachaOddsView(PlayerMixin, APIView):
         200 {"ticket_types": [...], "notes": [...]}
         503 {"error": {"code": "gacha_odds_unavailable", ...}}
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     # 【Pre-mortem #6】購入前に到達できる必要があるため、チケット未所持でも 200 を返す。
@@ -404,7 +405,7 @@ class GachaOddsView(PlayerMixin, APIView):
 
 
 class GachaStatusView(PlayerMixin, APIView):
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -538,6 +539,12 @@ class GachaStatusView(PlayerMixin, APIView):
             status_obj.weekly_last_granted_week == this_monday
         )
 
+        # 【BUG-146 Phase 2】locale の解決は view ごとに 1 行だけ。
+        # Pre-mortem #4: 各所にコピペすると 1 箇所だけ抜けても無言で ja に落ちる
+        # (FEAT-516 で実際に踏んだ罠)。ゲスト経路でも `request.locale` は
+        # I18nMiddleware が SimpleLazyObject で必ず載せるので getattr は保険。
+        locale = getattr(request, 'locale', 'ja')
+
         return Response({
             'daily_tickets':   status_obj.daily_tickets,
             'daily_pity':      status_obj.daily_pity,
@@ -570,12 +577,13 @@ class GachaStatusView(PlayerMixin, APIView):
                     'icon':        h.reward.icon,
                     # 【BUG-119 (2026-06-14)】character 排出時は具体的キャラ名を表示
                     # (例: 「ルーン (SSR)」)、それ以外は reward.name (旧履歴も含む)。
+                    # 【BUG-146 Phase 2】どちらの分岐も master data なので _en を読む。
                     'name': (
-                        f'{h.character.name} ({h.reward.rarity})'
+                        f'{get_i18n_field(h.character, "name", locale)} ({h.reward.rarity})'
                         if h.character is not None
-                        else h.reward.name
+                        else get_i18n_field(h.reward, 'name', locale)
                     ),
-                    'detail':      h.reward.detail,
+                    'detail':      get_i18n_field(h.reward, 'detail', locale),
                     'ticket_type': h.ticket_type,
                     'pulled_at':   h.pulled_at.isoformat(),
                 }
@@ -585,7 +593,7 @@ class GachaStatusView(PlayerMixin, APIView):
 
 
 class GachaPullView(PlayerMixin, APIView):
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     _TICKET_NAMES = {'daily': 'デイリー', 'weekly': 'ウィークリー', 'monthly': 'マンスリー'}
@@ -593,6 +601,9 @@ class GachaPullView(PlayerMixin, APIView):
     def post(self, request):
         player      = self.get_player(request)
         ticket_type = request.data.get('ticket_type', 'daily')
+        # 【BUG-146 Phase 2】locale の解決は view ごとに 1 行だけ (Pre-mortem #4)。
+        # 各所にコピペすると 1 箇所だけ抜けても無言で ja に落ちる。
+        locale = getattr(request, 'locale', 'ja')
 
         if ticket_type not in ('daily', 'weekly', 'monthly'):
             return error_response(
@@ -708,9 +719,10 @@ class GachaPullView(PlayerMixin, APIView):
                         ).get(pk=char_id)
                         granted_character_info = {
                             'id':         ch.id,
-                            'name':       ch.name,
+                            # 【BUG-146 Phase 2】排出キャラ名 / 役職も master data。
+                            'name':       get_i18n_field(ch, 'name', locale),
                             'image_path': ch.image_path,
-                            'role':       ch.role,
+                            'role':       get_i18n_field(ch, 'role', locale),
                         }
                         # 【BUG-119 (2026-06-14)】履歴に保存する Character.id を確定。
                         granted_character_id = ch.id
@@ -778,8 +790,8 @@ class GachaPullView(PlayerMixin, APIView):
                 'rarity':      reward.rarity,
                 'reward_type': reward.reward_type,
                 'container':   reward.container,
-                'name':        reward.name,
-                'detail':      reward.detail,
+                'name':        get_i18n_field(reward, 'name', locale),
+                'detail':      get_i18n_field(reward, 'detail', locale),
                 'icon':        reward.icon,
                 # 【2026-06-14】排出キャラ情報 (reward_type='character' 排出時のみ)。
                 # Mobile UI で「キャラ画像 + キャラ名 (SSR)」表示 (gacha_summon_page)。
@@ -799,7 +811,12 @@ class GachaPullView(PlayerMixin, APIView):
         return Response(response_data)
 
 
-def _serialize_pending(p: PendingDuplicateReward) -> dict:
+def _serialize_pending(p: PendingDuplicateReward, locale: str = 'ja') -> dict:
+    """【BUG-146 Phase 2】`locale` は呼び出し側が 1 度だけ解決して渡す。
+
+    default を `'ja'` にしているのは既存呼び出しとの互換のためで、
+    **view からは必ず明示的に渡すこと** (省略すると無言で日本語に落ちる)。
+    """
     return {
         'id':            p.id,
         'reward': {
@@ -807,8 +824,8 @@ def _serialize_pending(p: PendingDuplicateReward) -> dict:
             'rarity':      p.reward.rarity,
             'reward_type': p.reward.reward_type,
             'container':   p.reward.container,
-            'name':        p.reward.name,
-            'detail':      p.reward.detail,
+            'name':        get_i18n_field(p.reward, 'name', locale),
+            'detail':      get_i18n_field(p.reward, 'detail', locale),
             'icon':        p.reward.icon,
         },
         'status':        p.status,
@@ -820,7 +837,7 @@ def _serialize_pending(p: PendingDuplicateReward) -> dict:
 
 class PendingRewardListView(PlayerMixin, APIView):
     """GET /api/gacha/pending/ — 交換待ち重複報酬一覧"""
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -837,12 +854,14 @@ class PendingRewardListView(PlayerMixin, APIView):
             .filter(player=player, status='pending', expires_at__gt=now)
             .select_related('reward')
         )
-        return Response([_serialize_pending(p) for p in pendings])
+        # 【BUG-146 Phase 2】locale の解決は view ごとに 1 行だけ (Pre-mortem #4)。
+        locale = getattr(request, 'locale', 'ja')
+        return Response([_serialize_pending(p, locale) for p in pendings])
 
 
 class DuplicateExchangeView(PlayerMixin, APIView):
     """POST /api/gacha/exchange/<pk>/ — 重複報酬を交換する"""
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     _PIECES_AMOUNT      = 100
@@ -924,11 +943,14 @@ class GachaRedoView(PlayerMixin, APIView):
 
     Pre-mortem #3 対応: ダイヤ消費はサーバー側検証成功後のみ (Optimistic UI 禁止)。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def post(self, request):
         player = self.get_player(request)
+        # 【BUG-146 Phase 2】locale の解決は view ごとに 1 行だけ (Pre-mortem #4)。
+        # 各所にコピペすると 1 箇所だけ抜けても無言で ja に落ちる。
+        locale = getattr(request, 'locale', 'ja')
 
         with transaction.atomic():
             player_locked = PlayerProfile.objects.select_for_update().get(pk=player.pk)
@@ -1034,9 +1056,10 @@ class GachaRedoView(PlayerMixin, APIView):
                         ).get(pk=char_id)
                         granted_character_info = {
                             'id':         ch.id,
-                            'name':       ch.name,
+                            # 【BUG-146 Phase 2】排出キャラ名 / 役職も master data。
+                            'name':       get_i18n_field(ch, 'name', locale),
                             'image_path': ch.image_path,
-                            'role':       ch.role,
+                            'role':       get_i18n_field(ch, 'role', locale),
                         }
                         # 【BUG-119 (2026-06-14)】redo 経路でも履歴用に Character.id を確定。
                         granted_character_id = ch.id
@@ -1084,8 +1107,8 @@ class GachaRedoView(PlayerMixin, APIView):
                 'rarity':      reward.rarity,
                 'reward_type': reward.reward_type,
                 'container':   reward.container,
-                'name':        reward.name,
-                'detail':      reward.detail,
+                'name':        get_i18n_field(reward, 'name', locale),
+                'detail':      get_i18n_field(reward, 'detail', locale),
                 'icon':        reward.icon,
                 'character':   granted_character_info,
             },

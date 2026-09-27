@@ -106,7 +106,7 @@ class _FakeBattleSession extends BattleSessionNotifier {
   int startCount = 0;
 
   @override
-  Future<void> startBattle({String? enemyKey}) async {
+  Future<void> startBattle({String? enemyKey, bool ambient = false}) async {
     final result = results[startCount.clamp(0, results.length - 1)];
     startCount++;
     // 一旦リセット (本物の startBattle も BattleSession を作り直す)
@@ -356,7 +356,7 @@ class _CountingFakeSession extends BattleSessionNotifier {
   final Ref _ref;
 
   @override
-  Future<void> startBattle({String? enemyKey}) async {
+  Future<void> startBattle({String? enemyKey, bool ambient = false}) async {
     _ref.read(_canBattleFlag.notifier).state = false;
     state = const BattleSession();
     Future.delayed(const Duration(milliseconds: 10), () {

@@ -1,0 +1,23 @@
+/* 【2026-08-09 / FEAT-489 Phase 5 (v1.1 G4)】iOS ネイティブ権限ダイアログの日本語文言。
+
+   Info.plist に直書きしていた 3 つの UsageDescription を、言語別に出し分けるため
+   ここへ移した。**Info.plist 側の値は fallback として残してある** —— この
+   InfoPlist.strings が何らかの理由で bundle に入らなかった場合でも、日本語の
+   説明が出る (無言のクラッシュや空ダイアログにはならない) ようにするため。
+
+   ⚠️ 文言を変えるときは Info.plist 側と本ファイルの両方を更新すること。
+   片方だけ直すと「ja 端末とそれ以外で文言が違う」状態になる。
+
+   出典の経緯:
+   - NSSpeechRecognition / NSMicrophone: FEAT-499 (2026-07-26) フリーメモ音声入力 β
+   - NSPhotoLibrary: FEAT-366 (2026-05-27) お問い合わせのスクリーンショット添付
+*/
+
+/* フリーメモの音声入力 (FEAT-499)。サビ口調 + 🪶 マーカー */
+"NSSpeechRecognitionUsageDescription" = "音声で「浮かんだこと」を書き留めるために、音声認識を使わせていただきます 🪶";
+"NSMicrophoneUsageDescription" = "音声入力を受け取るためにマイクを使わせていただきます 🪶";
+
+/* お問い合わせの画像添付 (FEAT-366)。
+   ここだけ意図的にサビ口調を使わない —— Apple ガイドラインの「具体的な必要性説明」
+   要件に対して、素直な目的説明の方が伝わるため (Info.plist の元コメント準拠)。 */
+"NSPhotoLibraryUsageDescription" = "お問い合わせの際にスクリーンショットを添付するため、写真ライブラリへのアクセスを許可してください。";

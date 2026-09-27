@@ -4,13 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
 // timeline_models.dart は timeline_provider.dart から re-export されるため直接 import 不要
 import '../providers/timeline_provider.dart';
-import '../../habits/models/habit.dart' show HabitReward;
-import '../../social/models/social_models.dart';  // 【FEAT-452】FriendGiftCandidate
-import '../../puzzle_world/models/puzzle_world.dart';  // 【FEAT-479】PuzzlePieceAwarded
-import '../../puzzle_world/providers/puzzle_world_provider.dart';  // 【FEAT-479】puzzlePieceAwardedProvider
-import '../../social/providers/social_provider.dart';  // 【FEAT-452】friendGiftCandidateProvider
+import '../../habits/providers/apply_completion_result.dart';
 import '../../habits/providers/habits_provider.dart'
-    show rewardToastProvider, playerNotifierProvider, pendingLoginBonusProvider;
+    show playerNotifierProvider;
 import '../../habits/providers/completion_effect_provider.dart';
 import '../../../core/services/notification_service.dart';  // 【FEAT-273】完了時の通知キャンセル
 import '../../calendar/providers/calendar_provider.dart'
@@ -171,30 +167,14 @@ class _TimelineEventCardState extends ConsumerState<TimelineEventCard>
       if (completing) {
         // 未完了 → 完了: 専用エンドポイントで EXP・ダイヤを受け取る
         final reward = await service.completeEventWithReward(widget.event.id);
+        // 【BUG-150 (2026-08-29)】レスポンス → provider の配線は共有関数 1 箇所。
+        // この経路は元々 4 つとも拾えていた**唯一の正しい実装**だったが、
+        // 同じ配線がカレンダー側に不完全な形で複製されていたため、
+        // 両方を apply_completion_result.dart に寄せた。
+        applyTimelineReward(ref.read, reward);
         if (reward.expGain > 0) {
-          ref.read(rewardToastProvider.notifier).state = HabitReward(
-            expGain:       reward.expGain,
-            bonusExp:      0,
-            diamondEarned: reward.diamondEarned,
-          );
           // BUG-19: EXP バー・レベル表示を更新（habits_provider.incrementCount と同等）
           ref.invalidate(playerNotifierProvider);
-        }
-        // 【BUG-122 (2026-06-14)】その日初回タスク達成ボーナス (タイムライン経路)
-        if (reward.todayLoginBonus != null) {
-          ref.read(pendingLoginBonusProvider.notifier).state =
-              reward.todayLoginBonus;
-        }
-        // 【FEAT-452 (2026-06-20)】当日 3 回目のタスク達成でフレンドプレゼント
-        // popup 候補 (タイムライン経路、3 経路統一)
-        if (reward.friendGiftCandidate != null) {
-          ref.read(friendGiftCandidateProvider.notifier).state =
-              FriendGiftCandidate.fromJson(reward.friendGiftCandidate!);
-        }
-        // 【FEAT-479 (2026-07-06)】その日初回タスク達成でパズルピース (grey) 付与。
-        if (reward.puzzlePieceAwarded != null) {
-          ref.read(puzzlePieceAwardedProvider.notifier).state =
-              PuzzlePieceAwarded.fromJson(reward.puzzlePieceAwarded!);
         }
         // 【FEAT-419 (2026-06-10)】予定時刻 ±15 分以内ボーナスの SnackBar 通知
         if (mounted) {

@@ -279,11 +279,12 @@ def try_grant_quest_piece(player: PlayerProfile, today: date) -> dict | None:
         eco.diamonds_total += scene.reward_diamonds
         battle_state.current_exp += scene.reward_exp
 
-        # レベルアップ処理 (habit_count_service と同ロジック、+3pt 配分)
+        # レベルアップ処理 (habit_count_service と同ロジック)
+        # 【FEAT-537】旧リテラル 3。経路差は撤回し全経路で共通定数を使う。
         while battle_state.current_exp >= battle_state.max_exp:
             battle_state.current_exp -= battle_state.max_exp
             battle_state.level += 1
-            battle_state.allocatable_points += 3
+            battle_state.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
             battle_state.max_exp = GameBalance.level_to_max_exp(battle_state.level)
 
         eco.save(update_fields=['diamonds', 'diamonds_total'])

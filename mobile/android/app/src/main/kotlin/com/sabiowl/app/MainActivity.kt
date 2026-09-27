@@ -21,6 +21,7 @@ import io.flutter.plugin.common.MethodChannel
  *  - gaugeMax    : 中程度 ~100ms 単発、振幅 130 (ゲージ MAX 通知)
  *  - criticalHit : 強め 60ms 単発、振幅 200 (クリ命中、2026-06-27 追加)
  *  - ultimateHit : 250-350ms 余韻ある波形、振幅 255 (撃墜エフェクト命中)
+ *  - koFinish    : 380ms「一撃 → 間 → 祝祭」波形 (FEAT-526、2026-08-22 追加)
  *
  * VibrationEffect.createWaveform で振幅 + 持続を制御 (API 26+)。
  * 振幅制御非対応の端末は createOneShot にフォールバック。
@@ -54,6 +55,9 @@ class MainActivity : FlutterActivity() {
                     // gaugeMax→criticalHit→ultimateHit の振幅階段)。
                     "normalHit"   -> result.success(playNormalHit(vibrator))
                     "criticalHit" -> result.success(playCriticalHit(vibrator))
+                    // 【FEAT-526】とどめの一撃。ultimateHit と違い **上昇して終わる**
+                    // (「強く当たった」ではなく「勝った」を返すため)。
+                    "koFinish"    -> result.success(playKoFinish(vibrator))
                     else          -> result.notImplemented()
                 }
             }
@@ -180,6 +184,52 @@ class MainActivity : FlutterActivity() {
             // API 26 未満: 古い pattern API
             @Suppress("DEPRECATION")
             val pattern = longArrayOf(50L, 100L, 30L, 80L, 50L, 120L)
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+            true
+        }
+    }
+
+    /**
+     * 【FEAT-526 (2026-08-22)】とどめの一撃: 380ms「一撃 → 間 → 祝祭」波形。
+     *
+     * ultimateHit との違いは **終わり方** である。ultimateHit は減衰して消える
+     * (「強く当たった」)。こちらは上昇して終わる (「勝った」)。
+     *
+     * 波形設計 (timings[i] は amplitudes[i] の継続時間):
+     *   -   0 →  60ms : 振幅 255  とどめの一撃「ドン」
+     *   -  60 → 180ms : 振幅   0  **ヒットストップの「間」** ← ここがいちばん大事
+     *   - 180 → 215ms : 振幅 140  祝祭 1「タ」
+     *   - 215 → 240ms : 振幅   0  区切り
+     *   - 240 → 285ms : 振幅 190  祝祭 2「タ」
+     *   - 285 → 310ms : 振幅   0  区切り
+     *   - 310 → 380ms : 振幅 255  祝祭 3「ターン」
+     *
+     * 合計 380ms。真ん中の無音を詰めると、ただの連打になって「決めた」感が消える。
+     *
+     * 振幅制御非対応の端末では on/off の時間だけで同じリズムを作る
+     * (強弱は出せないが、**間とリズムは再現できる** —— そちらが本質)。
+     */
+    private fun playKoFinish(vibrator: Vibrator): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val timings = longArrayOf(60L, 120L, 35L, 25L, 45L, 25L, 70L)
+            if (vibrator.hasAmplitudeControl()) {
+                val amplitudes = intArrayOf(255, 0, 140, 0, 190, 0, 255)
+                val effect = VibrationEffect.createWaveform(timings, amplitudes, -1)
+                vibrator.vibrate(effect)
+            } else {
+                // 振幅制御非対応: timing の on/off だけで同じリズムを刻む。
+                // createWaveform(timings, repeat) は timings[0] を「待ち」として
+                // 扱うので、先頭に 0 を置いてから on/off を交互に並べる。
+                val onOffTimings = longArrayOf(0L, 60L, 120L, 35L, 25L, 45L, 25L, 70L)
+                val effect = VibrationEffect.createWaveform(onOffTimings, -1)
+                vibrator.vibrate(effect)
+            }
+            true
+        } else {
+            // API 26 未満: 古い pattern API (先頭は待ち時間)
+            @Suppress("DEPRECATION")
+            val pattern = longArrayOf(0L, 60L, 120L, 35L, 25L, 45L, 25L, 70L)
             @Suppress("DEPRECATION")
             vibrator.vibrate(pattern, -1)
             true

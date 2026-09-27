@@ -73,8 +73,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   // `setPlayerName` API の patch 待ちと sheet dismiss の `whenComplete` が race して
   // 認証が誤って取り消される問題（freeze）があった。`_handleSocialResult` で
   // 直接 `authenticated` + `justRegistered=true` にして OnboardingPage の
-  // `_complete()` で name + gender + character + `markTutorialShown` を一括処理する
+  // `_complete()` で name + gender + character + 設定済みフラグを一括処理する
   // 設計に統一（ゲスト / Google / Apple の 3 経路を OnboardingPage 単一エントリへ集約）。
+  //
+  // 🔵 【FEAT-542 (2026-09-23)】**その集約がようやく例外なしになった。**
+  // スプラッシュから直接オンボーディングへ行く経路（= 黙ってゲストを作る経路）が
+  // 消え、**3 経路すべてが「認証 → プロフィール設定 → ホーム」の順**になった。
 
   // ── FEAT-189: ゲスト→既存ユーザー衝突確認ダイアログ ───────────────────────
   // 【2026-07-02】旧実装 (~70 LOC の inline AlertDialog) を GuestPromoteConflictDialog

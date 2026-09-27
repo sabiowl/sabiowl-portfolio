@@ -30,6 +30,7 @@ class _HabitCardState extends ConsumerState<HabitCard> {
   bool _expanded = false;
   late List<ChecklistItem> _localItems;
   final Set<int> _toggling = {};
+  bool _actionInFlight = false; // ＋ / ✓ の往復中フラグ (レビュー 20260824 §4-1 #1)
   bool _hintShown = false; // 1回限りのヒントを表示済みか
 
   @override
@@ -618,11 +619,16 @@ class _HabitCardState extends ConsumerState<HabitCard> {
 
   /// 個別チェックリスト項目タイル
   Widget _buildChecklistItemTile(ChecklistItem item) {
+    // 【FEAT-533 §8-3】`_actionInFlight` (✓ / ＋ ボタン側) も見る。逆方向を塞がないと、
+    // ✓ の往復中に項目タイルが素通りして「楽観的にチェックが付く → `toggleChecklistItem`
+    // が `_inFlight` で早期 return (throw しない) → catch に入らないので楽観更新が
+    // 戻らない」= **チェックが付いたまま、サーバーには何も無い**状態が残る。
     final isToggling = _toggling.contains(item.id);
+    final blocked = isToggling || _actionInFlight;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: isToggling ? null : () => _handleItemToggle(item),
+      onTap: blocked ? null : () => _handleItemToggle(item),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
@@ -664,7 +670,12 @@ class _HabitCardState extends ConsumerState<HabitCard> {
 
   /// 個別チェックリスト項目のトグル（楽観的 UI 更新）
   Future<void> _handleItemToggle(ChecklistItem item) async {
+    // 【FEAT-533 §8-3】`onTap: null` と二重の防御。触覚より先に置くこと。
+    if (_actionInFlight || _toggling.contains(item.id)) return;
+
     HapticFeedback.selectionClick();
+    // 【BUG-150】await をまたぐので l10n は先に capture する。
+    final l10n = AppLocalizations.of(context)!;
 
     // 楽観的更新
     setState(() {
@@ -681,7 +692,7 @@ class _HabitCardState extends ConsumerState<HabitCard> {
       }
       await ref
           .read(habitsNotifierProvider.notifier)
-          .toggleChecklistItem(widget.habit.id, item.id);
+          .toggleChecklistItem(widget.habit.id, item.id, l10n: l10n);
     } catch (_) {
       // エラー時は楽観的更新を元に戻す
       setState(() {
@@ -719,51 +730,48 @@ class _HabitCardState extends ConsumerState<HabitCard> {
   ///
   /// 結果として週次習慣では「カードは達成済み外観 / ボタンは未チェック」が並ぶが、
   /// これは「今週は達成済み、ただし今日はまだ」という正しい情報である。
+  ///
+  /// 【ゲームプレイレビュー 20260824 §4-1 #1 (2026-08-25)】飛行中のタップを
+  /// **黙って捨てるのをやめた**。チェックリスト項目
+  /// (`_buildChecklistItemTile` / `_handleItemToggle`) と同じ 3 点セットに揃える:
+  ///
+  ///   ① 飛行中は `onTap: null`   …… 触覚が鳴らない = 嘘をつかない
+  ///   ② 飛行中は spinner を描く   …… 「処理中」が目に見える
+  ///   ③ 触覚と `_storeTapPosition` は **実際に送信する経路の中だけ**で呼ぶ
+  ///
+  /// 🔴 直したのは **UI が黙っていたこと**で、`_inFlight` guard 自体ではない。
+  /// guard は BUG-71 の構造修正として正しいので触らない。ここはその guard が
+  /// 働いたことをユーザーに見せる層である。
+  ///
+  /// 🔵 レビューは ＋ ボタンだけを挙げていたが、**同じメソッドの ✓ ボタンも
+  /// 同じ形をしていた**ので両方直した (REVIEWER_LESSONS 失敗 18: 同じ関数の中の
+  /// 2 件目を数えない)。
   Widget _buildActionPanel(BuildContext context) {
     final habit = widget.habit;
     final isCompleted = habit.isCompletedToday;
+    // 【FEAT-533 §8-3 (2026-08-25)】守り手は 2 つ (`_actionInFlight` = このパネル /
+    // `_toggling` = 項目タイル) だが、**守る対象は 1 つ** (`_inFlight[habitId]`) なので
+    // 合流させる。分けたままだと、項目タイルの往復中に ✓ を押したとき `busy` が false で
+    // **触覚がまた嘘をつく**。
+    final busy = _actionInFlight || _toggling.isNotEmpty;
 
     if (habit.habitType == 'checklist') {
       // ── チェックリスト: ✓ ボタン ───────────────────────────────
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () async {
-          HapticFeedback.lightImpact();
-          try {
-            if (isCompleted) {
-              await ref
-                  .read(habitsNotifierProvider.notifier)
-                  .decrementCount(habit.id);
-            } else {
-              _storeTapPosition(context, ref);
-              await ref
-                  .read(habitsNotifierProvider.notifier)
-                  .incrementCount(habit.id, l10n: AppLocalizations.of(context));
-            }
-          } catch (_) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    AppLocalizations.of(context)!.habitCardNetworkErrorSabi_message,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  backgroundColor: const Color(0xFF2A2A3E),
-                  duration: const Duration(seconds: 3),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          }
-        },
+        onTap: busy ? null : () => _handleCountAction(toggleOff: isCompleted),
         child: SizedBox(
           width: 56,
           child: Center(
-            child: Icon(
-              isCompleted ? Icons.check_circle : Icons.check_circle_outline,
-              color: isCompleted ? AppTheme.expColor : Colors.white38,
-              size: 28,
-            ),
+            child: busy
+                ? const _ActionSpinner()
+                : Icon(
+                    isCompleted
+                        ? Icons.check_circle
+                        : Icons.check_circle_outline,
+                    color: isCompleted ? AppTheme.expColor : Colors.white38,
+                    size: 28,
+                  ),
           ),
         ),
       );
@@ -772,40 +780,69 @@ class _HabitCardState extends ConsumerState<HabitCard> {
       // ── カウント: ＋ ボタン ────────────────────────────────────
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () async {
-          HapticFeedback.lightImpact();
-          _storeTapPosition(context, ref);
-          try {
-            await ref
-                .read(habitsNotifierProvider.notifier)
-                .incrementCount(habit.id, l10n: AppLocalizations.of(context));
-          } catch (_) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    AppLocalizations.of(context)!.habitCardNetworkErrorSabi_message,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                  backgroundColor: const Color(0xFF2A2A3E),
-                  duration: const Duration(seconds: 3),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          }
-        },
+        onTap: busy ? null : () => _handleCountAction(toggleOff: false),
         child: SizedBox(
           width: 56,
           child: Center(
-            child: Icon(
-              isCompleted ? Icons.add_circle : Icons.add_circle_outline,
-              color: isCompleted ? AppTheme.primary : Colors.white38,
-              size: 28,
-            ),
+            child: busy
+                ? const _ActionSpinner()
+                : Icon(
+                    isCompleted ? Icons.add_circle : Icons.add_circle_outline,
+                    color: isCompleted ? AppTheme.primary : Colors.white38,
+                    size: 28,
+                  ),
           ),
         ),
       );
+    }
+  }
+
+  /// アクションパネルのタップ処理 (＋ / ✓ 共通)。
+  ///
+  /// 【ゲームプレイレビュー 20260824 §4-1 #1】触覚 (`lightImpact`) と
+  /// `_storeTapPosition` を **guard の内側**で呼ぶ。外に置くと
+  /// `incrementCount` / `decrementCount` が `_inFlight` で早期 return した回でも
+  /// 振動が鳴り、タップ座標だけが書き換わる —— 「振動は 3 回、数字は +1」という、
+  /// 取りこぼしにしか見えない状態になる。
+  ///
+  /// ⚠️ `_actionInFlight` の解放は **必ず `finally`** に置くこと。`_inFlight` は
+  /// まさにこの解放漏れで BUG-71 になった (`firstWhere` の `StateError` が try の
+  /// 外にあった)。同じ穴を UI 側に作らない。
+  ///
+  /// 契約テスト: `mobile/test/habits/habit_action_tap_feedback_test.dart`
+  Future<void> _handleCountAction({required bool toggleOff}) async {
+    if (_actionInFlight) return;
+    setState(() => _actionInFlight = true);
+
+    HapticFeedback.lightImpact();
+
+    final notifier = ref.read(habitsNotifierProvider.notifier);
+    final l10n = AppLocalizations.of(context);
+
+    try {
+      if (toggleOff) {
+        await notifier.decrementCount(widget.habit.id);
+      } else {
+        // 未完了 → 完了: エフェクト発動のためタップ座標を保存
+        _storeTapPosition(context, ref);
+        await notifier.incrementCount(widget.habit.id, l10n: l10n);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.habitCardNetworkErrorSabi_message,
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+            backgroundColor: const Color(0xFF2A2A3E),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _actionInFlight = false);
     }
   }
 
@@ -957,4 +994,32 @@ void _storeTapPosition(BuildContext context, WidgetRef ref) {
     Offset(box.size.width / 2, box.size.height / 2),
   );
   ref.read(completionTapPositionProvider.notifier).state = center;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 【ゲームプレイレビュー 20260824 §8-5】アクションパネルのスピナー
+//
+// 🔴 このクラスは元々 `_StreakProtectButton` のセクションバナーと docstring の
+// **あいだ**に挿入されており、`_StreakProtectButton` から docstring を奪っていた
+// (FEAT-420「在庫消費は翌日」という**コードからは読み取れない仕様**が
+// スピナーの説明文になっていた)。ファイル末尾に移設して所在を戻した。
+// **クラスを足すときは、直前の docstring が誰のものかを見ること。**
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// アクションパネル (＋ / ✓) の往復中に描くスピナー。
+///
+/// 【ゲームプレイレビュー 20260824 §4-1 #1】チェックリスト項目の 16px は
+/// アイコンが 16px だから 16px。こちらはアイコンが 28px なので一回り大きく取る。
+/// タップ領域 (56px 幅の `SizedBox`) は据え置きで、**押せる面積は変えない**。
+class _ActionSpinner extends StatelessWidget {
+  const _ActionSpinner();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 20,
+      height: 20,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    );
+  }
 }

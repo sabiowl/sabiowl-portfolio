@@ -17,7 +17,7 @@ import datetime
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
-from rest_framework.authentication import TokenAuthentication
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -36,7 +36,7 @@ class GoogleEventCompletionListView(PlayerMixin, APIView):
     Multi-device 同期用に、指定期間内の completion 一覧を返す。
     `date_from` / `date_to` は省略可能（省略時は全件）。
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -77,7 +77,7 @@ class GoogleEventCompletionView(PlayerMixin, APIView):
     POST   /api/google-events/<google_event_id>/complete/  完了マーク + ボーナス判定
     DELETE /api/google-events/<google_event_id>/complete/  完了取消（コイン -5 対称化）
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes     = [IsAuthenticatedOrGuest]
 
     # 【FEAT-419 流用】予定時刻 ±15 分以内 + 同日完了でコイン +5。

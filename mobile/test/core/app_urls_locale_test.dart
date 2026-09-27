@@ -131,7 +131,10 @@ void main() {
 
     test('日本語 locale では日本語 TOP を返す', () {
       ServiceL10n.debugSetLocale(const Locale('ja'));
-      expect(kSabiowlHomePageTopUrl, endsWith('sabiowl-home-pages/'));
+      // 【2026-09-23】独自ドメイン移行で `sabiowl-home-pages/` を直に書いた
+      // 期待値が腐ったので、**base から組み立てる形**に直した。
+      // ドメインを動かしても、見ている中身 (「TOP は base の直下」) は変わらない。
+      expect(kSabiowlHomePageTopUrl, equals('$kSabiowlHomePageBase/'));
       expect(kSabiowlHomePageTopUrl, isNot(contains('/en/')));
     });
   });

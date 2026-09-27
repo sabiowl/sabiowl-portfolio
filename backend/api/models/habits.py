@@ -340,3 +340,55 @@ class RestDay(models.Model):
 
     def __str__(self):
         return f'{self.player} - {self.date}'
+
+
+class DailyAchievement(models.Model):
+    """【FEAT-539 (2026-09-05)】その日タスクを達成した事実を 1 日 1 行で記録する。
+
+    🔴 **連続日数 / 累計日数の真実値はこの行である。**
+    `PlayerStreakState.login_streak_days` / `best_task_streak_days` は
+    読み取りを速くするためのキャッシュにすぎず、
+    `check_daily_achievement_consistency` が両者の一致を検証する。
+
+    ## なぜカウンタ 2 本ではなく行なのか (指示書 §4)
+
+    カウンタは黙ってズレ、**ズレたことを検出する手段が無い**。
+    行が残っていれば `COUNT(*)` が常に真実値で、キャッシュ側が壊れても
+    照合して直せる。`login_streak_days` が §2 で「誰も更新しない field」に
+    なっていたのを検出できなかったのは、まさに検証手段が無かったためである。
+
+    ## 書き込み口は 1 箇所だけ
+
+    `services/daily_achievement.py:record_daily_achievement()` からのみ書く。
+    それは `award_daily_first_task_bonus` の `transaction.atomic()` +
+    `select_for_update()` のロック内で呼ばれる ——
+    **その日の初回タスク達成でちょうど 1 回だけ通る場所**である。
+    習慣 / ToDo / チェックリスト / タイムラインの 4 経路すべてがここを通るので、
+    経路によらず 1 日 1 行になる。
+
+    ⚠️ `date` は必ず JST (`timezone.localdate()`) の日付。UTC の `.date()` を
+    渡さないこと (BUG-130 の前例)。
+    """
+
+    player = models.ForeignKey(
+        PlayerProfile, on_delete=models.CASCADE,
+        related_name='daily_achievements', verbose_name='プレイヤー',
+    )
+    date       = models.DateField(verbose_name='達成日')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label   = 'api'
+        verbose_name = '日次達成記録'
+        verbose_name_plural = '日次達成記録'
+        ordering    = ['-date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['player', 'date'],
+                name='unique_player_daily_achievement',
+            ),
+        ]
+        indexes = [models.Index(fields=['player', '-date'])]
+
+    def __str__(self):
+        return f'{self.player} - {self.date}'

@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from ..models import Challenge, ChallengeParticipation
 from ..permissions import IsAuthenticatedOrGuest  # FEAT-187
+from ..serializers import get_i18n_field  # 【2026-08-11】title / description の locale 解決
 from ..services.challenge_reward_service import grant_pending_rewards
 from .mixins import PlayerMixin
 
@@ -65,9 +66,10 @@ class ChallengeListView(PlayerMixin, APIView):
     def get(self, request):
         player = self.get_player(request)
         today = timezone.localdate()
+        locale = getattr(request, 'locale', 'ja')
 
         # lazy 報酬配布 (終了済 + 未完全配布の participation を集約)
-        pending_rewards = grant_pending_rewards(player)
+        pending_rewards = grant_pending_rewards(player, locale=locale)
 
         active_challenges = Challenge.objects.filter(
             is_active=True,
@@ -98,8 +100,11 @@ class ChallengeListView(PlayerMixin, APIView):
 
             active.append({
                 'id': challenge.id,
-                'title': challenge.title,
-                'description': challenge.description,
+                # 【2026-08-11】locale 解決。下の「_en field が無い」というコメントは
+                # FEAT-516 (migration 0200) で field が追加された後も残っており、
+                # **配線だけが取り残されていた** (実機の英語スクリーンショットで検出)。
+                'title':       get_i18n_field(challenge, 'title', locale),
+                'description': get_i18n_field(challenge, 'description', locale),
                 'category': challenge.category,
                 'is_tiered': challenge.is_tiered,
                 'current_count': challenge.current_count,
@@ -112,13 +117,21 @@ class ChallengeListView(PlayerMixin, APIView):
             })
 
         return Response({
-            'info_text': _info_text(getattr(request, 'locale', 'ja')),
+            'info_text': _info_text(locale),
             'active': active,
             'pending_rewards': pending_rewards,
-            # 【2026-08-03】`title` / `description` は Challenge model に `_en` field が
-            # 無いため **英語 locale でも日本語のまま返る**。同じ状態の model が
-            # 他に 7 つある (FEAT-516)。ここだけ小手先で直すと画面内の整合が崩れる
-            # ので、migration を伴う横断対応として別途扱う。
+            # 【2026-08-11 訂正】ここには 2026-08-03 時点の
+            # 「`title` / `description` は `_en` field が無いため英語 locale でも
+            #  日本語のまま返る。migration を伴う横断対応として別途扱う」
+            # というコメントが残っていたが、**その横断対応 (FEAT-516 / migration
+            # 0200) は既に完了していた**。field は追加されたのに view の配線だけが
+            # 取り残され、英語 UI でチャレンジ名と説明文だけ日本語で出ていた
+            # (実機の英語スクリーンショットで検出)。
+            #
+            # 🔴 Challenge は seed も management command も無く、**Django admin で
+            # 手動作成する運用**。`title_en` / `description_en` を admin の
+            # fieldsets に出していないと、配線を直しても入力経路が無いままになる
+            # (`ChallengeAdmin` を同時に修正した理由)。
         })
 
 

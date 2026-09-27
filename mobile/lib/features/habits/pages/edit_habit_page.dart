@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/category_request_dialog.dart';
 import '../../../shared/widgets/sabi_category_chips.dart';
 import '../../../l10n/app_localizations.dart';
+import '../models/checklist_draft.dart';
 import '../models/habit.dart';
 import '../providers/habits_provider.dart';
 import 'habit_detail_page.dart'; // habitDetailProvider のため
@@ -40,10 +41,12 @@ class _EditHabitPageState extends ConsumerState<EditHabitPage> {
   bool _initialized = false; // 初期化済みフラグ（2回目以降のbuildで上書きしない）
   String? _error;
 
-  // チェックリスト編集用
-  List<ChecklistItem> _existingItems = [];
-  final List<int> _deleteItemIds = [];
-  final List<String> _addItems = [];
+  // 【FEAT-525】チェックリスト編集用。
+  //
+  // 旧実装は `_existingItems` / `_addItems` / `_deleteItemIds` の 3 状態に
+  // 分かれており、**既存項目と新規項目をまたぐ順序が表現できなかった**。
+  // 1 本の draft リストに畳み、保存時に `set_checklist_items` へそのまま写す。
+  List<ChecklistDraft> _checklistDrafts = [];
 
   // 【FEAT-213 真実値】CATEGORY_CHOICES（11 値）の subset。API 障害時の
   // 安全フォールバック用。'メンタル' は migration 0066 で '精神' にリネーム済。
@@ -81,7 +84,9 @@ class _EditHabitPageState extends ConsumerState<EditHabitPage> {
     _resetCycle    = habit.resetCycle;
     _habitType     = habit.habitType;
     _difficulty    = habit.difficulty;
-    _existingItems = List.from(habit.checklistItems);
+    _checklistDrafts = habit.checklistItems
+        .map((i) => ChecklistDraft(id: i.id, text: i.text))
+        .toList();
     _initialized   = true;
   }
 
@@ -272,41 +277,69 @@ class _EditHabitPageState extends ConsumerState<EditHabitPage> {
     );
   }
 
+  /// 【FEAT-525】チェックリスト項目の並び替えエディタ。
+  ///
+  /// ## ネストしたスクロールへの対処
+  ///
+  /// 編集画面はフォーム全体が外側の `ListView` で縦スクロールする。その中に
+  /// `ReorderableListView` を置くので **`shrinkWrap: true` +
+  /// `NeverScrollableScrollPhysics`** が要る。忘れると
+  /// `Vertical viewport was given unbounded height` で落ちる
+  /// (報告時点で 11 件あり、画面に収まらない件数は普通に発生する)。
+  ///
+  /// この構成では **ドラッグ中の自動スクロールが効かない** (外側の viewport を
+  /// `ReorderableListView` が知らないため)。画面外へ動かしたいときは一度指を
+  /// 離してスクロールし、掴み直す操作になる。**この制約を受け入れる**判断をした:
+  /// 並び替え専用の全画面シートに逃がす案もあるが、「編集画面でそのまま直せる」
+  /// 素直さを優先した。項目数が数十に増えて苦しくなったら別 FEAT で見直す。
+  ///
+  /// ## ドラッグの起点はハンドルだけ
+  ///
+  /// `buildDefaultDragHandles: false` + `ReorderableDragStartListener` で
+  /// `Icons.drag_indicator` だけを掴める。行全体を掴めるようにすると
+  /// × ボタンが押しづらくなり、リストのスクロールとも競合する
+  /// (`home_body.dart` が同じ形)。
   Widget _buildChecklistEditor() {
-    final visibleExisting =
-        _existingItems.where((i) => !_deleteItemIds.contains(i.id)).toList();
-
     return Column(
       children: [
-        // 既存項目（削除予定を除く）
-        ...visibleExisting.map((item) => ListTile(
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: _checklistDrafts.length,
+          onReorder: (oldIndex, newIndex) => setState(() {
+            _checklistDrafts =
+                reorderDrafts(_checklistDrafts, oldIndex, newIndex);
+          }),
+          itemBuilder: (context, index) {
+            final draft = _checklistDrafts[index];
+            return ListTile(
+              // localKey は text 重複でも一意 (index を Key にすると掴んだのと
+              // 違う行が動く)。
+              key: ValueKey(draft.localKey),
               dense: true,
               contentPadding: EdgeInsets.zero,
               // 【FEAT-441 (2026-06-17)】Icons.drag_handle → Icons.drag_indicator
               // (6 点 2×3 グリッド) に変更、home_page と統一。
-              leading: const Icon(Icons.drag_indicator, color: Colors.white38),
-              title: Text(item.text,
+              // 【FEAT-525】そのハンドルに **実際の掴み先** を付けた。
+              leading: ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(Icons.drag_indicator, color: Colors.white38),
+                ),
+              ),
+              title: Text(draft.text,
                   style: const TextStyle(color: Colors.white, fontSize: 14)),
               trailing: IconButton(
                 icon: const Icon(Icons.close, color: Colors.red, size: 18),
-                onPressed: () =>
-                    setState(() => _deleteItemIds.add(item.id)),
+                onPressed: () => setState(() {
+                  _checklistDrafts = [..._checklistDrafts]..removeAt(index);
+                }),
               ),
-            )),
-        // 新規追加した項目
-        ..._addItems.asMap().entries.map((entry) => ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading:
-                  const Icon(Icons.add_circle_outline, color: AppTheme.primary, size: 20),
-              title: Text(entry.value,
-                  style: const TextStyle(color: Colors.white, fontSize: 14)),
-              trailing: IconButton(
-                icon: const Icon(Icons.close, color: Colors.red, size: 18),
-                onPressed: () =>
-                    setState(() => _addItems.removeAt(entry.key)),
-              ),
-            )),
+            );
+          },
+        ),
         // 入力フィールド
         Row(
           children: [
@@ -335,7 +368,8 @@ class _EditHabitPageState extends ConsumerState<EditHabitPage> {
     final text = _checklistController.text.trim();
     if (text.isNotEmpty) {
       setState(() {
-        _addItems.add(text);
+        // 末尾に追加。差し込みたい位置へはドラッグで動かす。
+        _checklistDrafts = [..._checklistDrafts, ChecklistDraft(text: text)];
         _checklistController.clear();
       });
     }
@@ -591,14 +625,18 @@ class _EditHabitPageState extends ConsumerState<EditHabitPage> {
         'difficulty': _difficulty,
         'memo': _memoController.text.trim(),
       };
-      if (_habitType == 'checklist') {
-        if (_addItems.isNotEmpty) {
-          body['add_checklist_items'] =
-              _addItems.map((t) => {'text': t}).toList();
-        }
-        if (_deleteItemIds.isNotEmpty) {
-          body['delete_checklist_items'] = _deleteItemIds;
-        }
+      // 【FEAT-525】追加・削除・並び替えを 1 往復で送る。
+      //
+      // `_initialized` を必ず確認すること。習慣の読み込み前に空の draft リストを
+      // 送ると **全項目削除**になる (宣言的な形式なので「空配列 = 全消し」)。
+      // 保存ボタンは `habitAsync.when(data:)` の中にしか無いので現状は到達しないが、
+      // 事故の代償が大きいので構造で塞いでおく。
+      //
+      // 🔴 旧 `add_checklist_items` / `delete_checklist_items` とは **併送しない**。
+      // 両方送ると backend が 400 (`habit_update_checklist_payload_conflict`) を返す。
+      if (_habitType == 'checklist' && _initialized) {
+        body['set_checklist_items'] =
+            buildSetChecklistItemsPayload(_checklistDrafts);
       }
       await ref
           .read(habitsNotifierProvider.notifier)

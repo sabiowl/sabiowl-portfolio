@@ -161,6 +161,31 @@ Future<void> invalidateHomeBootstrapCache(Ref ref) async {
   ref.invalidate(homeBootstrapRawProvider);
 }
 
+/// 【FEAT-530 (2026-08-29)】ホームが**今**ブートストラップを使っているか、
+/// だけを表す標識。値に意味は無く、**element が生きているかどうか**が答えである。
+///
+/// `HomePage.build` が watch し、`autoDispose` なので HomePage が unmount した
+/// 1 イベントループ後に element ごと消える。したがって
+/// `ref.exists(homeIsLiveProvider)` は「ホームが今その値を使っているか」に追従する。
+///
+/// 🔴 **`homeBootstrapRawProvider` 自体に `exists` を使ってはいけない。**
+/// あちらは非 autoDispose + `keepAlive()` なので、**一度ホームを開いたら以後
+/// 永久に `exists == true` / `hasValue == true`** になる (FEAT-530 Pre-mortem #3
+/// が現実になっている形)。それを判定に使うと、全画面バトルからの復帰でも
+/// 「ホームは生きている」と誤判定し、`refresh()` が二度と走らなくなる ——
+/// FEAT-295 が塞いだ「ホーム盾バッジが古いまま」の再発である。
+///
+/// 実測 (`battle_finish_refresh_test.dart` が縛っている):
+///
+/// | ホーム | `invalidate(homeBootstrapRawProvider)` の効果 |
+/// |---|---|
+/// | watch 中 | 即時再取得 → `setFromBootstrap` で player も更新される |
+/// | 離脱後   | 再取得は走るが **player には伝わらない** (下の Provider が
+/// |          | 誰にも listen されておらず再評価されないため) |
+///
+/// 下段があるので、ホーム不在時は `playerNotifierProvider.refresh()` が要る。
+final homeIsLiveProvider = Provider.autoDispose<bool>((ref) => true);
+
 /// bootstrap データを個別プロバイダーへ注入するコントローラー。
 /// HomePage の build() 先頭で `ref.watch(homeBootstrapControllerProvider)` するだけ。
 ///

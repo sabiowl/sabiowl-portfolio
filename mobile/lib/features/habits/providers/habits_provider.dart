@@ -1,22 +1,19 @@
 import 'package:flutter/foundation.dart';                    // debugPrint
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../l10n/app_localizations.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // 【FEAT-398】EXP throttle SnackBar 1日1回制御
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/analytics/posthog_service.dart';  // FEAT-200
 import '../../../core/api/api_client.dart';
 import '../../../core/services/notification_service.dart';
-import '../../../core/services/toast_center.dart';            // FEAT-314
 import '../../battle/models/weapon_info.dart';  // 【FEAT-326】WeaponInfo (装備変更 Optimistic UI)
 import '../../calendar/providers/calendar_provider.dart';  // FEAT-280: invalidateCalendarBootstrapCache
-import '../../social/models/social_models.dart';  // 【FEAT-452】FriendGiftCandidate
-import '../../puzzle_world/models/puzzle_world.dart';  // 【FEAT-479】PuzzlePieceAwarded
-import '../../puzzle_world/providers/puzzle_world_provider.dart';  // 【FEAT-479】puzzlePieceAwardedProvider
-import '../../social/providers/social_provider.dart';  // 【FEAT-452】friendGiftCandidateProvider
 import '../models/habit.dart' show Habit, HabitReward, HabitsSummary, PendingPlayerReward;
 import '../models/player.dart';
 import '../providers/home_bootstrap_provider.dart';  // FEAT-280: invalidateHomeBootstrapCache
 import '../services/habits_service.dart';
+// 【BUG-150 (2026-08-29)】達成レスポンス → provider の配線は共有関数が単一真実値。
+// 走査テスト test/habits/apply_completion_result_test.dart が複製を禁じている。
+import 'apply_completion_result.dart';
 
 part 'habits_provider.g.dart';
 
@@ -376,9 +373,27 @@ class HabitsNotifier extends _$HabitsNotifier {
     }
   }
 
-  void _refreshRelated() {
+  /// write 操作後に、周辺の provider を最新化する。
+  ///
+  /// 【FEAT-524 Phase 2 (2026-08-08)】`player` が渡された場合は
+  /// `invalidate` **せずに注入する**。POST のレスポンスに既に権威ある player が
+  /// 入っているのに、直後の `invalidate` が `GET /player/` を走らせて
+  /// **同じものを取り直していた** (player は 1 タップにつき 3 回運ばれ、
+  /// 最初の 1 回が捨てられていた)。
+  ///
+  /// `player == null` の経路 (minus / player を返さない write) は
+  /// **従来どおり invalidate** する (Pre-mortem #4)。
+  ///
+  /// 🔴 `habitsSummaryProvider` の invalidate は**残す**。誰も watch していない
+  /// 実質 no-op だが、削除は `/api/home/` の payload とセットで判断すべきもので
+  /// v1.2 送り (指示書 §3 / Pre-mortem #5)。ここで「ついで」に消さない。
+  void _refreshRelated({Player? player}) {
     ref.invalidate(habitsSummaryProvider);
-    ref.invalidate(playerNotifierProvider);
+    if (player != null) {
+      ref.read(playerNotifierProvider.notifier).setFromBootstrap(player);
+    } else {
+      ref.invalidate(playerNotifierProvider);
+    }
     _invalidateSwrCaches();
   }
 
@@ -408,8 +423,17 @@ class HabitsNotifier extends _$HabitsNotifier {
   }
 
   // カウント +1
-  Future<void> incrementCount(int habitId, {AppLocalizations? l10n}) async {
-    if (_inFlight.contains(habitId)) return; // 二重送信ガード
+  /// 【ゲームプレイレビュー 20260824 §8-3 / FEAT-533 (2026-08-25)】
+  /// **実際に送ったかどうか**を返す。`_inFlight` guard で早期 return した回は `false`。
+  ///
+  /// 🔴 呼び出し元は、**戻り値が `false` のとき「成功した」という顔をしてはいけない**。
+  /// 触覚を鳴らす / サビの成功文言を出す / トーストを出すのは `true` の場合だけである。
+  /// guard が落としたタップで祝うと、**何も記録されていないのにサビが
+  /// 「積み重ねが世界のどこかで種になった」と言う**状態になる。
+  ///
+  /// 契約テスト: `mobile/test/habits/habit_inflight_call_sites_test.dart`
+  Future<bool> incrementCount(int habitId, {AppLocalizations? l10n}) async {
+    if (_inFlight.contains(habitId)) return false; // 二重送信ガード
     _inFlight.add(habitId);
 
     // 【BUG-71 fix 2026-05-27】try-finally の **外側** にあった `firstWhere` の
@@ -451,9 +475,13 @@ class HabitsNotifier extends _$HabitsNotifier {
           .incrementCount(habitId, prevLevel: prevLevel);
 
       _updateInList(result.habit); // サーバー確定値で上書き
-      _refreshRelated();
+      // 【FEAT-524 Phase 2】POST が返した player をそのまま注入する
+      // (null なら従来どおり invalidate にフォールバック)。
+      _refreshRelated(player: result.player);
 
       // ③ 確定値に切り替え（差分プロバイダーをクリア）
+      // 【FEAT-524 Phase 2 の副次効果】上で確定 player が既に state に入っているため、
+      // 楽観値 → 確定値の受け渡しに隙間が無くなる (旧: refetch 完了まで直前値に依存)。
       ref.read(pendingPlayerRewardProvider.notifier).state = null;
 
       // FEAT-200: count 型習慣の完了 / ToDo の完了をトラッキング。
@@ -466,78 +494,12 @@ class HabitsNotifier extends _$HabitsNotifier {
         },
       );
 
-      // ④ RewardToast 表示
-      if (result.expGain > 0) {
-        ref.read(rewardToastProvider.notifier).state = HabitReward(
-          expGain:       result.expGain,
-          bonusExp:      result.bonusExp,
-          diamondEarned: result.diamondEarned,
-        );
-      }
-
-      if (result.leveledUp) {
-        ref.read(levelUpNotifierProvider.notifier).state = result.newLevel;
-        ref.read(levelUpAutoAllocationsProvider.notifier).state = result.autoAllocations;
-        // 【FEAT-379】結晶付与サマリーを同時セット (ダイアログ表示に使う)
-        if (result.crystalsAwarded.isNotEmpty) {
-          ref.read(levelUpCrystalsProvider.notifier).state = result.crystalsAwarded;
-        }
-      }
-      if (result.isComeback) {
-        ref.read(comebackNotifierProvider.notifier).state = true;
-      }
-      // FEAT-131: 自動シールド通知
-      if (result.autoShieldType != null) {
-        ref.read(autoShieldNotifierProvider.notifier).state = result.autoShieldType;
-      }
-      // 【FEAT-314】 7 / 14 / 21 / ... 日達成節目のサビ口調トースト + +5💎 誘導
-      // streakDiamondDays が non-null = Backend 側で実付与済（冪等チェック通過）。
-      final streakDays = result.streakDiamondDays;
-      if (streakDays != null) {
-        ToastCenter.showSuccess(
-          l10n?.habitProviderStreakMilestoneSabi_message(streakDays) ??
-              '$streakDays days in a row — splendid. Here are +5 Diamonds for you. 🪶',
-        );
-      }
-      // 【FEAT-398】日次 EXP 閾値到達直後 → サビ口調 SnackBar (1 日 1 回限定)
-      if (result.dailyThrottleTriggered) {
-        await _maybeShowExpThrottleSabiSnackBar(l10n);
-      }
-      // 【FEAT-420 (2026-06-10)】予約していたストリーク保護が今回の達成で消費された場合のみ表示
-      if (result.streakProtectionPendingConsumed) {
-        ToastCenter.showSuccess(
-          result.streakProtectionMessage ??
-              (l10n?.habitProviderStreakProtectionSabi_message ??
-                  'One streak shield has been used. 🪶'),
-        );
-      }
-      // 【FEAT-433 (2026-06-13) → FEAT-438 (2026-06-17) ポップアップ昇格】
-      // 当月 21 日達成で SSR 確定チケットを配布した場合、provider state を true に。
-      // RestackApp の global listener が showDialog で MonthlyTicketAwardedDialog
-      // を表示する (旧 SnackBar は廃止)。
-      if (result.monthlyTicketAwarded) {
-        ref.read(monthlyTicketAwardedNotifierProvider.notifier).state = true;
-      }
-      // 【BUG-122 (2026-06-14)】その日初回タスク達成ボーナスを保留 provider に注入。
-      // Home / Habits 系の Consumer がこれを watch して LoginBonusCalendarDialog を表示。
-      if (result.todayLoginBonus != null) {
-        ref.read(pendingLoginBonusProvider.notifier).state =
-            result.todayLoginBonus;
-      }
-      // 【FEAT-452 (2026-06-20)】当日 3 回目のタスク達成でフレンドプレゼント popup
-      // 候補を friendGiftCandidateProvider に set。FriendGiftPopupListener が watch
-      // して non-null 時に確認ダイアログを表示する。
-      if (result.friendGiftCandidate != null) {
-        ref.read(friendGiftCandidateProvider.notifier).state =
-            FriendGiftCandidate.fromJson(result.friendGiftCandidate!);
-      }
-      // 【FEAT-479 (2026-07-06)】その日初回タスク達成でパズルピース (grey) 付与。
-      // puzzlePieceAwardedProvider に set → PuzzlePieceListener が watch して
-      // PuzzlePieceOverlayModal を発火する。
-      if (result.puzzlePieceAwarded != null) {
-        ref.read(puzzlePieceAwardedProvider.notifier).state =
-            PuzzlePieceAwarded.fromJson(result.puzzlePieceAwarded!);
-      }
+      // ④ 【BUG-150 (2026-08-29)】レスポンス → provider の配線は共有関数 1 箇所。
+      // 旧実装はここに 11 個の if を並べており、**checklist 経路とカレンダー経路に
+      // 不完全な複製**があった (後から足された BUG-122 / FEAT-433 / FEAT-452 /
+      // FEAT-479 が片方にしか入らず、カレンダーからの初回達成では
+      // ログインボーナスもかけらも出なかった)。
+      await applyHabitLogResult(ref.read, result, l10n: l10n);
     } catch (_) {
       // ⑤ ロールバック: 楽観的更新前の状態に戻す
       _updateInList(habit);
@@ -547,34 +509,12 @@ class HabitsNotifier extends _$HabitsNotifier {
     } finally {
       _inFlight.remove(habitId);
     }
+    return true;
   }
 
-  /// 【FEAT-398】日次 EXP 閾値到達時のサビ口調 SnackBar (1 日 1 回限定)。
-  ///
-  /// SharedPreferences に「最終表示日」を保存し、同日に 2 回以上表示されないよう抑制する。
-  /// 習慣 / タイムライン 両経路が呼び出すため、共通 utility として定義。
-  Future<void> _maybeShowExpThrottleSabiSnackBar(AppLocalizations? l10n) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      const key = 'last_exp_throttle_snackbar_shown_date';
-      final today = DateTime.now();
-      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-      final lastShown = prefs.getString(key);
-      if (lastShown == todayStr) return;  // 同日 2 回目以降はスキップ
-      await prefs.setString(key, todayStr);
-      // 【FEAT-408 (2026-06-01)】"上限→打ち止め" フレームから "上澄み → 余録" フレームに変更。
-      // 旧: 「十分に積み上がりましたね」= 達成の打ち止めを示唆、パワーユーザーへの
-      //     "もう十分" メッセージとして誤読される可能性あり。
-      // 新: 「ここから先はおまけのご褒美」= 達成欲を否定せず余録フレームで伝える。
-      // サビ口調規則 (〜ですよ / 〜ましたね / 🪶 / 感嘆符なし) 準拠。
-      ToastCenter.showSuccess(
-        l10n?.habitProviderExpThrottleSabi_message ??
-            "You've done well today. From here on, think of it as bonus rewards. 🪶",
-      );
-    } catch (e, st) {
-      debugPrint('[HabitsNotifier._maybeShowExpThrottleSabiSnackBar] failed: $e\n$st');
-    }
-  }
+  // 【BUG-150 (2026-08-29)】`_maybeShowExpThrottleSabiSnackBar` は
+  // apply_completion_result.dart の `maybeShowExpThrottleSabiToast` に移設した。
+  // 習慣 / タイムライン / カレンダーの 3 経路が同じ 1 日 1 回制御を共有する。
 
   // ── EXP 推定（楽観的更新用・正確な値は API レスポンス後に確定）───────────
   // サーバの実加算式（backend/api/views/habits.py の HabitCountView 参照）:
@@ -612,8 +552,17 @@ class HabitsNotifier extends _$HabitsNotifier {
   }
 
   // カウント -1（取り消し）
-  Future<void> decrementCount(int habitId) async {
-    if (_inFlight.contains(habitId)) return; // 二重送信ガード
+  /// 【ゲームプレイレビュー 20260824 §8-3 / FEAT-533 (2026-08-25)】
+  /// **実際に送ったかどうか**を返す。`_inFlight` guard で早期 return した回は `false`。
+  ///
+  /// 🔴 呼び出し元は、**戻り値が `false` のとき「成功した」という顔をしてはいけない**。
+  /// 触覚を鳴らす / サビの成功文言を出す / トーストを出すのは `true` の場合だけである。
+  /// guard が落としたタップで祝うと、**何も記録されていないのにサビが
+  /// 「積み重ねが世界のどこかで種になった」と言う**状態になる。
+  ///
+  /// 契約テスト: `mobile/test/habits/habit_inflight_call_sites_test.dart`
+  Future<bool> decrementCount(int habitId) async {
+    if (_inFlight.contains(habitId)) return false; // 二重送信ガード
     _inFlight.add(habitId);
 
     // 【BUG-71 fix 2026-05-27】incrementCount と同じ構造的修正 (firstWhere StateError
@@ -641,6 +590,8 @@ class HabitsNotifier extends _$HabitsNotifier {
           await ref.read(habitsServiceProvider).decrementCount(habitId);
       _updateInList(updated);
       ref.read(pendingPlayerRewardProvider.notifier).state = null;
+      // 【FEAT-524 Phase 2 / Pre-mortem #4】minus は `decrementCount` が Habit しか
+      // 返さない (player を持ち帰らない) 経路。ここは**従来どおり invalidate**。
       _refreshRelated();
     } catch (_) {
       // ロールバック: 楽観的更新前の状態に戻す
@@ -651,11 +602,28 @@ class HabitsNotifier extends _$HabitsNotifier {
     } finally {
       _inFlight.remove(habitId);
     }
+    return true;
   }
 
   // チェックリストトグル
-  Future<void> toggleChecklistItem(int habitId, int itemId) async {
-    if (_inFlight.contains(habitId)) return; // 二重送信ガード
+  /// 【ゲームプレイレビュー 20260824 §8-3 / FEAT-533 (2026-08-25)】
+  /// **実際に送ったかどうか**を返す。`_inFlight` guard で早期 return した回は `false`。
+  ///
+  /// 🔴 呼び出し元は、**戻り値が `false` のとき「成功した」という顔をしてはいけない**。
+  /// 触覚を鳴らす / サビの成功文言を出す / トーストを出すのは `true` の場合だけである。
+  /// guard が落としたタップで祝うと、**何も記録されていないのにサビが
+  /// 「積み重ねが世界のどこかで種になった」と言う**状態になる。
+  ///
+  /// 契約テスト: `mobile/test/habits/habit_inflight_call_sites_test.dart`
+  Future<bool> toggleChecklistItem(
+    int habitId,
+    int itemId, {
+    // 【BUG-150 (2026-08-29)】共有関数に寄せたことで checklist 経路でも
+    // streak 節目 / EXP 上限 / ストリーク保護のサビ口調トーストが出るように
+    // なった。旧実装ではそれらが**出ていなかった**ので l10n も不要だった。
+    AppLocalizations? l10n,
+  }) async {
+    if (_inFlight.contains(habitId)) return false; // 二重送信ガード
     _inFlight.add(habitId);
 
     // 【BUG-71 fix 2026-05-27】incrementCount と同じ構造的修正。
@@ -681,7 +649,9 @@ class HabitsNotifier extends _$HabitsNotifier {
           .read(habitsServiceProvider)
           .toggleChecklistItem(habitId, itemId, prevLevel: prevLevel);
       _updateInList(result.habit);
-      _refreshRelated();
+      // 【FEAT-524 Phase 2】checklist toggle も count 経路と同じ serializer の
+      // player を返すので、同様に注入する (null なら invalidate にフォールバック)。
+      _refreshRelated(player: result.player);
       // FEAT-200: チェックリスト型習慣の完了をトラッキング（個別アイテムのトグルではなく、
       // EXP が加算された = 「達成」と判定できるタイミングで送る）。
       if (result.expGain > 0) {
@@ -689,30 +659,12 @@ class HabitsNotifier extends _$HabitsNotifier {
           'category':   habit.category,
           'difficulty': habit.difficulty,
         });
-        ref.read(rewardToastProvider.notifier).state = HabitReward(
-          expGain:       result.expGain,
-          bonusExp:      result.bonusExp,
-          diamondEarned: result.diamondEarned,
-        );
       }
-      if (result.leveledUp) {
-        ref.read(levelUpNotifierProvider.notifier).state = result.newLevel;
-        ref.read(levelUpAutoAllocationsProvider.notifier).state = result.autoAllocations;
-        // 【FEAT-379】結晶付与サマリー (checklist 経路)
-        if (result.crystalsAwarded.isNotEmpty) {
-          ref.read(levelUpCrystalsProvider.notifier).state = result.crystalsAwarded;
-        }
-      }
-      // 【FEAT-433 (2026-06-13) → FEAT-438 (2026-06-17) ポップアップ昇格】(checklist 経路)
-      // 上記 _incrementCount と同パターン、provider state を true → RestackApp が表示
-      if (result.monthlyTicketAwarded) {
-        ref.read(monthlyTicketAwardedNotifierProvider.notifier).state = true;
-      }
-      // 【BUG-122 (2026-06-14)】その日初回タスク達成ボーナス (checklist 経路)
-      if (result.todayLoginBonus != null) {
-        ref.read(pendingLoginBonusProvider.notifier).state =
-            result.todayLoginBonus;
-      }
+      // 【BUG-150 (2026-08-29)】count 経路と同じ共有関数に寄せた。
+      // 🔴 旧実装はここに 4 つしか無く、**かけら / フレンドギフト / 復帰 /
+      // 自動シールド / streak 節目 / EXP 上限 / ストリーク保護が落ちていた** ——
+      // チェックリスト型の習慣で初回達成すると、かけらが永久に出なかった。
+      await applyHabitLogResult(ref.read, result, l10n: l10n);
     } catch (_) {
       // ロールバック: 楽観的更新前の状態に戻す
       _updateInList(habit);
@@ -721,6 +673,7 @@ class HabitsNotifier extends _$HabitsNotifier {
     } finally {
       _inFlight.remove(habitId);
     }
+    return true;
   }
 
   // シールド発動

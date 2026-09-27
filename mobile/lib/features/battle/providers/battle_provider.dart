@@ -9,7 +9,8 @@ import '../../gamification/models/gamification_models.dart' show CharacterStat; 
 import '../../gamification/providers/gamification_provider.dart' show statsNotifierProvider;  // FEAT-333
 import '../../habits/providers/habits_provider.dart' show playerNotifierProvider;
 // 【FEAT-295 hotfix 2026-05-25】戦闘終了後の Player + SWR キャッシュ即時 invalidate 用
-import '../../habits/providers/home_bootstrap_provider.dart' show homeBootstrapRawProvider;
+import '../../habits/providers/home_bootstrap_provider.dart'
+    show homeBootstrapRawProvider, homeIsLiveProvider;
 import '../../puzzle_world/models/puzzle_world.dart' show PuzzlePieceColored;  // 【FEAT-479】
 import '../../puzzle_world/providers/puzzle_world_provider.dart' show puzzlePieceColoredProvider;  // 【FEAT-479】
 import '../constants/battle_constants.dart';
@@ -19,6 +20,7 @@ import '../models/combatant.dart';
 import '../models/enemy.dart';  // FEAT-296
 import '../models/job.dart';    // FEAT-299
 import '../models/tactic.dart';
+import '../services/ambient_auto_battle_preferences.dart';  // 【FEAT-528】
 import '../services/battle_orchestrator.dart';
 import '../services/battle_service.dart';
 import '../../../core/l10n/service_l10n.dart';  // 【FEAT-489 Phase 2F-a】
@@ -42,6 +44,84 @@ final battleServiceProvider = Provider<BattleService>((ref) {
 /// GuildPage.initState で SharedPreferences から読み込まれる。
 /// Toggle 時は AmbientAutoBattlePreferences.setEnabled() で永続化する。
 final ambientAutoBattleEnabledProvider = StateProvider<bool>((ref) => false);
+
+/// 【FEAT-528 (2026-08-22)】オートバトルの ON/OFF を切り替える唯一の入口。
+///
+/// 🔴 **バーとモーダルの 2 箇所から呼ぶので、処理をコピーしない。**
+/// この関数は 3 つのことを同時にやる:
+///   1. `ambientAutoBattleEnabledProvider` の更新（描画の真実値）
+///   2. `SharedPreferences` への永続化（orchestrator 発火の真実値）
+///   3. PostHog `ambient_battle_toggled` の送信
+///
+/// コピペして 2 箇所に分けると、**片方だけ直したときにもう片方が古くなる**。
+/// 特に 3 の計測が「バーからの toggle だけ」になっても、数字が減ったことに
+/// 誰も気付けない（FEAT-528 Pre-mortem #6）。
+Future<void> setAmbientAutoBattleEnabled(WidgetRef ref, bool value) async {
+  ref.read(ambientAutoBattleEnabledProvider.notifier).state = value;
+  final prefs = await SharedPreferences.getInstance();
+  await AmbientAutoBattlePreferences.setEnabled(prefs, value);
+  PosthogService.instance.capture(
+    'ambient_battle_toggled',
+    properties: {'enabled': value},
+  );
+}
+
+/// 【FEAT-528 (2026-08-22)】バトル速度の永続設定（1.0 / 1.5 / 2.0 / 3.0 / 50.0 = ⏭）。
+///
+/// ## 🔴 `battle_speed_multiplier` への書き込みはここに一本化する
+///
+/// 直接 `prefs.setDouble('battle_speed_multiplier', ...)` を書くと、
+/// **BUG-79 と同型の「二重の真実値」に戻る** —— FEAT-416 の hotfix で実際に
+/// 「`_SpeedChip` は 1x をハイライトしているのに実速度は 3x」というユーザー報告が
+/// 出ている。書き手が 2 つある限り、どちらかが片方を更新し忘れる。
+/// `test/battle/battle_settings_dialog_test.dart` の D-1 がソース走査で縛っている。
+///
+/// ## なぜ自分でロードするのか
+///
+/// `ambientAutoBattleEnabledProvider` は `_GuildPageState.initState` から
+/// 流し込まれる形で、**ギルド画面を開くまで既定値のまま**になる
+/// （実際に gameplay_review 20260803 §2-1 の事故を起こしている）。
+/// 同じ形にすると、モーダルを他画面に置いた瞬間に同じ穴が開く
+/// （FEAT-528 Pre-mortem #3）。だからホスト画面に依存せず自分で読む。
+///
+/// ⚠️ オートバトル側の既存の形は本 FEAT の範囲外として据え置いた。
+/// **モーダルをギルド以外の画面に置くときは、必ず一緒に直すこと。**
+class BattleSpeedPreferenceNotifier extends StateNotifier<double> {
+  BattleSpeedPreferenceNotifier() : super(1.0) {
+    _load();
+  }
+
+  /// SharedPreferences のキー。`startBattle` の読み出し側と同じ文字列。
+  static const String prefsKey = 'battle_speed_multiplier';
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getDouble(prefsKey);
+      if (saved != null && mounted) state = saved;
+    } catch (_) {
+      // テスト環境 / 初回起動でプラグイン未初期化 → 既定 1.0 のまま継続。
+      // `startBattle` の復元側と同じ握り方にしておく。
+    }
+  }
+
+  /// 速度を変更して永続化する。
+  Future<void> setSpeed(double value) async {
+    state = value;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(prefsKey, value);
+    } catch (_) {
+      // 永続化に失敗しても in-memory の state は更新済（今回の戦闘には効く）。
+    }
+  }
+}
+
+/// 【FEAT-528】非 autoDispose。画面をまたいで保持する設定なので破棄しない。
+final battleSpeedPreferenceProvider =
+    StateNotifierProvider<BattleSpeedPreferenceNotifier, double>(
+  (ref) => BattleSpeedPreferenceNotifier(),
+);
 
 /// 【FEAT-305】直近 N 件の BattleLog 一覧。リリア（ギルド受付）の状態判定で
 /// 「直近 5 分以内勝敗」「連戦判定」に使用。
@@ -347,6 +427,19 @@ class BattleSessionNotifier extends StateNotifier<BattleSession> {
   BattleOrchestrator? _orchestrator;
   bool _finishSent = false;
 
+  /// 【FEAT-531 (2026-08-29)】直近に開始したバトルの計測メタ。
+  ///
+  /// `battle_started` と `battle_finished` を **同じ 1 戦として突き合わせる**ために
+  /// 開始時の値をここへ持ち越す。`_sendFinish` は `startBattle` が作った
+  /// orchestrator 経由でしか到達しないので、両方とも必ず設定済みになる。
+  ///
+  /// 🔴 **`entry` の判定はここに入れる 1 箇所だけ。** FEAT-529 の `ambient`
+  /// フラグをそのまま流す。別途「額縁かどうか」を判定し直すと、片方だけ直した
+  /// ときに **ダッシュボードの手動 / 自動の比率が静かに狂う** —— 数字が
+  /// おかしいことに誰も気付けない種類の壊れ方になる (FEAT-531 Pre-mortem #2)。
+  String _lastBattleEntry = '';
+  String _lastBattleEnemyKey = '';
+
   /// 【FEAT-296】開始する敵の識別子（次回 `BattlePage.initState` or WorldFrameSection 経由
   /// での startBattle 用）。ギルド画面の `_onJoin(enemy)` → `selectEnemyForNextBattle(enemy.key)`
   /// → 【FEAT-297】context.go(/home) → WorldFrameSection が pending 検出 → startBattle
@@ -421,7 +514,12 @@ class BattleSessionNotifier extends StateNotifier<BattleSession> {
   /// `enemyKey` が明示指定されればそれを使い、null なら `_pendingEnemyKey`
   /// （ギルド画面経由で先にセット済み）を使い、それも null なら Backend が
   /// default ゴブリンを返す（後方互換、Pre-mortem #3）。
-  Future<void> startBattle({String? enemyKey}) async {
+  ///
+  /// 【FEAT-529】`ambient` はホーム額縁のアンビエントバトルからの呼び出しを表す。
+  /// `true` のとき倍速の**実効値だけ** [BattleConstants.ambientMaxSpeedMultiplier]
+  /// で頭打ちにする（Skip を額縁に持ち込まないため）。既定値は必ず `false` ——
+  /// ここを `true` にすると Skip 機能そのものが壊れる（Pre-mortem #2）。
+  Future<void> startBattle({String? enemyKey, bool ambient = false}) async {
     // 【FEAT-297 hotfix 2026-05-24】戦闘終了済（won/lost）なら _orchestrator を
     // 破棄してリセット → 新規セッション開始を許可する。running 中の二重開始のみ防ぐ。
     // 旧実装は `_orchestrator != null` で常に早期 return していたため、
@@ -469,6 +567,36 @@ class BattleSessionNotifier extends StateNotifier<BattleSession> {
       } catch (_) {
         // プリファレンス取得失敗 (test 環境 / 初回起動) → default 1.0 を使用
       }
+
+      // 【FEAT-529 (2026-08-22)】額縁は Skip (50x) を持ち込まない。
+      // FEAT-527 の攻撃モーションは 400ms 固定で倍速に追従しないため、
+      // Skip のままだと戦闘のほうが先に終わり、モーションが一度も見えない。
+      //
+      // 🔴 clamp するのは savedSpeed（このバトルでの実効値）だけで、
+      // **prefs は書き換えない**。書き戻すと、額縁バトルが 1 回走っただけで
+      // バトル画面の Skip 設定が勝手に 3x に落ちる（ユーザーには「設定が
+      // いつの間にか消えた」に見え、ホームに戻っただけなので操作と結び付かない）。
+      if (ambient && savedSpeed > BattleConstants.ambientMaxSpeedMultiplier) {
+        savedSpeed = BattleConstants.ambientMaxSpeedMultiplier;
+      }
+
+      // 【FEAT-531】バトル本流の開始を計測する。
+      //
+      // ここまで来ていれば Backend の出陣は成立している (charges 消費 / 日次上限の
+      // 判定は `svc.startBattle` の中)。**上限で弾かれた回は started に数えない。**
+      //
+      // 🔵 `ambient_battle_started` (FEAT-513) とは**粒度が違う** ——
+      // あちらは連戦ループ 1 run の開始で、こちらは 1 戦ごと。両立する。
+      //
+      // 🔴 送るのは **key だけ**。`enemy_name` のような表示名を足すと
+      // ロケール依存の文字列が入り、集計が ja / en で割れる (Pre-mortem #5)。
+      _lastBattleEntry = ambient ? 'ambient' : 'manual';
+      _lastBattleEnemyKey = start.enemyKey;
+      PosthogService.instance.capture('battle_started', properties: {
+        'enemy_key':        _lastBattleEnemyKey,
+        'entry':            _lastBattleEntry,
+        'speed_multiplier': savedSpeed,
+      });
 
       // 【FEAT-299】Backend `player_job` をプレイヤー Combatant に反映する。
       // null（古い Backend / 異常状態）の場合は `Job.fallback`（既存挙動互換）。
@@ -682,6 +810,23 @@ class BattleSessionNotifier extends StateNotifier<BattleSession> {
       // ホーム画面の ref.listen が「prev != next」検出 + 5 秒以内判定で
       // LiliaFloatingPanel を発火する。敗北 / 中断時は更新しない。
       final isWin = finalState.status == BattleStatus.won;
+
+      // 【FEAT-531】バトル本流の結果を計測する。
+      //
+      // 🔴 **勝敗の分岐の外に置く。** 報酬 0 の敗北パスは処理が短いので
+      // `if (isWin)` の中に書いてしまいやすいが、**敗北が測れないと
+      // 「負けた翌日また戦うか」に永久に答えられない** (Pre-mortem #4)。
+      //
+      // 🔵 **途中離脱では飛ばないのが正しい。** 戻るジェスチャ / アプリ終了 /
+      // 日次上限では `_sendFinish` 自体が走らないので `battle_started` だけが
+      // 残る。**その差分が離脱率**である (deploy_ops.md の表に明記済)。
+      PosthogService.instance.capture('battle_finished', properties: {
+        'enemy_key':    _lastBattleEnemyKey,
+        'entry':        _lastBattleEntry,
+        'result':       isWin ? 'win' : 'lose',
+        'rounds':       finalState.rounds,
+        'duration_sec': finalState.durationSec,
+      });
       // 【FEAT-511 Phase A】PostHog event 送信 (level-up / maxed)
       final mastery = res.jobMastery;
       if (mastery != null) {
@@ -738,15 +883,8 @@ class BattleSessionNotifier extends StateNotifier<BattleSession> {
         // 【FEAT-511 Phase A】Max 到達時のみジョブ名を渡す (null = 到達なし)。
         jobMasteryMaxedJobName: mastery?.maxedNow == true ? mastery!.jobName : null,
       );
-      // 【FEAT-295 hotfix 2026-05-25】Player を即時 refresh して coins/exp/battle_charges
-      // をホーム盾バッジ + ギルド画面に確実に反映する。
-      // 旧実装は `_ref.invalidate(playerNotifierProvider)` のみで、これは「次回 watch 時に
-      // 再 fetch」だけで即時実行されないため、戦闘終了後もホーム盾バッジが「✓」のまま
-      // 残るバグが発生していた。`refresh()` で強制再 fetch + FEAT-280 SWR キャッシュも
-      // invalidate して、battle_charges -1 (FEAT-403) を確実に反映する。
-      await _ref.read(playerNotifierProvider.notifier).refresh();
-      // ignore: invalid_use_of_visible_for_testing_member
-      _ref.invalidate(homeBootstrapRawProvider);
+      // 【FEAT-530】再取得はここ 1 箇所に集約した (catch 側も同じものを呼ぶ)。
+      await _refreshAfterFinish();
       // 【FEAT-439 (2026-06-17)】勝利時に EnemyListView.defeated を即時更新するため
       // enemy 一覧 (family 全体) を invalidate。次回ギルド画面で勝利済敵の弱点 chip
       // と BattlePreStartSheet の advisory が即座に表示される。
@@ -770,14 +908,52 @@ class BattleSessionNotifier extends StateNotifier<BattleSession> {
       // (RefreshIndicator.onRefresh) しないと 2/10 に更新されないバグがあった
       // (daily_battle_count は BattleStartView で既に +1 済のためサーバー側は正)。
       try {
-        await _ref.read(playerNotifierProvider.notifier).refresh();
-        // ignore: invalid_use_of_visible_for_testing_member
-        _ref.invalidate(homeBootstrapRawProvider);
+        await _refreshAfterFinish();
       } catch (_) {
         // player refresh も失敗するケース (ネットワーク完全断など) は諦めて
         // モーダルだけ出す。次回画面遷移で自然と最新化される。
       }
     }
+  }
+
+  /// 【FEAT-530 (2026-08-29)】バトル終了後の再取得。
+  ///
+  /// 🔴 **成功パスと catch の両方が呼ぶ、唯一の場所。** 以前は同じ 2 行が
+  /// `_sendFinish` の中に 2 箇所あり、成功パスだけ直して catch 側を取りこぼす
+  /// —— という形の事故が起きうる状態だった (FEAT-530 §2.1 / Pre-mortem #2)。
+  /// **足すときも減らすときも、ここ 1 箇所を触ること。**
+  ///
+  /// ## なぜ分岐なのか
+  ///
+  /// ホームが生きているときは、`invalidate` が即時再取得になり、player は
+  /// bootstrap の `'player'` から `setFromBootstrap` で入る。つまり
+  /// `GET /api/player/` は**丸ごと余る**。
+  /// 逆にホームが居ないとき、`invalidate` は再取得までは走らせるが、
+  /// `homeBootstrapControllerProvider` が誰にも listen されていないので
+  /// **player には伝わらない** —— ここでは `refresh()` が仕事をしている。
+  ///
+  /// 🔴 **どちらか一方を消すのは誤り。** 過去 2 回 (FEAT-295 hotfix /
+  /// 2026-07-05 追記) は「反映されない」を見て `refresh()` を**足す**方向で
+  /// 解決してきた。3 度目を防ぐため、**両方の文脈を縛るテスト**を
+  /// `test/battle/battle_finish_refresh_test.dart` に置いてある。
+  ///
+  /// ## 経緯 (消さないこと)
+  ///
+  /// - **FEAT-295 hotfix (2026-05-25)**: 旧実装は `invalidate(playerNotifierProvider)`
+  ///   だけで、これは「次回 watch 時に再 fetch」にしかならず、戦闘後もホーム盾
+  ///   バッジが「✓」のまま残った。ここで `refresh()` (強制再 fetch) が入り、
+  ///   `battle_charges -1` (FEAT-403) を確実に反映するようになった。
+  /// - **2026-07-05 追記**: finish が 400 で reject されるとギルド画面の
+  ///   「本日のクエスト」が 1/10 のまま止まったため、catch 側にも同じ 2 行が入った。
+  ///
+  /// ホーム不在時も `invalidate` はしておく (次にホームへ来たとき新しい値になる)。
+  Future<void> _refreshAfterFinish() async {
+    final homeIsLive = _ref.exists(homeIsLiveProvider);
+    if (!homeIsLive) {
+      await _ref.read(playerNotifierProvider.notifier).refresh();
+    }
+    // ignore: invalid_use_of_visible_for_testing_member
+    _ref.invalidate(homeBootstrapRawProvider);
   }
 
   /// 【FEAT-299】`job` 引数でジョブ駆動 modifier を Combatant に反映する。

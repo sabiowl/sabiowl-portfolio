@@ -302,7 +302,7 @@ def _apply_player_level_up_loop(battle, exp_delta: int) -> tuple[int, int]:
     while battle.current_exp >= battle.max_exp:
         battle.current_exp -= battle.max_exp
         battle.level += 1
-        battle.allocatable_points += GameBalance.ALLOCATABLE_POINTS_HABIT
+        battle.allocatable_points += GameBalance.ALLOCATABLE_POINTS_PER_LEVEL
         # 【FEAT-319】level_to_max_exp で単一真実値化、直書き禁止。
         battle.max_exp = GameBalance.level_to_max_exp(battle.level)
     return old_level, battle.level
@@ -484,8 +484,10 @@ def _apply_plus(
         # checklist 経路 (is_checklist=True) は EXP スロットル対象外 (既存挙動踏襲)。
         # ガチャ報酬経路 (_apply_reward) は本サービスを呼ばないため自動的に対象外。
         if not is_checklist:
-            base_exp_throttled, _pts, throttled_now = apply_daily_exp_throttle(
-                player, base_exp, 0,  # points_gain は HabitCountView で別管理
+            # 【FEAT-537】旧実装は pt も受け取って `_pts` で捨てていた。
+            # スロットル側から pt を外したので受け取り自体が無くなった。
+            base_exp_throttled, throttled_now = apply_daily_exp_throttle(
+                player, base_exp,
             )
             # EXP スロットル後の delta_exp を再計算
             # bonus_exp も同じ削減率適用 (1pt 固定後は bonus もほぼゼロ)

@@ -1,8 +1,7 @@
 import logging
 from datetime import timedelta
 
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.authtoken.models import Token
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -15,6 +14,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from ...models import GuestPromotePending, GuestSession, PlayerProfile, SocialAccount
+from ...services.auth_token import issue_token
 from ...services.exp_service import create_default_stats
 from ...services.seed_default import seed_new_user_defaults
 from .._error_helpers import error_response  # 【FEAT-475 Phase 3c】新形式統一
@@ -191,8 +191,8 @@ class SocialAuthView(APIView):
                 # 【BUG-67】savepoint 確定後の副作用処理。GuestSession 削除と
                 # Token 発行は savepoint 外でも問題なし（失敗しても致命的ではない）。
                 guest_session.delete()
-                token, _ = Token.objects.get_or_create(user=user)
-                return Response({'status': 'ok', 'token': token.key})
+                token_key = issue_token(user)
+                return Response({'status': 'ok', 'token': token_key})
             except IntegrityError:
                 # 【BUG-67】savepoint がロールバックされ、外側のトランザクションは
                 # 生きている → 以下の SocialAccount 検索クエリが正常実行される。
@@ -209,16 +209,16 @@ class SocialAuthView(APIView):
                         message='認証処理が競合しました。少し時間をおいて、もう一度お試しください 🪶',
                         status=409,
                     )
-                token, _ = Token.objects.get_or_create(user=existing_sa.user)
-                return Response({'status': 'ok', 'token': token.key})
+                token_key = issue_token(existing_sa.user)
+                return Response({'status': 'ok', 'token': token_key})
 
         # ────────────────────────────────────────────────────────────
         # 既存フロー: ゲストセッションなし
         # ────────────────────────────────────────────────────────────
         # ── Case 1: 既存の SocialAccount → トークン発行 ───────────
         if existing_sa:
-            token, _ = Token.objects.get_or_create(user=existing_sa.user)
-            return Response({'status': 'ok', 'token': token.key})
+            token_key = issue_token(existing_sa.user)
+            return Response({'status': 'ok', 'token': token_key})
 
         # ── Case 2: 新規ユーザー作成 ───────────────────────────────
         if email and not email_verified:
@@ -248,9 +248,9 @@ class SocialAuthView(APIView):
                     email=email or effective_email,
                 )
             # 【BUG-67】savepoint 確定後に Token 発行（失敗しても致命的ではない部分は外で実行）
-            token, _ = Token.objects.get_or_create(user=user)
+            token_key = issue_token(user)
             return Response(
-                {'status': 'new_user', 'token': token.key, 'needs_name': True},
+                {'status': 'new_user', 'token': token_key, 'needs_name': True},
                 status=201,
             )
         except IntegrityError:
@@ -258,8 +258,8 @@ class SocialAuthView(APIView):
             # ── 並列救済: 既に同 uid で先行作成済み（H-02-new）────────────────
             existing_sa = SocialAccount.objects.select_related('user').filter(provider_uid=uid).first()
             if existing_sa:
-                token, _ = Token.objects.get_or_create(user=existing_sa.user)
-                return Response({'status': 'ok', 'token': token.key})
+                token_key = issue_token(existing_sa.user)
+                return Response({'status': 'ok', 'token': token_key})
 
             # ── 【BUG-70】email 衝突時の SocialAccount rebind ─────────────────
             # User.username=email の UNIQUE 違反による IntegrityError。同 email の
@@ -296,8 +296,8 @@ class SocialAuthView(APIView):
                             'BUG-70 rebind: provider=%s user_id=%s new uid=%s',
                             provider, existing_user.id, uid,
                         )
-                        token, _ = Token.objects.get_or_create(user=existing_user)
-                        return Response({'status': 'ok', 'token': token.key})
+                        token_key = issue_token(existing_user)
+                        return Response({'status': 'ok', 'token': token_key})
 
             _logger.error(
                 'SocialAuth Case 2 IntegrityError but no existing SA for uid=%s',
@@ -321,7 +321,7 @@ class SocialAccountListView(APIView):
         "apple":  {"is_linked": bool, "email": str|null}
       }
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication]
     permission_classes     = [IsAuthenticated]
 
     def get(self, request):
@@ -354,7 +354,7 @@ class SocialLinkView(APIView):
                                       — 別プロバイダで既に連携済み（FEAT-178: 1 ユーザー 1 プロバイダ制約）
       {"error": "..."} 400/401/409  — その他のエラー
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication]
     permission_classes     = [IsAuthenticated]
 
     def post(self, request):
@@ -486,11 +486,11 @@ class SocialPromoteConfirmView(APIView):
         # pending も CASCADE で削除される
 
         # ── 既存ユーザーの認証トークン発行 ──
-        token, _ = Token.objects.get_or_create(user=target_user)
+        token_key = issue_token(target_user)
 
         return Response({
             'status': 'ok',
-            'token':  token.key,
+            'token':  token_key,
         })
 
 
@@ -519,7 +519,7 @@ class SocialUnlinkView(APIView):
     レスポンス: {token: <guest_token>, player_profile_id: <id>}
     エラー: 401 (認証なし)、404 (PlayerProfile 不在、運用ミス)
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication]
     permission_classes     = [IsAuthenticated]
 
     def post(self, request):

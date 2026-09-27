@@ -2,7 +2,8 @@
 
 ファーミング防止のための 2 軸制限:
   1. EXP スロットル: 経路 1-2 (習慣 +1 / ToDo / タイムライン予定完了) で
-     1 日 25 件超過後の経路 EXP / 配分 pt を 1pt 固定に削減。
+     1 日 25 件超過後の経路 EXP を 1 に削減。
+     【FEAT-537 (2026-08-29)】配分 pt の削減は廃止した (下記)。
   2. バトル出陣上限: 経路 4 (BattleStartView) で 1 日 10 回超過後の出陣を拒否。
 
 両者は独立カウンタ。ガチャ報酬 (経路 3) は対象外。
@@ -23,21 +24,31 @@ from ..constants import (
 )
 
 
-def apply_daily_exp_throttle(player, exp_gain: int, points_gain: int):
-    """EXP / 配分 pt を日次閾値で削減し、daily_exp_count を更新して保存する。
+def apply_daily_exp_throttle(player, exp_gain: int):
+    """EXP を日次閾値で削減し、daily_exp_count を更新して保存する。
 
     caller は select_for_update() ロック済みの player を渡すこと (Pre-mortem #2)。
     【FEAT-478 Phase 2b】battle state への書込と保存を本関数内で完結する。
 
+    【FEAT-537 (2026-08-29)】旧実装は配分 pt も同時に 1 へ落としていたが、
+    引数と戻り値から外した。**レベルアップ回数はすでに EXP 収入で律速されて
+    おり** (EXP を絞ればレベルアップも減る)、その上で 1 回あたりの pt まで
+    絞るのは二重に効かせる形だった。
+
+    実際、習慣経路 (`habit_count_service`) は戻り値の pt を `_pts` で捨てて
+    おり、pt のスロットルは **実質タイムライン経路にしか効いていなかった**
+    —— 経路差の温存でもあった。
+
+    ⚠️ **EXP 側の閾値・挙動は 1 つも変えていない。** ファーミング防止の本体は
+    こちらである。
+
     Args:
         player: PlayerProfile インスタンス (ロック済み)
         exp_gain: 削減前の EXP 付与量
-        points_gain: 削減前の 配分 pt 付与量
 
     Returns:
-        (exp_gain, points_gain, throttled_now):
-            exp_gain:     削減後 EXP (閾値前は不変、閾値後は 1pt 固定)
-            points_gain:  削減後 pt  (同上)
+        (exp_gain, throttled_now):
+            exp_gain:      削減後 EXP (閾値前は不変、閾値後は 1 固定)
             throttled_now: 今回の処理で初めて閾値 (26 件目) に達した場合 True
                            (Flutter 側でサビ口調 SnackBar を 1 回表示するためのシグナル)
     """
@@ -54,12 +65,11 @@ def apply_daily_exp_throttle(player, exp_gain: int, points_gain: int):
         # 閾値到達直後 (== LIMIT が 25 件目が終了して 26 件目に入る瞬間) のみ True
         if battle.daily_exp_count == DAILY_EXP_THROTTLE_LIMIT:
             throttled_now = True
-        exp_gain    = DAILY_EXP_THROTTLED_VALUE  # 1pt 固定
-        points_gain = DAILY_EXP_THROTTLED_VALUE
+        exp_gain = DAILY_EXP_THROTTLED_VALUE  # 1 固定
 
     battle.daily_exp_count += 1
     battle.save(update_fields=['daily_exp_count', 'daily_exp_count_date'])
-    return exp_gain, points_gain, throttled_now
+    return exp_gain, throttled_now
 
 
 def check_daily_battle_limit(player):

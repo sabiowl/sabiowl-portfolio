@@ -9,7 +9,7 @@ from django.utils import timezone  # BUG-A: サーバー TZ ではなく JST 基
 
 _logger = logging.getLogger(__name__)
 
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -215,8 +215,90 @@ def get_sabi_message(player, today_summary: dict, nonce: str = '', locale: str =
     return pool[seed % len(pool)] if pool else ''
 
 
+def period_summary(player, *, total: int | None = None) -> dict:
+    """【BUG-145】`frequency` の期間で「達成済み」を数えた summary を返す。
+
+    `get_sabi_message` に渡す用。`today_summary()` を渡してはいけない。
+
+    ## なぜ分けるか (実際に起きたこと)
+
+    `today_summary()` は **今日 1 日** の `HabitLog` しか見ない。一方で習慣カードの
+    完了表示は **`frequency` の期間** で判定している
+    (`HabitSerializer.get_period_done`、FEAT-520)。このため
+
+        週次習慣を月曜に達成 → 火曜以降もカードは「完了」
+                             → サビは completed=0 を見て `home.none_done` を選ぶ
+
+    となり、**同じ習慣をカードは「完了」・サビは「達成ゼロ」と読む**状態だった。
+    ユーザーは 2026-06-26 にこれに気付き、`home_none_done` プールを admin から
+    一括無効化して抑えようとしたが、DB が空のプールは YAML にフォールバックする
+    ため日本語では効かず、**英語だけが日本語に落ちる** 2 次症状を生んだ。
+
+    ## 判定条件
+
+    `get_period_done` と **同一** (`count > 0` の日が期間内に 1 日以上)。
+    ToDo (`habit_type='todo'`) は `frequency` に関わらず `daily` 扱いにする点も
+    揃えている。条件が 2 箇所に分かれると必ずずれるため、期間の起点は
+    `serializers.get_period_start` を経由すること。
+
+    ## 戻り値の意味
+
+    `completed == total` は「**すべての習慣が、それぞれの周期の中で達成済み**」。
+    日次習慣のみのユーザー (大多数) では `today_summary()` と一致するため、
+    **挙動は変わらない**。
+
+    `total` は呼び出し側が既に数えている場合に渡せる (ホーム bootstrap は
+    `active_habits.count()` を先に持っているため、重複クエリを避ける)。
+    """
+    # serializers は models と service しか import しないため循環しない。
+    from ..serializers import get_period_start
+
+    today  = timezone.localdate()
+    active = Habit.objects.filter(player=player, is_active=True)
+
+    # ToDo は「1 回やって終わり」の単発タスクなので frequency を持たない扱い
+    # (get_period_count / get_period_done と同じ)。daily バケットへ寄せる。
+    #
+    # 【2026-08-16 機能レビュー P2】初版は 3 バケットを別々に COUNT していたが、
+    # 「期間の起点が違うだけの同じ COUNT」なので **OR 1 本に畳める**。
+    # ホーム bootstrap は起動時に必ず叩かれるので 3 本 → 1 本の差は効く。
+    #
+    # 3 バケットは相互排他かつ全 habit を覆う (todo は daily のみ、
+    # 非 todo は frequency ちょうど 1 つ)。この排他性が崩れると `distinct()` が
+    # 効いていても **バケット間**で二重計上が起きるため、
+    # `test_buckets_are_mutually_exclusive_and_total` で明示的に縛っている。
+    is_todo = Q(habit__habit_type='todo')
+    in_period = (
+        (is_todo & Q(date__gte=get_period_start(today, 'daily')))
+        | (~is_todo & Q(habit__frequency='daily',
+                        date__gte=get_period_start(today, 'daily')))
+        | (~is_todo & Q(habit__frequency='weekly',
+                        date__gte=get_period_start(today, 'weekly')))
+        | (~is_todo & Q(habit__frequency='monthly',
+                        date__gte=get_period_start(today, 'monthly')))
+    )
+
+    completed = (
+        HabitLog.objects
+        .filter(in_period, habit__in=active, count__gte=1, date__lte=today)
+        .values('habit_id')
+        .distinct()
+        .count()
+    )
+
+    return {
+        'completed': completed,
+        'total':     active.count() if total is None else total,
+    }
+
+
 def today_summary(player) -> dict:
-    """BUG-10: 同一条件の重複クエリを DB 集計 1本に統合（クエリ数: 3→2）"""
+    """BUG-10: 同一条件の重複クエリを DB 集計 1本に統合（クエリ数: 3→2）
+
+    【BUG-145】**サビのプール選択には使わないこと** (`period_summary` を使う)。
+    本関数は「今日 1 日」の実績で、`/api/player/` の `today_summary` が
+    その意味で公開している値。
+    """
     today         = timezone.localdate()
     active_habits = Habit.objects.filter(player=player, is_active=True)
     total         = active_habits.count()
@@ -258,7 +340,7 @@ def _apply_greeting(message: str, time_segment: str, locale: str = 'ja') -> str:
 
 # ── SabiMessageView ───────────────────────────────────────────────────────
 class SabiMessageView(PlayerMixin, APIView):
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -348,7 +430,9 @@ class SabiMessageView(PlayerMixin, APIView):
         # 【FEAT-424 (2026-06-11)】休息日チェック（最優先判定）は廃止。
         # RestDay table は既存データ参照用に残置するが、sabi メッセージへの
         # 反映は機能停止する。
-        summary = today_summary(player)
+        # 【BUG-145】今日 1 日ではなく frequency の期間で達成を数える
+        # (ホーム bootstrap 側と同じ判定にする)。
+        summary = period_summary(player)
         message = _apply_greeting(
             get_sabi_message(player, summary, nonce=nonce, locale=locale),
             time_segment,

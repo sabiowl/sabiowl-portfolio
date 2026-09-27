@@ -7,10 +7,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/calendar_models.dart';
 import '../providers/calendar_provider.dart';
-import '../../habits/models/habit.dart' show HabitReward;
+import '../../habits/providers/apply_completion_result.dart';
 import '../../habits/providers/habits_provider.dart';
-import '../../social/models/social_models.dart';  // 【FEAT-452】FriendGiftCandidate
-import '../../social/providers/social_provider.dart';  // 【FEAT-452】friendGiftCandidateProvider
 // 【FEAT-220】Calendar provider 統合: timelineEventsProvider を invalidate 対象に追加
 import '../../timeline/providers/timeline_provider.dart'
     show timelineServiceProvider, timelineEventsProvider;
@@ -107,19 +105,11 @@ class _DailyTaskCardState extends ConsumerState<DailyTaskCard> {
         final reward = await ref
             .read(timelineServiceProvider)
             .completeEventWithReward(item.id);
-        if (reward.expGain > 0) {
-          ref.read(rewardToastProvider.notifier).state = HabitReward(
-            expGain:       reward.expGain,
-            bonusExp:      0,
-            diamondEarned: reward.diamondEarned,
-          );
-        }
-        // 【FEAT-452 (2026-06-20)】当日 3 回目のタスク達成でフレンドプレゼント
-        // popup 候補 (カレンダー daily_task_section 経路、3 経路統一)
-        if (reward.friendGiftCandidate != null) {
-          ref.read(friendGiftCandidateProvider.notifier).state =
-              FriendGiftCandidate.fromJson(reward.friendGiftCandidate!);
-        }
+        // 【BUG-150 (2026-08-29)】レスポンス → provider の配線は共有関数 1 箇所。
+        // 🔴 旧実装はトーストとフレンドギフトの 2 つしか拾っておらず、
+        // **ログインボーナスとかけらを落としていた** —— どちらも Backend では
+        // 配布済みなので、カレンダーから初回達成した日は二度と出なかった。
+        applyTimelineReward(ref.read, reward);
         // 【FEAT-419 (2026-06-10)】予定時刻 ±15 分以内ボーナスの SnackBar 通知
         if (mounted) {
           final message = reward.onTimeBonusAwarded
@@ -158,6 +148,8 @@ class _DailyTaskCardState extends ConsumerState<DailyTaskCard> {
   }
 
   Future<void> _toggleTodo(DailyTodo todo) async {
+    // 【BUG-150】await をまたぐので l10n は先に capture する (FEAT-489 Phase 2E)。
+    final l10n = AppLocalizations.of(context)!;
     final isDone = _isTodoDone(todo);
     setState(() {
       if (isDone) {
@@ -184,18 +176,12 @@ class _DailyTaskCardState extends ConsumerState<DailyTaskCard> {
         final result = await ref
             .read(habitsServiceProvider)
             .incrementCount(todo.id, prevLevel: prevLevel);
-        if (result.expGain > 0) {
-          ref.read(rewardToastProvider.notifier).state = HabitReward(
-            expGain:       result.expGain,
-            bonusExp:      result.bonusExp,
-            diamondEarned: result.diamondEarned,
-          );
-        }
-        if (result.leveledUp) {
-          ref.read(levelUpNotifierProvider.notifier).state = result.newLevel;
-          ref.read(levelUpAutoAllocationsProvider.notifier).state =
-              result.autoAllocations;
-        }
+        // 【BUG-150 (2026-08-29)】同上。旧実装はトーストとレベルアップの
+        // 2 つしか拾っておらず、**ログインボーナス / かけら / 月次チケット /
+        // フレンドギフト / 結晶 / 復帰 / 自動シールド / streak 系を全部
+        // 落としていた**。habitsServiceProvider の直呼び自体は BUG-56 の
+        // 回避策として正しいので、配線だけを共有関数に寄せる。
+        await applyHabitLogResult(ref.read, result, l10n: l10n);
       }
       // 【FEAT-220】Calendar provider 統合: bootstrap + timelineEvents に統一
       ref.invalidate(calendarBootstrapProvider);

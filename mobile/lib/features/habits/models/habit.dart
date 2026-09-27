@@ -1,5 +1,6 @@
 // 【FEAT-205】`TimeOfDay` の import は `dueTime` 削除に伴い不要化、撤去済み。
 import '../../../l10n/app_localizations.dart';
+import 'player.dart';  // 【FEAT-524 Phase 2】HabitLogResult.player
 
 // チェックリストアイテム（API: text / is_done）
 class ChecklistItem {
@@ -498,6 +499,18 @@ class HabitLogResult {
   /// PuzzlePieceOverlayModal を発火する。keys: {piece_index, new_state=1, scene_key}
   final Map<String, dynamic>? puzzlePieceAwarded;
 
+  /// 【FEAT-524 Phase 2 (2026-08-08)】POST が返した**確定済みの** player。
+  ///
+  /// `POST /habits/<id>/count/` も checklist toggle も、レスポンスに
+  /// `PlayerProfileSerializer` の全体を含んでいる (`habits.py:646` / `:852`)。
+  /// 従来はここから `level` だけ抜いて残りを捨て、直後に
+  /// `invalidate(playerNotifierProvider)` で **同じ player を取り直して**いた。
+  ///
+  /// 本 field を持たせて `setFromBootstrap` に流すことで `GET /player/` が 1 本消える。
+  /// 旧 Backend / player を返さない経路 (minus) では null になり、
+  /// 呼び出し側は従来どおり invalidate にフォールバックする。
+  final Player? player;
+
   const HabitLogResult({
     required this.habit,
     required this.diamondEarned,
@@ -517,6 +530,7 @@ class HabitLogResult {
     this.todayLoginBonus,                          // 【BUG-122】
     this.friendGiftCandidate,                      // 【FEAT-452】
     this.puzzlePieceAwarded,                       // 【FEAT-479】
+    this.player,                                   // 【FEAT-524 Phase 2】
   });
 
   /// 【BUG-137 (2026-06-17)】race ガード追加: `prevLevel > 0` を必須化。

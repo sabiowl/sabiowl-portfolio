@@ -32,7 +32,7 @@ import secrets
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from ...authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -141,7 +141,7 @@ class BattleStartView(PlayerMixin, APIView):
     # の対応漏れ修正。バトル系 4 View (BattleStartView / BattleFinishView /
     # BattleLogListView / EnemyListView) を IsAuthenticated → IsAuthenticatedOrGuest に。
     # PlayerMixin.get_player() は既にゲスト対応済 (request.auth.player_profile 経路)。
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes = [IsAuthenticatedOrGuest]
 
     def post(self, request):
@@ -412,7 +412,14 @@ class BattleStartView(PlayerMixin, APIView):
             'token': token,
             'enemy': {
                 'key':        enemy.key,
-                'name':       enemy.name,
+                # 【2026-08-09 修正】locale 解決が抜けていた。掲示板 (EnemyListView)
+                # は get_i18n_field で英語化していたのに本 view だけ生の `enemy.name`
+                # を返しており、**英語 UI で「掲示板は Dark Knight → タップすると
+                # 闇の騎士」**という断絶が起きていた (バトル画面のネームプレートと
+                # ダメージログの両方が日本語)。すぐ下の L431 `player_job` は同じ
+                # request.locale を渡せていたので、同一レスポンス辞書の中での
+                # 付け忘れ。`key` は Mobile 側の switch key なので locale 非依存のまま。
+                'name':       get_i18n_field(enemy, 'name', getattr(request, 'locale', 'ja')),
                 'sprite_key': enemy.sprite_key,
                 'hp':         scaled_hp,
                 'atk':        scaled_atk,

@@ -1,17 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 // 【FEAT-498 §2.4 (2026-07-31)】旧 shared_preferences 依存
 // (_checkFreeMemoMonthlyPrompt) は memo_page.dart に移設したため import 撤去。
 
-import '../../../core/constants/preferences_keys.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/router/app_router.dart';
-import '../../../core/services/popup_serializer.dart';
-import '../../../shared/widgets/backup_prompt_sheet.dart';
-import '../../../shared/widgets/level_up_dialog.dart';
 import '../../../shared/widgets/reward_toast.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../../auth/services/onboarding_service.dart';
 import '../../battle/providers/battle_provider.dart';
 import '../../challenge/models/challenge.dart';  // 【20260729 v1.0.5】PendingChallengeReward
@@ -25,7 +18,6 @@ import 'home_notification_prompt_controller.dart';
 import '../providers/completion_effect_provider.dart';
 import '../providers/habits_provider.dart';
 import '../widgets/light_beam_overlay.dart';
-import '../widgets/login_bonus_calendar_dialog.dart';
 
 /// 【FEAT-473 Phase 1 (2026-07-03)】ホーム画面の ref.listen を集約したラッパー。
 ///
@@ -123,63 +115,14 @@ class _HomeListenersState extends ConsumerState<HomeListeners> {
       },
     );
 
-    // ── 【BUG-122】ログインボーナス → 7 日カレンダーダイアログ ─────────────
-    ref.listen<Map<String, dynamic>?>(pendingLoginBonusProvider, (_, bonus) {
-      if (bonus == null) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        await PopupSerializer.enqueueShowDialog<void>(
-          context: context,
-          barrierDismissible: true,
-          builder: (_) => LoginBonusCalendarDialog(bonus: bonus),
-        );
-        if (!mounted) return;
-        ref.read(pendingLoginBonusProvider.notifier).state = null;
-        ref.read(playerNotifierProvider.notifier).refresh();
-      });
-    });
-
-    // ── レベルアップ検知 → ダイアログ表示 ──────────────────────────────
-    ref.listen<int?>(levelUpNotifierProvider, (_, newLevel) {
-      if (newLevel == null) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        final autoAllocs      = ref.read(levelUpAutoAllocationsProvider);
-        final crystalsAwarded = ref.read(levelUpCrystalsProvider);
-        final wantStats = await LevelUpDialog.show(
-          context,
-          newLevel,
-          autoAllocations: autoAllocs,
-          crystalsAwarded: crystalsAwarded,
-        );
-        if (!mounted) return;
-        ref.read(levelUpNotifierProvider.notifier).state = null;
-        ref.read(levelUpAutoAllocationsProvider.notifier).state = const {};
-        ref.read(levelUpCrystalsProvider.notifier).state = const {};
-        // 【BUG-65】dialog dispose 完了 (150ms transitionDuration + マージン) を
-        // 待ってから navigation することで defunct freeze を構造的に解消。
-        if (wantStats == true) {
-          await Future.delayed(const Duration(milliseconds: 300));
-          if (!context.mounted) return;
-          context.push(AppRoutes.stats);
-          return;
-        }
-        if (kBackupSheetMilestoneLevels.contains(newLevel)) {
-          final isGuest = ref.read(isGuestModeProvider).valueOrNull ?? false;
-          if (isGuest && await shouldShowBackupPromptSheet(newLevel)) {
-            await markBackupPromptSheetShown(newLevel);
-            await Future.delayed(const Duration(milliseconds: 300));
-            if (!context.mounted) return;
-            await showModalBottomSheet<void>(
-              context:            context,
-              backgroundColor:    Colors.transparent,
-              isScrollControlled: true,
-              builder: (_) => const BackupPromptSheet(),
-            );
-          }
-        }
-      });
-    });
+    // 🔴 【BUG-150 (2026-08-29)】ログインボーナス / レベルアップの listener は
+    // `core/widgets/app_popup_listeners.dart` に**移設した**。
+    //
+    // ここ (HomePage の中) に置いていたせいで、素の ShellRoute がタブ切替で
+    // HomePage を unmount する → `ref.listen` は edge-triggered なので
+    // **カレンダータブから達成しても祝われない**状態だった。
+    //
+    // ⚠️ **戻さないこと。** 両方に置くと二重発火する。
 
     // ── コンバック通知（休息日なのに習慣を達成）─────────────────────────
     ref.listen<bool>(comebackNotifierProvider, (_, isComeback) {

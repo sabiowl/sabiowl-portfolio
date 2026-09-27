@@ -5,7 +5,7 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from django.db.models import Prefetch
 from django.utils import timezone
-from rest_framework.authentication import TokenAuthentication
+from ..authentication import ExpiringTokenAuthentication  # 【BUG-163】DRF 素の ExpiringTokenAuthentication は停止検査も期限も持たない
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -21,7 +21,9 @@ from ..services.daily_throttle_service import (
     reset_daily_battle_count_if_new_day,
 )
 from .mixins import PlayerMixin
-from .sabi import CONTEXT_EMOTION_MAP, _apply_greeting, get_sabi_message
+from .sabi import (  # 【BUG-145】period_summary を追加
+    CONTEXT_EMOTION_MAP, _apply_greeting, get_sabi_message, period_summary,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ class HomeBootstrapView(PlayerMixin, APIView):
         "free_memo_count": 0     # 【FEAT-493 + BUG-141】未 archive フリーメモ件数
     }
     """
-    authentication_classes = [TokenAuthentication, GuestTokenAuthentication]
+    authentication_classes = [ExpiringTokenAuthentication, GuestTokenAuthentication]
     permission_classes = [IsAuthenticatedOrGuest]
 
     def get(self, request):
@@ -199,11 +201,16 @@ class HomeBootstrapView(PlayerMixin, APIView):
         time_segment = request.query_params.get('time_segment', '')
         sabi_message_data = None
         if time_segment:
-            sabi_today_summary = {
-                'completed': today_completed,
-                'total':     total,
-                'exp_today': total_exp_today,
-            }
+            # 【BUG-145】今日 1 日ではなく frequency の期間で達成を数える。
+            #
+            # 旧: `{'completed': today_completed, 'total': total}` を渡していた。
+            # `today_completed` は今日の HabitLog のみを数えるため、週次 / 月次
+            # 習慣を今日以外に達成したユーザーは **その周期のあいだずっと
+            # 「達成ゼロ」扱い**になり、習慣カードの完了表示 (`period_done`) と
+            # 食い違っていた。`total` は既に数えてあるので渡して重複クエリを避ける。
+            #
+            # `exp_today` は `get_sabi_message` が参照しないため渡さない。
+            sabi_today_summary = period_summary(player, total=total)
             # 【FEAT-489 Phase 4 hotfix (2026-08-02)】locale を渡す。
             #
             # FEAT-484 でホーム画面のサビセリフ取得が SabiMessageView から本
@@ -254,7 +261,11 @@ class HomeBootstrapView(PlayerMixin, APIView):
         # best-effort: 例外は握り潰して Home 表示は継続 (Sabi 哲学「押し付けない」)。
         pending_challenge_rewards: list[dict] = []
         try:
-            pending_challenge_rewards = grant_pending_rewards(player)
+            # 【2026-08-11】locale を渡す。ここが既定 'ja' のままだと
+            # 「Challenge 画面では英語 / Home の SnackBar では日本語」になる。
+            pending_challenge_rewards = grant_pending_rewards(
+                player, locale=getattr(request, 'locale', 'ja'),
+            )
         except Exception as exc:
             _logger.warning(
                 'HomeBootstrapView: grant_pending_rewards failed (best-effort continue): %s',

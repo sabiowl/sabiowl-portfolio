@@ -9,6 +9,7 @@ import '../api/api_client.dart';
 import '../constants/app_urls.dart';
 import '../providers/connection_error_provider.dart';
 import '../providers/maintenance_provider.dart';
+import '../providers/rate_limit_provider.dart';
 import '../theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -69,13 +70,18 @@ class _ConnectionErrorScreenState extends ConsumerState<_ConnectionErrorScreen> 
   /// 200 なら connection error を clear、それ以外は state 維持。
   /// 同時に `/api/maintenance/` も確認し、maintenance が ON に変わっていたら
   /// MaintenanceOverlay に遷移させる。
+  ///
+  /// 【BUG-147 Phase C (2026-08-20)】**`probeDio` を使う** (認証インターセプタ
+  /// 非経由)。旧実装は古いトークンをそのまま送っていたため、**何度押しても
+  /// 同じ 401 が返る**——脱出のためのボタンが脱出できない原因そのものを
+  /// 再現していた。
   Future<void> _onRetry() async {
     if (_retrying) return;
     setState(() => _retrying = true);
 
     final apiClient = ref.read(apiClientProvider);
     try {
-      final response = await apiClient.dio.get(
+      final response = await apiClient.probeDio.get(
         '/health/',
         options: Options(
           receiveTimeout: const Duration(seconds: 10),
@@ -83,7 +89,19 @@ class _ConnectionErrorScreenState extends ConsumerState<_ConnectionErrorScreen> 
           validateStatus: (_) => true,
         ),
       );
-      if (response.statusCode == 200) {
+      // 【BUG-158 (2026-09-12)】429 ならレート制限画面に引き渡す。
+      //
+      // 🔴 旧実装はここで state を保持していた。つまり**枠を使い切って出た
+      // 画面が、押すたびに枠をもう 1 本消費する**——脱出のためのボタンが
+      // 脱出を妨げているものを増やしていた。BUG-147 Phase C が 401 で
+      // 解いたのとまったく同じ形である。
+      if (response.statusCode == 429) {
+        ref.read(rateLimitProvider.notifier).mark(
+              parseRetryAfter(response.headers.value('retry-after')),
+            );
+        // 通信は生きていたので「通信できませんでした」は下ろす。
+        ref.read(connectionErrorProvider.notifier).clear();
+      } else if (response.statusCode == 200) {
         // Backend 到達可能。maintenance 状態も更新して maintenance が ON なら
         // MaintenanceOverlay に遷移させる。
         final status = await ref.read(maintenanceServiceProvider).fetchStatus();

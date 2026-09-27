@@ -68,6 +68,10 @@ class SabiMessage(models.Model):
         default=True,
         db_index=True,
         verbose_name='有効',
+        # 【BUG-145】本 help_text は「プール内の最後の 1 行を OFF にした場合」
+        # には成り立たない (active 0 件のプールは YAML の初期値に戻る)。
+        # 注意書きは `SabiMessageAdmin` の fieldset description に置いた
+        # —— help_text を変えると AlterField migration が発生するため。
         help_text='OFF にすると本セリフは出現しなくなる (削除せず一時無効化したい時)',
     )
     sort_order = models.IntegerField(

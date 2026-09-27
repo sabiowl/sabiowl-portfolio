@@ -1,9 +1,21 @@
 """【FEAT-408 (2026-06-01)】PostHog イベント capture の契約テスト 5 シナリオ。
 
 テスト方針:
-  - `requests.post` を `unittest.mock.patch` で mock し、実際の HTTP 送信は行わない
+  - `_session.post` を `unittest.mock.patch` で mock し、実際の HTTP 送信は行わない
   - `POSTHOG_API_KEY` 環境変数の有無で no-op / capture を切り替える動作を確認
   - 各イベントの発火タイミング・プロパティ内容を縛る
+
+【FEAT-524 Phase 1 (2026-08-08) による改修】
+  capture() の送信が `transaction.on_commit` 経由になった。`TestCase` は既定で
+  on_commit を実行しないため、**本ファイルの「capture が呼ばれる」系は
+  `self.captureOnCommitCallbacks(execute=True)` で包まないと黙って緑になる**
+  (= 実装を消しても通る)。FEAT-524 Pre-mortem #1 が想定した回帰そのものなので、
+  該当する 4 件 (A2 / B / D / E) を包んだ。
+  「呼ばれない」系 (A / C / E2) も、包んだうえで呼ばれないことを見ないと
+  検証が空になるため同様に包んでいる。
+
+  patch 先も `requests.post` → `_session.post` に変わっている
+  (Session 再利用のため。patch 先を直さないと**実際に外部 HTTP が飛ぶ**)。
 
 カバー範囲:
   シナリオ A: POSTHOG_API_KEY 未設定 → no-op (HTTP 送信なし)
@@ -52,21 +64,29 @@ _TEST_RF_OVERRIDE = {
 class PostHogCaptureNoopTest(TestCase):
     """capture() の no-op 保証テスト。"""
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_A_no_api_key_is_noop(self, mock_post):
-        """POSTHOG_API_KEY 未設定 → requests.post が呼ばれない。"""
+        """POSTHOG_API_KEY 未設定 → 送信が呼ばれない。
+
+        【FEAT-524】on_commit を実行させたうえで呼ばれないことを見る。
+        包まないと「on_commit が走っていないから呼ばれていないだけ」と区別できない。
+        """
         # 環境変数を確実に空にする
         with patch.dict(os.environ, {'POSTHOG_API_KEY': ''}, clear=False):
-            capture('test_event', 'player_1', {'key': 'value'})
+            with self.captureOnCommitCallbacks(execute=True):
+                capture('test_event', 'player_1', {'key': 'value'})
 
         mock_post.assert_not_called()
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_A2_api_key_set_sends_request(self, mock_post):
-        """POSTHOG_API_KEY 設定済み → requests.post が呼ばれる。"""
+        """POSTHOG_API_KEY 設定済み → コミット後に送信される。"""
         mock_post.return_value = MagicMock(status_code=200)
         with patch.dict(os.environ, {'POSTHOG_API_KEY': 'phc_test_key'}, clear=False):
-            capture('test_event', 'player_42', {'foo': 'bar'})
+            with self.captureOnCommitCallbacks(execute=True):
+                capture('test_event', 'player_42', {'foo': 'bar'})
+                # 【FEAT-524】ブロック内 = コミット前は、まだ送信されていない
+                mock_post.assert_not_called()
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args
@@ -102,17 +122,20 @@ class DailyExpThrottlePostHogTest(APITestCase):
             category='運動', difficulty='easy', frequency='daily', habit_type='count',
         )
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_B_throttle_reached_first_time_captures(self, mock_post):
         """daily_exp_count=25 → 習慣 +1 で throttled_now=True → capture 呼び出し。
 
         POSTHOG_API_KEY が設定されていない場合は no-op のため、API キーをモック設定。
         """
         with patch.dict(os.environ, {'POSTHOG_API_KEY': 'phc_test_key'}, clear=False):
-            res = self.client.post(
-                reverse('habit-count', args=[self.habit.pk]),
-                data={'action': 'plus'}, format='json',
-            )
+            # 【FEAT-524】送信は on_commit 経由。包まないと mock_post が呼ばれず、
+            # 「実装を消しても緑」の状態になる (Pre-mortem #1)。
+            with self.captureOnCommitCallbacks(execute=True):
+                res = self.client.post(
+                    reverse('habit-count', args=[self.habit.pk]),
+                    data={'action': 'plus'}, format='json',
+                )
         self.assertEqual(res.status_code, 200, res.content)
         # throttle_reached 時に capture が呼ばれたことを確認
         # (diamond_service の capture も呼ばれる可能性があるため、最低 1 回は呼ばれる)
@@ -131,7 +154,7 @@ class DailyExpThrottlePostHogTest(APITestCase):
         )
         self.assertTrue(any_throttle, '`daily_exp_throttle_reached` イベントが capture されるべき')
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_C_throttle_already_active_does_not_capture(self, mock_post):
         """daily_exp_count=26 (既にスロットル超過) → throttled_now=False → throttle_reached は capture しない。"""
         # 26 件目以降は throttled_now=False
@@ -139,10 +162,12 @@ class DailyExpThrottlePostHogTest(APITestCase):
         self.player.save()
 
         with patch.dict(os.environ, {'POSTHOG_API_KEY': 'phc_test_key'}, clear=False):
-            self.client.post(
-                reverse('habit-count', args=[self.habit.pk]),
-                data={'action': 'plus'}, format='json',
-            )
+            # 【FEAT-524】「呼ばれない」側も on_commit を実行させてから見る
+            with self.captureOnCommitCallbacks(execute=True):
+                self.client.post(
+                    reverse('habit-count', args=[self.habit.pk]),
+                    data={'action': 'plus'}, format='json',
+                )
 
         # daily_exp_throttle_reached が capture されていないことを確認
         any_throttle = any(
@@ -182,11 +207,13 @@ class DailyBattleLimitPostHogTest(APITestCase):
             },
         )
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_D_battle_limit_reached_captures(self, mock_post):
         """daily_battle_count=10 → 出陣試行 → 403 + daily_battle_limit_reached capture。"""
         with patch.dict(os.environ, {'POSTHOG_API_KEY': 'phc_test_key'}, clear=False):
-            res = self.client.post(reverse('battle-start'))
+            # 【FEAT-524】送信は on_commit 経由 (Pre-mortem #1)
+            with self.captureOnCommitCallbacks(execute=True):
+                res = self.client.post(reverse('battle-start'))
 
         self.assertEqual(res.status_code, 403, res.content)
         self.assertEqual(error_code(res), 'daily_battle_limit_reached')
@@ -212,12 +239,14 @@ class DiamondEarnedPostHogTest(TestCase):
             user=self.user, name='DiamondTest', diamonds=0,
         )
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_E_diamond_earned_captures_on_battle_win(self, mock_post):
         """award_diamond_for_battle_win が True を返す → diamond_earned イベントが capture される。"""
         today = timezone.localdate()
         with patch.dict(os.environ, {'POSTHOG_API_KEY': 'phc_test_key'}, clear=False):
-            result = award_diamond_for_battle_win(self.player, today)
+            # 【FEAT-524】送信は on_commit 経由 (Pre-mortem #1)
+            with self.captureOnCommitCallbacks(execute=True):
+                result = award_diamond_for_battle_win(self.player, today)
 
         self.assertTrue(result, '初回バトル勝利でダイヤ付与されるべき')
 
@@ -237,7 +266,7 @@ class DiamondEarnedPostHogTest(TestCase):
                 self.assertGreater(props.get('amount', 0), 0)
                 break
 
-    @patch('api.services.posthog_capture.requests.post')
+    @patch('api.services.posthog_capture._session.post')
     def test_E2_no_capture_on_skip(self, mock_post):
         """award_diamond_for_battle_win が False を返す (既付与) → capture なし。"""
         today = timezone.localdate()
@@ -246,7 +275,9 @@ class DiamondEarnedPostHogTest(TestCase):
         self.player.save()
 
         with patch.dict(os.environ, {'POSTHOG_API_KEY': 'phc_test_key'}, clear=False):
-            result = award_diamond_for_battle_win(self.player, today)
+            # 【FEAT-524】「呼ばれない」側も on_commit を実行させてから見る
+            with self.captureOnCommitCallbacks(execute=True):
+                result = award_diamond_for_battle_win(self.player, today)
 
         self.assertFalse(result, '既付与 → False を返すべき')
         # 既付与の場合は capture が呼ばれない

@@ -175,6 +175,7 @@ def award_job_mastery(player, battle, result: str) -> dict | None:
         'exp_gained':     exp_gain,
         'level':          mastery.level,
         'exp':            mastery.exp,
+        # 🔴 総量であって残量ではない (views/job_mastery.py の注記参照)。
         'exp_to_next':    (calc_job_mastery_exp_to_next(mastery.level)
                            if mastery.level < JOB_MASTERY_MAX_LEVEL else 0),
         'is_maxed':       mastery.is_maxed,

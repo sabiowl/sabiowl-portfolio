@@ -4,6 +4,13 @@
 // タイムライン自動登録 / ステータス順固定) で完成形に整備したオンボーディング体験を
 // 自動検証する 6 シナリオ。
 //
+// 🔴 【FEAT-542 (2026-09-23)】**行き先はここで確かめないこと。**
+//
+// 本ファイルは自前の `GoRouter` を組んでおり `redirect` を持たない。
+// そのため BUG-161（完了後にログイン画面へ弾かれる）を**緑のまま見逃した**。
+// 🔵 ここが守るのは**画面の中の挙動**（ガード SnackBar / 戻る / 非活性）で、
+// **経路は `test/onboarding_lands_on_home_test.dart` が本物のルーターで縛る。**
+//
 // テストカバレッジ:
 //   1. ゲスト経路で全 6 ステップを完走 → /home へ遷移
 //   2. 性別未選択で「次へ」→ SnackBar 警告
@@ -53,17 +60,9 @@ class _FakeHttpAdapter implements HttpClientAdapter {
       'content-type': ['application/json'],
     };
 
-    // ── /auth/guest-init/ ────────────────────────────────────────
-    if (options.path == '/auth/guest-init/' && options.method == 'POST') {
-      return ResponseBody.fromString(
-        jsonEncode({
-          'token': 'fake_guest_token_xyz',
-          'player_profile': {'id': 1, 'name': 'guest'},
-        }),
-        200,
-        headers: headers,
-      );
-    }
+    // ⛔ 【FEAT-542】`/auth/guest-init/` の応答は**用意しない**。
+    //    オンボーディングはもうトークンを作らない ——
+    //    ここに応答を置くと、迂回が戻ってきても気づけなくなる。
 
     // ── /player/ PATCH ───────────────────────────────────────────
     if (options.path == '/player/' && options.method == 'PATCH') {
@@ -102,8 +101,8 @@ class _FakeHttpAdapter implements HttpClientAdapter {
 // FlutterSecureStorage モック（MethodChannel レベル）
 // ─────────────────────────────────────────────────────────────────────────────
 
-void _installSecureStorageMock() {
-  final Map<String, String> store = {};
+void _installSecureStorageMock({Map<String, String>? seed}) {
+  final Map<String, String> store = {...?seed};
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(
     const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),
@@ -183,8 +182,12 @@ void _installSecureStorageMock() {
 void main() {
   // 各テストで SecureStorage + SharedPreferences をモックする
   setUp(() {
-    SharedPreferences.setMockInitialValues(<String, Object>{});
-    _installSecureStorageMock();
+    // 🔵 【FEAT-542】**この画面に着く時点で必ずトークンがある。**
+    //    認証画面の「ゲストとして始める」→ `startAsGuest()` が作る。
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      ApiClient.kSecureStorageInitializedKey: true,
+    });
+    _installSecureStorageMock(seed: {'hg_guest_token': 'guest_token_from_auth'});
   });
 
   /// 【2026-07-25 修正】テスト viewport を実機相当のスマホ縦画面にする。
@@ -260,8 +263,11 @@ void main() {
 
       // dio リクエストの監査: 期待するエンドポイントすべてがヒット
       final paths = built.adapter.requests.map((r) => '${r.method} ${r.path}').toList();
-      expect(paths, contains('POST /auth/guest-init/'),
-          reason: 'ゲストトークンが無いので guest-init が呼ばれた');
+      // 🔴 【FEAT-542】**この画面はトークンを作らない。**
+      //    旧実装の「ゲストトークンが無ければ guest-init」が
+      //    BUG-161 / BUG-166 / 計測欠落の共通の根だった。
+      expect(paths, isNot(contains('POST /auth/guest-init/')),
+          reason: 'オンボーディングがまた黙ってゲストを作っている');
       expect(paths, contains('PATCH /player/'),
           reason: '名前 + 性別の PATCH が呼ばれた');
       expect(paths, contains('GET /characters/'),

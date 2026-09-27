@@ -397,32 +397,16 @@ class _DialogBody extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
 
-        // ── v1.1+ 熟練度システム予告バナー ─────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppTheme.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.20), width: 0.8),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, size: 16, color: AppTheme.primary.withValues(alpha: 0.85)),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  l10n.battlePartyJobHintSabi_message,
-                  style: TextStyle(
-                    color: AppTheme.primary.withValues(alpha: 0.85),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
+        // 【2026-08-09 削除】「熟練度システムは v1.1+ でご用意します」予告バナー。
+        //
+        // FEAT-430 (v1.0 のジョブ固定化) 時代に置いたものだが、**FEAT-511 Phase A が
+        // 2026-07-30 に実装済み**になった時点で外し忘れていた。結果、実装済みの機能に
+        // ついて「これから用意します」と言い続けており、ユーザーから
+        // 「熟練度が実装されているのか懸念している」という報告が上がった。
+        //
+        // 予告としての役目は終わっているので削除する。熟練度の実体は
+        // `JobSelectionOverlay` (このダイアログのジョブ枠タップで開く) と
+        // キャラクター画面の [JobMasteryBar] で見られる。
 
         // ── ジョブ (キャラ固定、v1.0 では閲覧のみ) ───────────────────
         // 【FEAT-431】全 13(8) ジョブの横スクロール露出を廃止、設定中ジョブ

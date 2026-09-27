@@ -19,11 +19,18 @@ from ..models import (
     PlayerWeapon, WeaponMaster,  # 【FEAT-326】EquipWeaponView 用
     SocialAccount,  # 【FEAT-245】Firebase Auth 削除のため uid 取得用
 )
-from ..serializers import CharacterStatSerializer, PlayerProfileSerializer
+from ..serializers import (
+    CharacterStatSerializer,
+    PlayerProfileSerializer,
+    get_i18n_field,  # 【BUG-146 Phase 2】master data の _en を読む
+)
 from ..services.daily_throttle_service import (
     reset_battle_charges_if_new_day,
     reset_daily_battle_count_if_new_day,
 )
+# 【FEAT-538 (2026-08-29)】「1 人 1 装備」の手続きは services/weapon_equip.py が
+# 単一真実値。admin (PlayerWeaponAdmin.save_model) も同じ関数を呼ぶ。
+from ..services.weapon_equip import equip_exclusively
 from ..views.sabi import today_summary
 from ..views.shop import compute_coins
 from ._error_helpers import error_response  # 【FEAT-475 Phase 3c】新形式統一
@@ -503,6 +510,8 @@ class PlayerWeaponsView(PlayerMixin, APIView):
 
     def get(self, request):
         player = self.get_player(request)
+        # 【BUG-146 Phase 2】locale の解決は view ごとに 1 行だけ (Pre-mortem #4)。
+        locale = getattr(request, 'locale', 'ja')
         weapons = (
             PlayerWeapon.objects
             .filter(player=player)
@@ -514,9 +523,10 @@ class PlayerWeaponsView(PlayerMixin, APIView):
                 {
                     'id':                    pw.weapon.id,
                     'key':                   pw.weapon.key,
-                    'name':                  pw.weapon.name,
+                    # 【BUG-146 Phase 2】WeaponMaster は master data (_en 投入済)。
+                    'name':                  get_i18n_field(pw.weapon, 'name', locale),
                     'atk_bonus':             pw.weapon.atk_bonus,
-                    'description':           pw.weapon.description,
+                    'description':           get_i18n_field(pw.weapon, 'description', locale),
                     'is_equipped':           pw.is_equipped,
                     'acquired_at':           pw.acquired_at.isoformat(),
                     # 【FEAT-379】ソケット情報 (v1.0 は表示のみ、装着は v1.1+)
@@ -599,18 +609,20 @@ class EquipWeaponView(PlayerMixin, APIView):
                            status=status.HTTP_404_NOT_FOUND,
                        )
 
-            # まず全 PlayerWeapon の is_equipped を False にしてから、対象のみ True へ
-            # (UniqueConstraint は (player, weapon) なので is_equipped 単独の制約はないが、
-            #  「1 人 1 武器装備」の不変条件を本 view で構造的に維持する)
-            PlayerWeapon.objects.filter(player=player).update(is_equipped=False)
-            target.is_equipped = True
-            target.save(update_fields=['is_equipped'])
+            # 【FEAT-538 (2026-08-29)】「1 人 1 武器装備」の不変条件は
+            # services/weapon_equip.equip_exclusively が単一真実値。
+            # UniqueConstraint は (player, weapon) だけで is_equipped 単独の
+            # DB 制約は無いため、**この関数を通らない書き込みは何も守られない**。
+            # admin も同じ関数を呼ぶ (複製すると経路が増えるたびに穴が空く)。
+            equip_exclusively(player, target)
 
         return Response({
             'equipped_weapon': {
                 'id':        target.weapon.id,
                 'key':       target.weapon.key,
-                'name':      target.weapon.name,
+                # 【BUG-146 Phase 2】装備変更直後の表示名も master data。
+                'name':      get_i18n_field(
+                    target.weapon, 'name', getattr(request, 'locale', 'ja')),
                 'atk_bonus': target.weapon.atk_bonus,
             },
         })

@@ -263,7 +263,7 @@ class HabitCountViewTestCase(APITestCase):
             self.player.level, 21,
             f'level={self.player.level} != 21 after overflow',
         )
-        # level-up で +10pt 加算（GameBalance.ALLOCATABLE_POINTS_HABIT、FEAT-285）
+        # level-up で +10pt 加算（GameBalance.ALLOCATABLE_POINTS_PER_LEVEL、FEAT-537 で全経路統一）
         self.assertEqual(
             self.player.allocatable_points, 10,
             f'allocatable_points={self.player.allocatable_points} != 10',

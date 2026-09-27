@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../gamification/widgets/job_mastery_bar.dart';  // 【2026-08-09】熟練度バー
+import '../../gamification/widgets/job_mastery_info_dialog.dart';  // 【2026-08-09】ⓘ
 import '../models/job.dart';
 import 'job_choices.dart';
 
@@ -132,6 +134,14 @@ class JobSelectionOverlay extends StatelessWidget {
               ),
             ),
           ),
+          // 【2026-08-09】熟練度の説明 ⓘ。
+          //
+          // **バナー側に置くのが要点。** 熟練度バーは未バトルのジョブで何も
+          // 描画しないため、バーの中に入れると「熟練度 0 の人にだけ説明が
+          // 出ない」= 最も説明を必要とする人に届かない配置になる
+          // (本件の報告者がまさにその状態だった)。
+          // ここなら**データの有無と無関係に**画面あたり 1 つ常に出る。
+          const JobMasteryInfoButton(),
         ],
       ),
     );
@@ -226,6 +236,23 @@ class _JobListTile extends StatelessWidget {
                       ],
                     ),
                   ],
+                  // ── 【2026-08-09】ジョブ熟練度バー ──────────────────
+                  //
+                  // ユーザー報告「熟練度のゲージが見当たらない」への対応。
+                  // Phase A の表示先はキャラクター画面だけで、**ジョブを見に来る
+                  // 最も自然な導線であるここに無かった**。
+                  //
+                  // 未バトルのジョブでは [JobMasteryBar] が何も描画しないため、
+                  // 「戦ったことのあるジョブにだけ静かに実績が出る」形になる。
+                  //
+                  // `showUnlockHint` は装着中のみ true。未装着側は直上に
+                  // 「熟練度 Max で解禁」の locked hint が既にあり、Max 到達時に
+                  // 同じ意味の文が 2 行並ぶのを避ける。
+                  JobMasteryBar(
+                    jobId: job.id,
+                    jobName: job.localizedName(l10n),
+                    showUnlockHint: isCurrent,
+                  ),
                 ],
               ),
             ),

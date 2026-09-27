@@ -1,10 +1,14 @@
+from django import forms
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.forms import UserChangeForm as DjangoUserChangeForm
 from django.db.models import Sum  # 【2026-06-29 hotfix】Subquery annotate 撤回で OuterRef/Subquery/IntegerField は不要に
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 # 【2026-08-07】権限 override (`return False` × 29 箇所) を mixin に集約。
 # mixin は必ず admin.ModelAdmin より左に置くこと (右だと無言で効かない)。
 # 権限マトリクスは tests/test_admin_permission_mixins.py が lock。
@@ -15,10 +19,26 @@ from .admin_mixins import (
 # 【2026-08-07】CharacterStat.max_exp の逆算は game 側の計算式なので
 # services/exp_service.py (apply_stat_level_up_step の隣) に移設した。
 from .services.exp_service import stat_max_exp_at_level
+# 【FEAT-535 (2026-08-29)】プレイヤー戦闘能力の Dart ミラー。
+# 🔴 真実値は Dart 側。詳細は battle_stats_preview.py の module docstring。
+from .services.battle_stats_preview import (
+    baseline_atk_for_enemy_table,
+    compute_player_battle_stats,
+)
+# 【FEAT-538 (2026-08-29)】プレイヤー Lv -> max_exp の単一真実値。
+# 直書き (level * 100 等) 禁止、CharacterStat 側の stat_max_exp_at_level と対。
+from .constants import GameBalance
+
+User = get_user_model()
+# 【FEAT-538 (2026-08-29)】「1 人 1 装備」の手続き。view と admin で共有する
+# (複製すると書き込み経路が増えるたびに同じ穴が空く。BUG-79 / FEAT-528 の型)。
+from .services.weapon_equip import equip_exclusively
 from .models import (
+    AccountSuspensionLog,  # 【FEAT-541 (2026-09-06)】停止履歴
     PlayerProfile, CharacterStat, Habit, HabitLog,
     Announcement, PlayerAnnouncementRead,  # 【FEAT-458】お知らせ機能
     MaintenanceConfig,  # 【FEAT-463】緊急メンテナンスモード
+    AppUpdateConfig,  # 【FEAT-543】バージョンアップ告知
     Challenge, ChallengeParticipation,  # 【FEAT-465】月次カテゴリチャレンジ
     SabiMessage,  # 【新規 (2026-06-26)】サビセリフ admin 編集対応
     Character,    # 【2026-06-27】新キャラ追加機能 (tagline / release_date 編集用)
@@ -96,14 +116,23 @@ class PlayerBattleStateInline(admin.StackedInline):
     max_num = 1
     verbose_name        = 'プレイヤーバトル状態'
     verbose_name_plural = 'プレイヤーバトル状態'
+    # 【FEAT-538 (2026-08-29)】max_exp は level から自動再計算されるので触れなくする。
+    # 再計算は PlayerProfileAdmin.save_formset (inline 経由はそこを通る)。
+    # 🔴 readonly だけ / 自動計算だけ ではダメで、両方要る ——
+    #    readonly が無いと「画面で編集できるのに保存すると黙って上書きされる」
+    #    最悪の UX になり、自動計算が無いと編集欄が無いまま drift が残る。
+    readonly_fields = ('max_exp',)
     fieldsets = (
         ('レベル / EXP (support 補償で直接編集可)', {
             'fields': ('level', 'current_exp', 'max_exp', 'allocatable_points'),
             'description': (
                 'レベルダウン救済 / EXP 補償 / ステ振り追加ポイント配布。<br>'
-                '<em>max_exp は通常 `level_to_max_exp(level)` から自動計算される値。'
-                'level を変更した後 save すると `PlayerProfile.save` 側で max_exp が再計算されない '
-                'ケースがあるため、level 手動変更時は max_exp も同期して調整すること。</em>'
+                '<em>max_exp は readonly。level を save すると '
+                '<code>level_to_max_exp(level)</code> から自動で追従する '
+                '(FEAT-538)。</em><br>'
+                '<em>current_exp は自動調整しない。Lv を下げると '
+                'current_exp &gt; max_exp になりうるが、補償で意図的に入れた EXP を'
+                '黙って削らないための仕様。</em>'
             ),
         }),
         ('バトルチャージ / 日次スロットル', {
@@ -135,12 +164,39 @@ class PlayerStreakStateInline(admin.StackedInline):
     verbose_name        = 'プレイヤーストリーク状態'
     verbose_name_plural = 'プレイヤーストリーク状態'
     fieldsets = (
-        ('ログインストリーク (救済で直接編集可)', {
-            'fields': ('login_streak_days', 'last_login_diamond_at'),
+        ('最終アクティブ (FEAT-540)', {
+            'fields': ('last_achievement_check_at',),
             'description': (
-                'login_streak_days = 連続ログイン日数。通信障害で途切れた場合はここを直接調整。<br>'
-                'last_login_diamond_at = 最終ログインダイヤ付与日 (冪等性キー、'
-                '今日の日付をここに書くと本日は追加付与されない)。'
+                'support が最初に見る値。**「まだ使っているか」**を測っている。<br>'
+                '🔴 <strong>「ログイン」ではない。</strong> DRF の Token 認証は '
+                '<code>User.last_login</code> を更新しないので、'
+                'Django 既定の User 画面に出ている「最終ログイン」は'
+                '<strong>全員 なし</strong>である (FEAT-540 §1)。<br>'
+                '更新経路は 3 つ: 習慣 / ToDo のカウント、チェックリストのチェック、'
+                '実績画面を開いたとき (60 秒スロットル)。<br>'
+                '⚠️ <strong>タイムライン予定の完了だけでは動かない。</strong>'
+                'タイムラインしか使っていないユーザーは休眠に見えるので、'
+                '判断する前に <code>DailyAchievement</code> (日次達成記録) も見ること。'
+            ),
+        }),
+        ('連続達成 (FEAT-539)', {
+            'fields': (
+                'login_streak_days', 'best_task_streak_days', 'last_login_diamond_at',
+            ),
+            'description': (
+                '🔴 <strong>login_streak_days / best_task_streak_days は キャッシュ であり、'
+                '真実値ではありません</strong>。真実値は <code>DailyAchievement</code> の行です '
+                '(FEAT-539)。<br>'
+                'ここを手で書き換えると <code>manage.py check_daily_achievement_consistency</code> '
+                'が不一致として報告し、<code>--fix</code> で<strong>行の値に戻されます</strong>。<br>'
+                '救済で連続日数を伸ばしたい場合は、キャッシュではなく '
+                '<code>DailyAchievement</code> の行を足してください。<br>'
+                '⚠️ <strong>last_login_diamond_at は「ログイン」で動きません。</strong>'
+                '<strong>その日の初回タスク達成</strong>で更新される冪等性キーです '
+                '(BUG-122 が発火条件を変えた際、名前だけ据え置かれた)。<br>'
+                '今日の日付をここに書くと、本日は追加付与されません。<br>'
+                '🔵 改名しないのは <code>diamond_service.py</code> が'
+                '冪等性キーとして依存しているためです。<strong>名前ではなく説明で解いています。</strong>'
             ),
         }),
         ('ダイヤ付与冪等性 (誤操作抑止)', {
@@ -151,7 +207,6 @@ class PlayerStreakStateInline(admin.StackedInline):
             'fields': (
                 'daily_task_count', 'daily_task_count_date',
                 'last_friend_gift_popup_date',
-                'last_achievement_check_at',
             ),
             'classes': ('collapse',),
         }),
@@ -255,8 +310,86 @@ class PlayerGachaStatusInline(admin.StackedInline):
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# 【BUG-152 / BUG-153 (2026-09-06)】プレイヤーごとの削除で巻き添えを許す model
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# 🔴 【BUG-153】BUG-152 は「`NoDeleteAdminMixin` を付けた 5 つ」と数えたが、
+#    **`ReadOnlyAdminMixin` 経由でも `has_delete_permission` は `False` になる**。
+#    片方の mixin だけを grep したせいで 3 model 漏れていた。
+#
+#    しかも Django の `get_deleted_objects` は `perms_needed` に
+#    **実際に行が存在する model だけ**を入れるので、症状は「1 個直すと次が出る」
+#    という形で小出しに現れる —— チャレンジ未参加なら 5 件、参加者なら 6 件目、
+#    課金ユーザーなら 7 件目。**手で数え直すやり方では終わらない。**
+#
+#    `test_every_blocking_cascade_model_is_classified` が
+#    `PlayerProfile` から CASCADE を BFS で辿って**発見**し、この列挙を検算する。
+#
+# ⚠️ 名前から `STATE` を外した。`IAPReceipt` / `ChallengeParticipation` は
+#    「state 行」ではない。名前が実態とズレると、次に足す人が
+#    「これは state じゃないから対象外だ」と判断して**また漏れる**。
+#
+# 🔴 **ここは明示列挙のまま維持する。** 走査で自動導出しない ——
+#    将来 `NoDeleteAdminMixin` を別の目的 (監査ログ等) で使ったとき、
+#    消してはいけないものまで消えるため (BUG-152 の判断)。
+#    **発見はテストの仕事、決定は人間の仕事。**
+CASCADE_DELETABLE_MODELS = (
+    # ── FEAT-478 の state 分割 5 兄弟 (BUG-152) ──────────────────────────
+    PlayerEconomyState,
+    PlayerBattleState,
+    PlayerStreakState,
+    PlayerSettings,
+    PlayerGachaStatus,
+    # ── 読み取り専用 admin だが、プレイヤーに従属するもの (BUG-153) ──────
+    ChallengeParticipation,   # 月次チャレンジの per-user 進捗
+    IAPReceipt,               # 課金領収書 (下の注記を読むこと)
+    PendingDuplicateReward,   # 重複報酬待ち。player が消えたら意味を持たない
+)
+
+# ⚠️ `IAPReceipt` を通してよいのか —— 本 BUG 唯一の判断ポイント。
+#
+#   - `IAPReceipt.player` の FK は **`CASCADE`** である。
+#     つまり **DB 設計としてすでに「プレイヤーが消えたら消える」**。
+#   - アプリの正規経路 (設定 → アカウント削除) は `request.user.delete()` /
+#     `player.delete()` を呼ぶので、**実ユーザーの退会でも今この瞬間に
+#     領収書は消えている** (`views/player.py`)。
+#
+#   → 本 BUG は**新しい破壊を許可していない**。admin の確認画面が、
+#     既に起きていることを表示していただけである。
+#
+# ⚠️ 「返金対応で領収書を残したい」なら、それは `on_delete` の設計論
+#    (`SET_NULL` にして player を切り離す等) であって本 BUG ではない。
+#    **migration を伴う設計変更を、削除ボタンを直すついでにやらない。**
+
+# 「プレイヤー削除を意図的に止める」model を置く場所。
+#
+# 🔵 空の箱をわざわざ置いているのは、上の網羅性テストが fail したときに
+#    逃げ道が「除外リストに足す」しか無いと、**考えずに足す**圧力がかかるため。
+#    2 つの箱を用意して**どちらかに入れることを強制する**と、
+#    「止めたいのか / 通したいのか」を必ず 1 回考えることになる。
+#
+# ⚠️ ここに足すときは、**なぜ止めるのかを 1 行で書くこと。**
+#    理由の書かれていない行は、次の人には「fail を黙らせた跡」にしか見えない。
+#
+# ⚠️ 空のまま維持できているうちは、admin から人を消せる状態が保たれている。
+CASCADE_BLOCKING_INTENTIONAL: tuple = ()
+
+
 @admin.register(PlayerProfile)
-class PlayerProfileAdmin(admin.ModelAdmin):
+class PlayerProfileAdmin(NoBulkDeleteAdminMixin, admin.ModelAdmin):
+    # 🔴 【BUG-152 (2026-09-06)】`NoBulkDeleteAdminMixin` を**同時に**足している。
+    #
+    # 本 BUG の修正 (`get_deleted_objects` で `perms_needed` を削る) は、
+    # 個別削除だけでなく**一覧の一括削除も同時に解禁する**。
+    # 修正前は 5 state の `has_delete_permission=False` が
+    # 「消せない」という形で一括削除も塞いでいた ——
+    # つまり**この BUG が偶然の防護柵になっていた**。
+    #
+    # 本 BUG の目的は「テストユーザーを 1 人ずつ掃除できるようにする」ことで、
+    # 「checkbox の全選択ミスでプレイヤーが一斉に消せるようにする」ことではない。
+    # しかも一括削除の確認画面は `delete_view` を通らないので、
+    # 下の警告メッセージも出ない。個別削除だけを開ける。
     # 【FEAT-478 Phase 2 最終 (2026-07-06)】level / current_exp は
     # PlayerBattleState に移動済のため、callable 経由で表示。
     # 【2026-07-09】diamonds / bonus_coins は PlayerEconomyState に移動済のため、
@@ -264,7 +397,7 @@ class PlayerProfileAdmin(admin.ModelAdmin):
     # 詳細画面での編集は PlayerEconomyStateInline (StackedInline) で提供。
     list_display = ('name', 'get_level', 'get_current_exp',
                     'get_diamonds', 'get_coins',
-                    'gender', 'created_at')
+                    'gender', 'created_at', 'get_last_active')
     # 【2026-07-09】PlayerWeapon / PlayerItem admin から autocomplete_fields で
     # 参照可能にするため search_fields を追加。name (プレイヤー名) / friend_id
     # (12 桁 ID) / user__email (連携済ユーザーの email) をキーに検索できる。
@@ -295,6 +428,291 @@ class PlayerProfileAdmin(admin.ModelAdmin):
     @admin.display(description='🪙コイン', ordering='economy_state__bonus_coins')
     def get_coins(self, obj):
         return obj.economy.bonus_coins
+
+    # ── 【FEAT-540 (2026-09-06)】最終アクティブ ────────────────────────────
+    @admin.display(
+        description='最終アクティブ',
+        ordering='streak_state__last_achievement_check_at',
+    )
+    def get_last_active(self, obj):
+        """実体は `PlayerStreakState.last_achievement_check_at`。
+
+        🔴 **`User.last_login` ではない。** DRF の `TokenAuthentication` は
+        `last_login` を更新せず、`django.contrib.auth.login()` の呼び出しも
+        0 件なので、**あちらは常に None である** (FEAT-540 §1、実測で User
+        3 件中 0 件)。一見もっとも素直な選択肢が実は全員 None という形なので、
+        `test_last_active_column_does_not_read_last_login` が走査で縛っている。
+
+        ⚠️ **「ログイン」ではなく「タスク達成」を測っている。**
+        更新経路は 3 つ —— 習慣 / ToDo のカウント、チェックリストのチェック、
+        実績画面を開いたとき (60 秒スロットル)。
+        **アプリを開いただけ・バトルしただけでは動かない。**
+
+        ⚠️ **既知の穴: タイムライン予定の完了だけでは動かない。**
+        `views/timeline.py` は `check_achievements` を呼ばないため。
+        タイムラインしか使っていないユーザーは休眠に見える。
+        `DailyAchievement` (FEAT-539) なら 4 経路すべてを拾えるが、
+        **日単位**になるうえ prod の backfill 前は全員空になるので、
+        v1.1.3 では精度と即応性を採って本フィールドにした。
+
+        🔵 `obj.streak` (shim) ではなく `obj.streak_state` を読む。
+        shim は中で `get_or_create` するので `select_related` が効かない。
+        """
+        state = getattr(obj, 'streak_state', None)
+        return state.last_achievement_check_at if state is not None else None
+
+    # ── 【FEAT-535 (2026-08-29)】バトルステータス個票 ──────────────────────
+    #
+    # v1.1 §5.2 の観測期間 (10/3-10/29) に「なぜ healer の勝率が 25% なのか」を
+    # 見るための個票。集計は PostHog (FEAT-531) の仕事で、admin は個票に徹する。
+    #
+    # 🔴 **これは Flutter 側の式のミラーである。** Backend はプレイヤーの攻撃力 /
+    # HP を 1 つも持っておらず、実際の戦闘値は端末が計算している。
+    # 式の drift は mobile/test/battle/battle_display_formula_contract_test.dart が
+    # 縛っており、係数を変えると Dart のテストが battle_stats_preview.py を
+    # 名指しで落とす。
+    #
+    # ⚠️ **list_display には入れない。** 1 行ごとに CharacterStat 6 件 +
+    # PlayerWeapon + Character + Job を引くので、一覧に出すと N+1 になる。
+    # 詳細画面 1 件なら 4 本 (CharacterStat 6 件を 1 本 / PlayerWeapon /
+    # PlayerBattleState / WeaponMaster) で、`test_detail_render_query_count` が
+    # その本数を縛っている。
+    #
+    # ⚠️ read-only の計算列なので **list_editable には絶対に入れない** ——
+    # admin.E121 で `manage.py check` が落ち、build.sh の migrate が止まって
+    # デプロイ不能になる (EnemyAdmin に前例あり)。
+    readonly_fields = ('battle_stats_preview',)
+
+    def save_formset(self, request, form, formset, change):
+        # 【FEAT-538 (2026-08-29)】🔴 **inline 経由は `save_model` を通らない。**
+        # PlayerBattleStateInline から level を編集したときに max_exp を追従
+        # させるのはここ。前例は PlayerStatsMatrixAdmin.save_formset
+        # (CharacterStat の max_exp を同じ形で追従させている)。
+        #
+        # ⚠️ current_exp は触らない。Lv を下げると current_exp > max_exp に
+        # なりうるが、support が補償として意図的に高い EXP を入れている場合が
+        # あり、勝手に切り詰めると**運営の意図を壊す**。
+        #
+        # ⚠️ 他の inline (economy / streak / gacha / settings) は必ず super()
+        # に流すこと。分岐を書き忘れると、その inline が**保存されなくなる**。
+        if formset.model is PlayerBattleState:
+            instances = formset.save(commit=False)
+            for instance in instances:
+                instance.max_exp = GameBalance.level_to_max_exp(instance.level)
+                instance.save()
+            for obj in formset.deleted_objects:
+                obj.delete()
+            formset.save_m2m()
+        else:
+            super().save_formset(request, form, formset, change)
+
+    def get_queryset(self, request):
+        # 個票が読む `active_character.job` を 1 本にまとめる。
+        #
+        # ⚠️ `battle_state` はここに足しても効かない。`player.battle` は
+        # FEAT-478 の @property shim (`get_or_create` + instance キャッシュ) で、
+        # `select_related` が張った逆参照ディスクリプタを見ないため。
+        # 効かないものを書くと「効いている」と誤読されるので足さない。
+        #
+        # 🔵 【FEAT-540 (2026-09-06)】**`streak_state` は効く。読み方が違うため。**
+        #    実測 (player 3 件):
+        #
+        #        plain          + `obj.streak`         4 本
+        #        select_related + `obj.streak`         4 本   ← 効かない
+        #        select_related + `obj.streak_state`   1 本   ← 効く
+        #        plain          + `obj.streak_state`   4 本
+        #
+        #    上の警告が正しいのは **shim (`obj.streak`) を読む場合**である。
+        #    `get_last_active` は**逆参照ディスクリプタそのもの**
+        #    (`obj.streak_state`) を読むので、JOIN が効いて 1 行も増えない。
+        #    `test_last_active_adds_no_query_per_row` がこれを縛っている。
+        return super().get_queryset(request).select_related(
+            'active_character__job', 'streak_state',
+        )
+
+    # ── 【BUG-152 (2026-09-06)】プレイヤーごとの削除を通す ──────────────────
+    @classmethod
+    def cascade_deletable_verbose_names(cls) -> set:
+        """`perms_needed` から取り除く `verbose_name` の集合。
+
+        🔴 **日本語のリテラルで書かないこと。** `perms_needed` の中身は
+        `opts.verbose_name` (日本語の文字列) だが、ここで文字列を直書きすると
+        **`verbose_name` を変えた瞬間に静かに効かなくなる** ——
+        例外も警告も出ず、ただ削除できなくなる。
+        `test_source_does_not_subtract_by_japanese_literal` が走査で縛っている。
+        """
+        return {model._meta.verbose_name for model in CASCADE_DELETABLE_MODELS}
+
+    def get_deleted_objects(self, objs, request):
+        """プレイヤーごとの削除だけ通す (BUG-152)。
+
+        ## なぜ止まっていたか
+
+        `NoDeleteAdminMixin` を付けた 5 つの state admin は
+        `has_delete_permission` が**ハードコードで `False`** である。
+        Django の `get_deleted_objects` はカスケード対象すべてについて
+        これを呼ぶので、**権限テーブルを見ずに `perms_needed` へ入り、
+        superuser でも親の削除が 403 になる**。
+
+        ## 何を変えて、何を変えないか
+
+        🔴 **各 state admin の `has_delete_permission` は `False` のまま維持する。**
+        塞ぎたいのは「state 行だけ消えて、property の `get_or_create` で
+        累計 0 の新しい行が生える」ケースであって、
+        「プレイヤーごと消えて state も一緒に消える」ケースではない。
+        後者は ORM の cascade として正しく、アカウント削除 API
+        (`views/player.py`) が現にそれに依存している。
+
+        ⚠️ **除くのは 5 model 分だけ。** `NoDeleteAdminMixin` の有無で
+        自動導出しない —— 将来この mixin を別の目的 (監査ログ等) で使ったとき、
+        **消してはいけないものまで消える**。
+
+        ⚠️ **`protected` は触らない。** `PROTECT` な FK は別の仕組みで、
+        これは**正しく止めるべきもの**である。返すのは `super()` のまま。
+        """
+        to_delete, model_count, perms_needed, protected = super().get_deleted_objects(
+            objs, request,
+        )
+        return (
+            to_delete,
+            model_count,
+            perms_needed - self.cascade_deletable_verbose_names(),
+            protected,
+        )
+
+    def delete_view(self, request, object_id, extra_context=None):
+        """⚠️ 削除確認画面に「実ユーザーの退会には使わない」注意を出す。
+
+        admin の削除は**アカウント削除 API が行っている付随処理を飛ばす**:
+
+          - PostHog identity の削除 (2-step)
+          - 退会フィードバックの保存
+          - Firebase Auth 側の best-effort 削除
+
+        BUG-152 §6 の残るリスクそのものなので、押す前に見える位置に出す。
+        """
+        if request.method == 'GET':
+            self.message_user(
+                request,
+                'この削除はテストユーザーの掃除用です。'
+                '実ユーザーの退会には使わないでください —— '
+                'admin からの削除は PostHog identity の削除 / 退会フィードバックの保存 / '
+                'Firebase Auth 側の削除を飛ばします。'
+                '正規経路はアプリの「設定 → アカウント削除」です。',
+                level=messages.WARNING,
+            )
+        return super().delete_view(request, object_id, extra_context)
+
+    @staticmethod
+    def _edit_link(url, label):
+        """【FEAT-538 Phase 4】個票から編集画面への導線 1 本。
+
+        ⚠️ `url` は必ず `reverse()` 由来を渡すこと (`ADMIN_URL` は環境変数)。
+        """
+        return format_html(
+            '<a href="{}" style="margin-left:10px;font-size:11px;">{} →</a>',
+            url, label,
+        )
+
+    @admin.display(description='バトルステータス (Flutter 式のミラー)')
+    def battle_stats_preview(self, obj):
+        """入力と結果の両方を出す。**結果だけだと、なぜその数字なのかが読めない。**"""
+        if obj is None or obj.pk is None:
+            return '—（保存後に表示されます）'
+
+        data = compute_player_battle_stats(obj)
+        i, st = data['inputs'], data['stats']
+
+        # ── フォールバックは必ず画面に出す (Pre-mortem #6) ──────────────
+        # 黙って 10 を出すと「武器を装備している」と誤読される。
+        if i['weapon_missing']:
+            weapon_text = '⚠️ 未装備 → 10 で計算 (starter_sword 相当)'
+        else:
+            weapon_text = f"{i['weapon'].name} (atk_bonus {i['weapon_atk']})"
+
+        if i['job_missing']:
+            job_text = (
+                '⚠️ ジョブ未解決 → modifier 1.0 で計算'
+                '（active_character 未設定 or Character.job が null）'
+            )
+        else:
+            job_text = (
+                f"{i['job'].job_name} ({i['job'].job_id}) — "
+                f"攻撃力 ×{i['attack_power_modifier']} / "
+                f"ATB ×{i['atb_speed_modifier']}"
+            )
+
+        char_text = (
+            i['active_character'].name if i['active_character'] is not None
+            else '⚠️ 未設定'
+        )
+
+        lv = i['stat_levels']
+        stat_text = ' / '.join(f'{k} {v}' for k, v in lv.items())
+        if i['missing_stats']:
+            stat_text += (
+                f"　⚠️ 未作成 {'・'.join(i['missing_stats'])} は 0 として計算"
+            )
+
+        # ── 【FEAT-538 Phase 4 (2026-08-29)】編集画面への導線 ──────────
+        #
+        # 閲覧は本個票に集約されたのに、編集は 4 画面に散っている。入力の隣に
+        # その入力を触れる画面へのリンクを置く。
+        #
+        # ⚠️ **URL をハードコードしないこと。** admin のマウント先は
+        # `ADMIN_URL` 環境変数で差し替わる (Render で予測困難なパスにしている)。
+        # `/admin/...` と直書きすると dev か prod のどちらかで 404 になる。
+        # `reverse()` は DB を引かないので、クエリ本数は増えない
+        # (`test_detail_render_query_count` が 4 本を縛っている)。
+        #
+        # アクティブキャラ / ジョブは本ページ内で編集できるのでリンク不要。
+        level_link = self._edit_link(
+            reverse('admin:api_playerbattlestate_change', args=[obj.pk]),
+            'Lv を編集',
+        )
+        stats_link = self._edit_link(
+            reverse('admin:api_playerstatsmatrix_change', args=[obj.pk]),
+            '6 ステータスを編集',
+        )
+        weapon_link = self._edit_link(
+            reverse('admin:api_playerweapon_changelist')
+            + f'?player__id__exact={obj.pk}',
+            '所持武器を編集',
+        )
+
+        rows = [
+            ('入力', 'レベル', format_html('{}{}', i['level'], level_link)),
+            ('入力', '6 ステータス', format_html('{}{}', stat_text, stats_link)),
+            ('入力', '装備武器', format_html('{}{}', weapon_text, weapon_link)),
+            ('入力', 'アクティブキャラ', char_text),
+            ('入力', 'ジョブ', job_text),
+            ('結果', 'ATK', st['atk']),
+            ('結果', 'maxHP', st['max_hp']),
+            ('結果', 'SPD', f"{st['spd']}（MVP 固定）"),
+            ('結果', 'ATB 倍率', f"{st['atb_modifier']:.2f}x"),
+            ('結果', '毎ターン回復', f"{st['hp_regen_per_turn']} HP"),
+            ('結果', 'クリ率', f"{st['crit_rate'] * 100:.1f}%"),
+            ('結果', '被ダメ軽減', f"{st['damage_reduction'] * 100:.1f}%"),
+        ]
+
+        body = format_html_join(
+            '',
+            '<tr><td style="padding:2px 10px;color:#888;">{}</td>'
+            '<td style="padding:2px 10px;white-space:nowrap;">{}</td>'
+            '<td style="padding:2px 10px;"><b>{}</b></td></tr>',
+            rows,
+        )
+        return format_html(
+            '<table style="border-collapse:collapse;">{}</table>'
+            '<p style="margin-top:8px;color:#888;">'
+            '🔴 これは Flutter 側の計算式のミラーです。'
+            '<b>実際の戦闘値は端末が計算しています。</b><br>'
+            '表示されるのは常に<b>「今の値」</b>で、'
+            '過去の戦闘時点の値ではありません'
+            '（Battle は敵側の初期値しか保存していないため）。'
+            '</p>',
+            body,
+        )
 
 
 # 【2026-07-09】「ステータス個別編集」admin。
@@ -534,8 +952,36 @@ class PlayerAnnouncementReadAdmin(admin.ModelAdmin):
 # 【FEAT-471 (2026-07-02)】save_model に cache invalidation hook を追加。
 @admin.register(MaintenanceConfig)
 class MaintenanceConfigAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
+    # 【FEAT-536 (2026-08-29)】翻訳の下書きプロンプトをクリップボードへコピーする
+    # ボタン。JS は `id_<name>` / `id_<name>_en` のペアを自動検出するので、
+    # ここでの対応表の設定は不要 (ChallengeAdmin と同じ)。
+    class Media:
+        js = ('admin/js/i18n_translate_prompt.js',)
+
     list_display = ('is_enabled', 'title', 'expires_at', 'updated_at')
-    fields = ('is_enabled', 'title', 'body', 'expires_at')
+    # 🔴 【FEAT-536】`title_en` / `body_en` を追加した。
+    # `fields` を明示している以上、**model に field があっても admin には
+    # 出てこない** —— つまり入力経路が存在しなかった。2026-08-11 に
+    # `Challenge` で直したのと同じ欠陥で、こちらは**障害中の唯一の画面**に
+    # 出る経路だった。露出は `test_i18n_field_census.py` の走査で縛っている。
+    fieldsets = (
+        ('メンテナンス状態', {
+            'fields': ('is_enabled', 'expires_at'),
+        }),
+        ('日本語', {
+            'fields': ('title', 'body'),
+        }),
+        ('English', {
+            'fields': ('title_en', 'body_en'),
+            'description': (
+                '英語欄が空のまま ON にすると、英語のユーザーには '
+                '<strong>汎用の英文</strong>が出ます (日本語は出ません)。<br>'
+                '<strong>具体的な状況を伝えたいときは英語欄も埋めてください。</strong><br>'
+                '⚠️ 汎用英文の実体は <code>api/views/maintenance.py</code> の '
+                '<code>_EN_FALLBACK</code> です。'
+            ),
+        }),
+    )
 
     # add は「pk=1 が未作成なら 1 回だけ許可」の条件付きなので mixin 化しない。
     def has_add_permission(self, request):
@@ -552,6 +998,92 @@ class MaintenanceConfigAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
         invalidate_maintenance_cache()
 
 
+# 【FEAT-543 (2026-09-23)】バージョンアップ告知 admin。
+# Singleton (pk=1 固定)。MaintenanceConfigAdmin をそのまま写している。
+@admin.register(AppUpdateConfig)
+class AppUpdateConfigAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
+    # 【FEAT-536】翻訳の下書きプロンプトをクリップボードへコピーするボタン。
+    class Media:
+        js = ('admin/js/i18n_translate_prompt.js',)
+
+    list_display = (
+        'is_enabled', 'latest_version', 'min_supported_version', 'updated_at',
+    )
+    fieldsets = (
+        ('告知の ON / OFF', {
+            'fields': ('is_enabled',),
+            'description': (
+                '🔴 <strong>latest_version を上げるのは、実機でストアから'
+                '実際に落とせることを確認した後にしてください。</strong><br>'
+                '承認直後のバイナリは地域ごとに段階配信されるため、数時間は'
+                '古い版が返ります。そこで告知すると<strong>押しても更新できない</strong>'
+                '画面を見せることになります。<br>'
+                '🔵 事故ったらここを OFF にすれば 60 秒で全ユーザーから消えます '
+                '(推奨も必須もまとめて止まります)。<br>'
+                '⚠️ 手順と運用早見表は <code>doc/runbook/app_update_notice.md</code> にあります。'
+            ),
+        }),
+        ('しきい値', {
+            'fields': ('latest_version', 'min_supported_version'),
+            'description': (
+                '<strong>latest_version</strong> = 「ここまで上げてほしい」'
+                '(「後で」で閉じられる)<br>'
+                '<strong>min_supported_version</strong> = 「ここより古いと'
+                '使わせられない」(閉じられない)<br>'
+                '🔴 <strong>min_supported_version は空のままが既定です。</strong>'
+                '入れるのは「その版ではデータが壊れる」ときだけ。'
+                '<strong>審査中の版を含めないでください</strong>'
+                '(reviewer が古い版で詰みます)。'
+            ),
+        }),
+        ('日本語 (推奨更新の文面)', {
+            'fields': ('title', 'body'),
+            'description': (
+                '⚠️ ここで編集できるのは<strong>推奨更新の文面</strong>です。<br>'
+                '必須更新 (閉じられない側) の文面は'
+                '<strong>下の「必須更新の文面」欄</strong>で編集します '
+                '(FEAT-544)。空にするとアプリ内の固定文に落ちるので、'
+                '<strong>緊急時に何も書かなくても成立します</strong>。'
+            ),
+        }),
+        ('English (推奨更新の文面)', {
+            'fields': ('title_en', 'body_en'),
+            'description': (
+                '英語欄が空のまま ON にすると、英語のユーザーには '
+                '<strong>汎用の英文</strong>が出ます (日本語は出ません)。<br>'
+                '⚠️ 汎用英文の実体は <code>api/models/app_update.py</code> の '
+                '<code>EN_FALLBACK</code> です。'
+            ),
+        }),
+        ('必須更新の文面 (閉じられない画面)', {
+            'fields': (
+                'mandatory_title', 'mandatory_body',
+                'mandatory_title_en', 'mandatory_body_en',
+            ),
+            'description': (
+                '🔵 <strong>空にするとアプリ内の既定文が出ます。</strong>'
+                '文面の無い画面にはなりません。<br>'
+                '⚠️ <strong>必須更新が発火するのは、上の「最低サポート'
+                'バージョン」に数字が入っているときだけです。</strong>'
+                '文面を書いても、そこが空なら誰にも出ません。<br>'
+                '🔴 この画面は<strong>閉じられません</strong>。'
+                '文面は「何をすればよいか」が分かるように書いてください。'
+            ),
+        }),
+    )
+
+    # add は「pk=1 が未作成なら 1 回だけ許可」の条件付きなので mixin 化しない。
+    def has_add_permission(self, request):
+        return not AppUpdateConfig.objects.filter(pk=1).exists()
+
+    def save_model(self, request, obj, form, change):
+        obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+        # admin 保存で cache を即時 invalidate → 次のリクエストから最新値が反映される
+        from .services.app_update_cache import invalidate_app_update_cache
+        invalidate_app_update_cache()
+
+
 # 【FEAT-465→FEAT-466 (2026-06-24)】月次カテゴリチャレンジ管理 admin。
 # リリース直前 (6/30 中) に Django admin から手動で 7 月分 3 件 seed する運用 (Q5)。
 # 【FEAT-466】3 段階 Bronze/Silver/Gold 累積開放方式に対応。is_tiered=False 時の
@@ -560,6 +1092,16 @@ class MaintenanceConfigAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
 # の autocomplete_fields 依存)、list_editable で is_active / is_tiered を一覧切替可。
 @admin.register(Challenge)
 class ChallengeAdmin(admin.ModelAdmin):
+    # 【2026-08-11】翻訳の下書きプロンプトをクリップボードへコピーするボタン。
+    # JS は `id_<name>` / `id_<name>_en` のペアをフォームから自動検出するので、
+    # ここでの対応表の設定は不要 (field を足しても更新漏れが起きない)。
+    #
+    # **LLM は呼んでいない。** 外部依存もシークレットも増やさずに運用を軽くする
+    # 方式で、`anthropic` を SEC-11 (2026-05-15) で撤去した状態を維持している。
+    # API を直接叩く案 (工数 6-8h + Render env var 追加) は v1.1 では見送った。
+    class Media:
+        js = ('admin/js/i18n_translate_prompt.js',)
+
     list_display = (
         'title', 'category', 'is_tiered', 'current_count', 'target_count_gold',
         'start_date', 'end_date', 'is_active',
@@ -570,6 +1112,23 @@ class ChallengeAdmin(admin.ModelAdmin):
     ordering = ('-start_date', 'title')
     fieldsets = (
         (None, {'fields': ('title', 'description', 'category', 'is_active')}),
+        # 【2026-08-11】英語版の入力欄。**fieldsets を明示定義しているため、
+        # model に field があってもここに書かない限り admin に出てこない**。
+        # FEAT-516 (migration 0200) で `title_en` / `description_en` は追加済
+        # だったが、この欄が無いせいで入力経路が存在せず、英語 UI でチャレンジ名
+        # だけ日本語のまま出ていた。
+        #
+        # Challenge は seed も management command も無く **admin で手動作成する
+        # 運用**なので、翻訳 JSON (`translate_master_data`) では埋められない。
+        # 月次でチャレンジを作るときに、ここも一緒に入力すること。
+        # 空欄なら ja へ silent fallback する (`get_i18n_field`)。
+        ('英語版 (v1.1〜、空欄なら日本語にフォールバック)', {
+            'fields': ('title_en', 'description_en'),
+            'description': (
+                '英語 locale のユーザーに表示されます。'
+                '<strong>空欄だと日本語がそのまま出ます。</strong>'
+            ),
+        }),
         ('累積開放方式', {'fields': ('is_tiered',)}),
         ('目標回数', {'fields': ('target_count_bronze', 'target_count_silver', 'target_count_gold')}),
         ('報酬 EXP', {'fields': ('reward_exp_bronze', 'reward_exp_silver', 'reward_exp_gold')}),
@@ -664,7 +1223,18 @@ class SabiMessageAdmin(admin.ModelAdmin):
     fieldsets = (
         ('基本情報', {
             'fields': ('pool', 'content', 'content_en', 'is_active'),
-            'description': 'content_en: 英語版 (空欄 = content にフォールバック)。',
+            # 【BUG-145】プール全体を無効化すると YAML の初期値に戻る挙動を明記。
+            # 2026-06-26 に home_none_done の 9 行が一括 OFF にされ、日本語では
+            # 何も変わらないまま英語だけが日本語に落ちる状態が 2026-08-16 まで
+            # 続いた。field の help_text ではなくここに書くのは、help_text を
+            # 変えると AlterField migration が発生するため。
+            'description': (
+                'content_en: 英語版 (空欄 = content にフォールバック)。<br>'
+                '⚠ <b>プール内の有効な行が 0 件になると、そのプールは YAML の'
+                '初期値に戻ります。</b>日本語では同じセリフが出続け、'
+                '<b>英語だけが日本語表示になります</b>。'
+                'プール全体を止めたい場合はコード側の対応が必要です。'
+            ),
         }),
         ('表示順 / メモ', {
             'fields': ('sort_order', 'note'),
@@ -720,6 +1290,12 @@ class SabiMessageAdmin(admin.ModelAdmin):
 #   FEAT-433 で 21 日達成で月 1 枚配布される SSR 確定チケット。
 @admin.register(GachaReward)
 class GachaRewardAdmin(admin.ModelAdmin):
+    # 【FEAT-536 (2026-08-29)】翻訳の下書きプロンプトをクリップボードへコピーする
+    # ボタン。JS は `id_<name>` / `id_<name>_en` のペアを自動検出するので、
+    # ここでの対応表の設定は不要 (field を足しても更新漏れが起きない)。
+    class Media:
+        js = ('admin/js/i18n_translate_prompt.js',)
+
     list_display = (
         'ticket_type', 'rarity', 'reward_type', 'icon_display', 'name',
         'detail_short', 'weight', 'drop_rate_display', 'value', 'is_active',
@@ -743,8 +1319,20 @@ class GachaRewardAdmin(admin.ModelAdmin):
             ),
         }),
         ('表示情報 (ユーザーに見える文言)', {
-            'fields': ('name', 'detail', 'icon'),
-            'description': 'name / detail はユーザーの結果画面に表示されます。icon は絵文字 1 文字推奨 (例: 💎 ⚔️ ✨ ⭐ 🌟)。',
+            # 🔴 【FEAT-536】`name_en` / `detail_en` を追加した。
+            # 欄が無い状態では、ja を直した時点で `_en` が陳腐化し、
+            # **admin から直す手段が無い** ——
+            # `translate_master_data` の `_source_matches` が「翻訳元と違う」で
+            # skip するため、次の一括投入でも直らない。
+            'fields': ('name', 'name_en', 'detail', 'detail_en', 'icon'),
+            'description': (
+                'name / detail はユーザーの結果画面に表示されます。'
+                'icon は絵文字 1 文字推奨 (例: 💎 ⚔️ ✨ ⭐ 🌟)。<br>'
+                '<strong style="color: #b91c1c;">⚠ 日本語を直したら英語も直してください。</strong> '
+                '英訳は通常 <code>translate_master_data</code> で一括投入しますが、'
+                'そのコマンドは「翻訳元の日本語が投入時と違う」行を <strong>skip</strong> します。'
+                'ここで ja だけ書き換えると、<strong>英語が古いまま固定されます</strong>。'
+            ),
         }),
         ('数値設定', {
             'fields': ('weight', 'value', 'weapon_key'),
@@ -944,6 +1532,12 @@ class WeaponMasterAdmin(admin.ModelAdmin):
     運営が新規武器を追加、既存武器のバランス調整 (atk_bonus / socket_count / tier)、
     説明文の修正を GUI から実施できる。
     """
+    # 【FEAT-536 (2026-08-29)】翻訳の下書きプロンプトをクリップボードへコピーする
+    # ボタン。JS は `id_<name>` / `id_<name>_en` のペアを自動検出するので、
+    # ここでの対応表の設定は不要 (field を足しても更新漏れが起きない)。
+    class Media:
+        js = ('admin/js/i18n_translate_prompt.js',)
+
     list_display  = ('key', 'name', 'atk_bonus', 'tier', 'socket_count', 'description')
     list_filter   = ('tier',)
     # 【運用】balance 調整で頻繁に触る atk_bonus / tier / socket_count を一覧編集可
@@ -955,7 +1549,8 @@ class WeaponMasterAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('基本情報', {
-            'fields': ('key', 'name', 'tier'),
+            # 🔴 【FEAT-536】`name_en` を追加 (GachaReward と同じ理由)。
+            'fields': ('key', 'name', 'name_en', 'tier'),
             'description': (
                 '<strong>key</strong>: internal identifier (例: <code>starter_sword</code>, '
                 '<code>dragon_slayer</code>)、ユニーク、Mobile ↔ Backend で共通の識別子。'
@@ -978,8 +1573,15 @@ class WeaponMasterAdmin(admin.ModelAdmin):
             ),
         }),
         ('説明', {
-            'fields': ('description',),
-            'description': 'user 向け説明文 (Shop / EquipmentSelectionOverlay で表示)。',
+            # 🔴 【FEAT-536】`description_en` を追加。
+            'fields': ('description', 'description_en'),
+            'description': (
+                'user 向け説明文 (Shop / EquipmentSelectionOverlay で表示)。<br>'
+                '<strong style="color: #b91c1c;">⚠ 日本語を直したら英語も直してください。</strong> '
+                '<code>translate_master_data</code> は「翻訳元の日本語が投入時と違う」行を '
+                '<strong>skip</strong> するため、ja だけ書き換えると'
+                '<strong>英語が古いまま固定されます</strong>。'
+            ),
         }),
     )
 
@@ -1002,6 +1604,7 @@ class PlayerWeaponAdmin(admin.ModelAdmin):
     readonly_fields     = ('acquired_at',)
     save_on_top         = True
 
+
     fieldsets = (
         ('所有者・武器', {
             'fields': ('player', 'weapon'),
@@ -1018,8 +1621,12 @@ class PlayerWeaponAdmin(admin.ModelAdmin):
             'description': (
                 'v1.0 は 1 人 1 武器を想定 (MVP 前提)、複数所持は Phase 2 拡張予定。'
                 '本 flag が True の武器がバトル開始時に自動装備される。<br>'
-                '同一プレイヤーで複数 True にすると Mobile 側の挙動が未定義 '
-                '(先勝ち等) になるため、通常は 1 武器のみ True にする運用。'
+                '<strong>【FEAT-538】True にして save すると、同じプレイヤーの'
+                '他の武器は自動で False に落ちる。</strong> 複数 True にすると '
+                'ATK の読み出しが非決定 (順序指定なしの先頭 1 件) になり、'
+                '同じプレイヤーの攻撃力がリクエストごとに変わるため。<br>'
+                '外す操作 (False) では何も昇格しない。0 本は正当な状態で、'
+                'Mobile は未装備なら atk_bonus 10 (starter_sword 相当) で計算する。'
             ),
         }),
         ('ソケット装着 (v1.1+ 用)', {
@@ -1044,6 +1651,52 @@ class PlayerWeaponAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        """【FEAT-538 (2026-08-29)】1 プレイヤー 1 装備に収束させる。
+
+        🔴 `is_equipped` には **DB 制約が無い**。守っていたのは
+        `EquipWeaponView` の手続きだけで、admin はそこを通らない。
+        しかも model default が **True** なので、補償対応で武器を 1 本
+        追加しただけで 2 本装備が成立する。
+
+        `list_editable` の一括保存でも `save_model` は 1 件ずつ呼ばれるため、
+        ここ 1 箇所で詳細画面 / 一覧 / 追加画面の 3 経路すべてを覆える
+        (`CharacterStatAdmin.save_model` が同じ前提で動いている)。
+        """
+        super().save_model(request, obj, form, change)
+
+        # 外す操作では何も昇格させない。不変条件は「常に 1 本」ではなく
+        # 「**多くとも 1 本**」で、0 本は正当な状態。
+        if not obj.is_equipped:
+            return
+
+        demoted = equip_exclusively(obj.player, obj)
+
+        # ⚠️ 収束したことを必ず伝える。同一 POST で 2 行を True にした場合は
+        # 後勝ちで 1 本に収束するので、黙っていると「チェックしたのに外れて
+        # いる」ように見える。
+        if demoted:
+            self.message_user(
+                request,
+                '「{player}」の装備を「{equipped}」1 本に収束させました'
+                '（外した武器: {demoted}）。'
+                '1 人 1 装備が前提のため、他の装備は自動で外れます。'.format(
+                    player=obj.player.name,
+                    equipped=obj.weapon.name,
+                    demoted='・'.join(w.weapon.name for w in demoted),
+                ),
+                messages.WARNING,
+            )
+        else:
+            self.message_user(
+                request,
+                '「{player}」の装備は「{equipped}」1 本です。'.format(
+                    player=obj.player.name,
+                    equipped=obj.weapon.name,
+                ),
+                messages.INFO,
+            )
 
 
 # 【2026-07-09】プレイヤー経済状態 (coin / diamond) admin。
@@ -1189,6 +1842,11 @@ class PlayerBattleStateAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_editable = ('level', 'current_exp', 'battle_charges')
     ordering = ('-level', '-current_exp')
     save_on_top = True
+    # 【FEAT-538 (2026-08-29)】max_exp は level から自動再計算 (下記 save_model)。
+    # ⚠️ read-only の列を list_editable に入れると admin.E121 で
+    #    `manage.py check` が落ち、build.sh の migrate が止まる (EnemyAdmin に前例)。
+    readonly_fields = ('max_exp',)
+
 
     fieldsets = (
         ('プレイヤー', {'fields': ('player',)}),
@@ -1196,7 +1854,10 @@ class PlayerBattleStateAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
             'fields': ('level', 'current_exp', 'max_exp', 'allocatable_points'),
             'description': (
                 'レベルダウン救済 / EXP 補償 / ステ振り追加ポイント配布。<br>'
-                '<em>level 手動変更時は max_exp も同期して調整すること。</em>'
+                '<em>max_exp は readonly。level を save すると '
+                '<code>level_to_max_exp(level)</code> から自動で追従する '
+                '(FEAT-538)。</em><br>'
+                '<em>current_exp は自動調整しない (補償で入れた EXP を尊重する)。</em>'
             ),
         }),
         ('バトルチャージ / 日次スロットル', {
@@ -1213,12 +1874,33 @@ class PlayerBattleStateAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
         }),
     )
 
+    def save_model(self, request, obj, form, change):
+        """【FEAT-538 (2026-08-29)】level を触ったら max_exp を追従させる。
+
+        `CharacterStat` 側は 2026-07-09 に同じ 3 点セットで解決済みだったが、
+        **プレイヤー Lv 側だけ「人間が手で合わせること」という注意書きのまま**
+        残っていた。max_exp が `level_to_max_exp(level)` から乖離すると、
+        次の EXP 加算でレベルアップ判定の while が意図しない回数まわる
+        (`services/exp_service.py` に同じ警告がある)。
+
+        `list_editable` / 詳細編集の両経路がここを通る。inline 経由だけは
+        通らないので `PlayerProfileAdmin.save_formset` に同じ処理がある。
+
+        ⚠️ current_exp は触らない (補償で入れた EXP を黙って削らない)。
+        """
+        obj.max_exp = GameBalance.level_to_max_exp(obj.level)
+        super().save_model(request, obj, form, change)
+
 
 @admin.register(PlayerStreakState)
 class PlayerStreakStateAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
+    # 【FEAT-539 (2026-09-05)】`login_streak_days` は FEAT-331 から本 FEAT まで
+    # **本番コードが一度も更新していなかった**。それでもこの列で並べ替えができたので、
+    # 運営から見ると「全員 0 の列で並べている」状態だった (指示書 §2)。
+    # 本 FEAT で発火点が書くようになったので、この列は実データになった。
     list_display = (
-        'player', 'login_streak_days', 'last_login_diamond_at',
-        'daily_task_count', 'last_battle_diamond_at',
+        'player', 'login_streak_days', 'best_task_streak_days',
+        'last_login_diamond_at', 'daily_task_count', 'last_battle_diamond_at',
     )
     search_fields = (
         'player__name', 'player__friend_id', 'player__user__email',
@@ -1230,10 +1912,39 @@ class PlayerStreakStateAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
 
     fieldsets = (
         ('プレイヤー', {'fields': ('player',)}),
-        ('ログインストリーク (救済で直接編集可)', {
-            'fields': ('login_streak_days', 'last_login_diamond_at'),
+        ('最終アクティブ (FEAT-540)', {
+            'fields': ('last_achievement_check_at',),
             'description': (
-                '通信障害で途切れた際の連続日数復元 / 冪等性キー last_login_diamond_at の調整。'
+                'support が最初に見る値。**「まだ使っているか」**を測っている。<br>'
+                '🔴 <strong>「ログイン」ではない。</strong> DRF の Token 認証は '
+                '<code>User.last_login</code> を更新しないので、'
+                'Django 既定の User 画面に出ている「最終ログイン」は'
+                '<strong>全員 なし</strong>である (FEAT-540 §1)。<br>'
+                '更新経路は 3 つ: 習慣 / ToDo のカウント、チェックリストのチェック、'
+                '実績画面を開いたとき (60 秒スロットル)。<br>'
+                '⚠️ <strong>タイムライン予定の完了だけでは動かない。</strong>'
+                'タイムラインしか使っていないユーザーは休眠に見えるので、'
+                '判断する前に <code>DailyAchievement</code> (日次達成記録) も見ること。'
+            ),
+        }),
+        ('連続達成 (FEAT-539)', {
+            'fields': (
+                'login_streak_days', 'best_task_streak_days', 'last_login_diamond_at',
+            ),
+            'description': (
+                '🔴 <strong>login_streak_days / best_task_streak_days は キャッシュ であり、'
+                '真実値ではありません</strong>。真実値は <code>DailyAchievement</code> の行です '
+                '(FEAT-539)。<br>'
+                'ここを手で書き換えると <code>manage.py check_daily_achievement_consistency</code> '
+                'が不一致として報告し、<code>--fix</code> で<strong>行の値に戻されます</strong>。<br>'
+                '救済で連続日数を伸ばしたい場合は、キャッシュではなく '
+                '<code>DailyAchievement</code> の行を足してください。<br>'
+                '⚠️ <strong>last_login_diamond_at は「ログイン」で動きません。</strong>'
+                '<strong>その日の初回タスク達成</strong>で更新される冪等性キーです '
+                '(BUG-122 が発火条件を変えた際、名前だけ据え置かれた)。<br>'
+                '今日の日付をここに書くと、本日は追加付与されません。<br>'
+                '🔵 改名しないのは <code>diamond_service.py</code> が'
+                '冪等性キーとして依存しているためです。<strong>名前ではなく説明で解いています。</strong>'
             ),
         }),
         ('ダイヤ付与冪等性', {
@@ -1244,7 +1955,6 @@ class PlayerStreakStateAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
             'fields': (
                 'daily_task_count', 'daily_task_count_date',
                 'last_friend_gift_popup_date',
-                'last_achievement_check_at',
             ),
             'classes': ('collapse',),
         }),
@@ -1436,8 +2146,11 @@ class EnemyAdmin(admin.ModelAdmin):
     # 【drift 防止】Dart 側の係数が変わると本モデルは黙って嘘になる。
     # `mobile/test/battle/battle_display_formula_contract_test.dart` が
     # `computeAtk` の形を縛り、変更時に本ファイルを名指しで落とす。
-    _BASELINE_ATK_INTERCEPT = 20   # 10 (基礎) + 10 (starter_sword)
-    _BASELINE_ATK_PER_LEVEL = 2
+    #
+    # 【FEAT-535 (2026-08-29)】式の実体は
+    # `services/battle_stats_preview.baseline_atk_for_enemy_table` へ移した。
+    # per-player 版 (`compute_player_battle_stats`) と**同じモジュール**に置くことで、
+    # 片方だけ直される事故を減らす。ここは呼ぶだけ。
 
     # 【FEAT-521 §6.3 PM 判断 (2026-08-07)】目標レンジは **5.0-7.0**。
     #
@@ -1449,10 +2162,14 @@ class EnemyAdmin(admin.ModelAdmin):
     _TARGET_HITS_MIN = 5.0
     _TARGET_HITS_MAX = 7.0
 
-    @classmethod
-    def _baseline_atk(cls, level: int) -> int:
-        """基準プレイヤー (初期装備 / stat 未成長 / ジョブ修飾なし) の ATK。"""
-        return cls._BASELINE_ATK_INTERCEPT + max(1, level) * cls._BASELINE_ATK_PER_LEVEL
+    @staticmethod
+    def _baseline_atk(level: int) -> int:
+        """基準プレイヤー (初期装備 / stat 未成長 / ジョブ修飾なし) の ATK。
+
+        🔴 **per-player の表示に流用しないこと。** 3 つの仮定を畳んだ簡約式である。
+        個票は `PlayerProfileAdmin.battle_stats_preview` (別式) が担当する。
+        """
+        return baseline_atk_for_enemy_table(level)
 
     @admin.display(description='想定撃数 (基準/耐性なし)')
     def expected_hits_baseline(self, obj):
@@ -1887,4 +2604,148 @@ class PlayerStatsMatrixAdmin(NoAddAdminMixin, NoDeleteAdminMixin,
             obj._creation     or 1,
             obj._contribution or 1,
         ])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 【FEAT-540 (2026-09-06)】User admin: `last_login` の誤情報を潰す
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# 🔴 **`User.last_login` はこのアプリでは一度も更新されない。**
+# DRF の `TokenAuthentication` は `last_login` を触らず、
+# `django.contrib.auth.login()` の呼び出しも api/ 配下に 0 件である。
+# 更新するのは `user_logged_in` シグナルだけで、トークン認証はそこを通らない
+# (実測 2026-09-05: User 3 件中、`last_login` が入っているのは 0 件)。
+#
+# それでも Django 既定の User admin は「最終ログイン: なし」を表示し続けるので、
+# **運営は「このユーザーは一度もログインしていない」という嘘を見せられる**。
+# FEAT-539 §2 の `login_streak_days` (誰も更新しないのに admin が実データの
+# ように見せていた) とまったく同じ形である。
+#
+# 🔵 **表示から外すのではなく、理由を書く。** 外すと「なぜ無いのか」が
+# 分からなくなり、**同じ疑問がまた出る** —— 今回まさにそれが起きた
+# (ユーザー質問 2026-09-05「最終ログイン日時は表示されているか？」)。
+# **嘘を消すより、嘘である理由を書くほうが情報が増える。**
+_LAST_LOGIN_NOTE = (
+    '🔴 <strong>last_login はこのアプリでは更新されません。</strong>'
+    'DRF の Token 認証は last_login を触らないため、'
+    '<strong>常に「なし」</strong>になります —— '
+    '「一度もログインしていない」という意味ではありません。<br>'
+    '実際に見たいのは「まだ使っているか」なので、'
+    '<strong>プレイヤー一覧の「最終アクティブ」列</strong>を見てください '
+    '(実体は PlayerStreakState.last_achievement_check_at、FEAT-540)。'
+)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 【FEAT-541 (2026-09-06)】アカウント停止 (ban)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# 🔴 **停止の真実値は `User.is_active` 単独である。**
+# 認証がそれを見ており (`authentication.py` が 403 を返す)、ここに
+# チェックボックスがあり、Django admin へのログインも塞ぐ。
+# 2 つ目のフラグ (`is_suspended` 等) を作ると**必ず食い違う**。
+# `AccountSuspensionLog` は**履歴**であって、状態の真実値ではない。
+_SUSPENSION_NOTE = (
+    '🔴 <strong>「有効」のチェックを外すとアカウント停止になります。</strong>'
+    'API は 403 (<code>auth_account_suspended</code>) を返し、'
+    'アプリには停止画面が出ます。Django admin へのログインも塞がれます。<br>'
+    '⚠️ 切り替えると <strong>アカウント停止履歴</strong>に「いつ・誰が・理由」が'
+    '1 行残ります。理由は<strong>運営内部用</strong>で、ユーザーの画面には出ません。<br>'
+    '⚠️ ゲスト (未ログイン) は User を持たないため停止できません。'
+)
+
+
+class UserSuspensionForm(DjangoUserChangeForm):
+    """`is_active` を切り替えるときの理由入力欄 (model 外)。
+
+    ⚠️ **`forms.ModelForm` を直接継承しないこと。** Django の
+    `UserChangeForm` は `password` を `ReadOnlyPasswordHashField`
+    （ハッシュ表示のみ、`required=False`）に差し替えている。
+    素の `ModelForm` にすると `password` が**必須の入力欄**に戻り、
+    保存が「この項目は必須です。」で弾かれる ——
+    しかも admin は 200 でフォームを再描画するだけなので、
+    **エラーに見えず「保存したのに変わらない」ように見える**。
+    最初にこれを踏んだ。
+    """
+
+    suspension_reason = forms.CharField(
+        label='停止 / 解除の理由',
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+        help_text='運営内部用の記録です。ユーザーの画面には表示されません。'
+                  '未入力でも「いつ誰が」は記録されます。',
+    )
+
+
+@admin.register(AccountSuspensionLog)
+class AccountSuspensionLogAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+    """⚠️ 履歴は追加・変更・削除すべて不可。
+
+    後から書き換えられると証跡の意味が無い。記録は
+    `UserWithLastLoginNoteAdmin.save_model` が自動で書く。
+    """
+
+    list_display  = ('created_at', 'user', 'action', 'performed_by', 'reason')
+    list_filter   = ('action',)
+    search_fields = ('user__username', 'user__email', 'reason')
+    date_hierarchy = 'created_at'
+
+
+class UserWithLastLoginNoteAdmin(DjangoUserAdmin):
+    """`last_login` の誤情報を潰し (FEAT-540)、停止の切替を記録する (FEAT-541)。"""
+
+    form = UserSuspensionForm
+    readonly_fields = DjangoUserAdmin.readonly_fields + ('last_login',)
+    fieldsets = tuple(
+        (name, {**opts, 'description': _LAST_LOGIN_NOTE})
+        if 'last_login' in opts.get('fields', ())
+        else (name, {**opts, 'description': _SUSPENSION_NOTE})
+        if 'is_active' in opts.get('fields', ())
+        else (name, opts)
+        for name, opts in DjangoUserAdmin.fieldsets
+    )
+
+    def get_fieldsets(self, request, obj=None):
+        """変更画面にだけ理由の入力欄を出す (追加画面には出さない)。"""
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None:
+            return fieldsets
+        return fieldsets + (
+            ('アカウント停止 (FEAT-541)', {
+                'fields': ('suspension_reason',),
+                'description': _SUSPENSION_NOTE,
+            }),
+        )
+
+    def save_model(self, request, obj, form, change):
+        """`is_active` の**遷移**を検知して履歴を 1 行書く。
+
+        🔴 理由・日時・実行者が残らない ban は運用できない ——
+        解除の判断も、問い合わせへの回答もできなくなる。
+
+        ⚠️ **理由が空でも行は作る。** 何も残らないより、
+        「いつ誰が」だけでも残るほうが良い。
+
+        ⚠️ 遷移が無い保存 (名前を直しただけ等) では**書かない**。
+        毎回書くと履歴がノイズで埋まり、証跡として読めなくなる。
+        """
+        previous = None
+        if change and obj.pk:
+            previous = User.objects.filter(pk=obj.pk).values_list(
+                'is_active', flat=True,
+            ).first()
+        super().save_model(request, obj, form, change)
+
+        if previous is None or previous == obj.is_active:
+            return
+        AccountSuspensionLog.objects.create(
+            user=obj,
+            action='lift' if obj.is_active else 'suspend',
+            reason=form.cleaned_data.get('suspension_reason', '') or '',
+            performed_by=request.user if request.user.is_authenticated else None,
+        )
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserWithLastLoginNoteAdmin)
 

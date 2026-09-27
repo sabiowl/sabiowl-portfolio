@@ -138,3 +138,62 @@ class GuestPromotePending(models.Model):
 
     def __str__(self):
         return f'GuestPromotePending → {self.target_user_id}'
+
+
+class AccountSuspensionLog(models.Model):
+    """【FEAT-541 (2026-09-06)】`User.is_active` の切替履歴。
+
+    🔴 **これは履歴であって、状態の真実値ではない。**
+    停止しているかどうかの真実値は `User.is_active` **単独**である ——
+    認証がそれを見ており、admin にチェックボックスがあり、Django admin への
+    ログインも塞ぐ。2 つ目のフラグを作ると**必ず食い違う**。
+
+    ## なぜ履歴が要るか
+
+    🔴 **理由・日時・実行者が残らない ban は運用できない。**
+    解除の判断も、問い合わせへの回答もできなくなる。
+
+    ⚠️ **理由が空でも行は作る。** 何も残らないより、
+    「いつ誰が」だけでも残るほうが良い。
+
+    ⚠️ `reason` は**運営内部用**で、ユーザーの画面には出さない
+    (出すと回避方法を教えることになる)。
+    """
+
+    ACTION_CHOICES = [
+        ('suspend', '停止'),
+        ('lift',    '解除'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='suspension_logs',
+        verbose_name='対象ユーザー',
+    )
+    action = models.CharField(
+        max_length=10, choices=ACTION_CHOICES, verbose_name='操作',
+    )
+    reason = models.TextField(
+        blank=True, default='', verbose_name='理由 (運営内部用)',
+        help_text='ユーザーの画面には表示されません。解除判断と問い合わせ回答のための記録です。',
+    )
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='+',
+        verbose_name='実行者',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='日時')
+
+    class Meta:
+        app_label    = 'api'
+        verbose_name = 'アカウント停止履歴'
+        verbose_name_plural = 'アカウント停止履歴'
+        ordering     = ['-created_at']
+        indexes      = [models.Index(fields=['user', '-created_at'])]
+
+    def __str__(self):
+        return f'{self.user_id} {self.get_action_display()} @ {self.created_at:%Y-%m-%d}'
+

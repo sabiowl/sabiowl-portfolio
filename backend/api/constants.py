@@ -64,13 +64,23 @@ class GameBalance:
         """
         return level * cls.EXP_PER_LEVEL_COEFFICIENT + cls.EXP_PER_LEVEL_BASE
 
-    # 【FEAT-285】レベルアップ時に付与する手動配分ポイント（経路別）。
-    # CLAUDE.md「経路別の意図的な傾斜」哲学に従い、コアループ（習慣）を厚く、
-    # 副次収入（タイムライン / ガチャ）を軽めに設計。
-    ALLOCATABLE_POINTS_HABIT     = 10  # 習慣 / ToDo / チェックリスト
-    ALLOCATABLE_POINTS_TIMELINE  = 3   # タイムライン予定の完了
-    ALLOCATABLE_POINTS_GACHA_EXP = 3   # ガチャ報酬で EXP 獲得時のレベルアップ
-    ALLOCATABLE_POINTS_CHALLENGE_EXP = 3  # 【FEAT-465】チャレンジ報酬で EXP 獲得時のレベルアップ
+    # 【FEAT-537 (2026-08-29)】レベルアップ時に付与する手動配分ポイント。
+    #
+    # 🔴 経路別の傾斜は撤回した。旧実装は 4 定数 (習慣 10 / タイムライン・ガチャ・
+    # チャレンジ 3 / バトル・パズルはリテラル 3 / 仮メモは加算なし) だったが、
+    # `current_exp` は経路をまたいで合算される単一カウンタなので、付与量を決めて
+    # いたのは「EXP の出どころ」ではなく「閾値をまたいだ瞬間の経路」だった。
+    # 習慣で 900 EXP 積んで最後をバトルで超えると 3pt、逆なら 10pt になる ——
+    # 傾斜が意図と無相関だったため、経路差そのものを廃止する。
+    #
+    # 「コアループを厚く」は `_auto_allocate_by_ratio` (habits.py) が担う。
+    # あちらは直近 30 日の習慣達成率から算出しており、出どころを実際に測っている。
+    # 統一後も習慣経路は 20pt 相当 対 10pt で 2 倍厚いまま。
+    #
+    # ⚠️ 旧 4 定数は別名を残さず削除した。別名を残すと 8 本目を書く人が旧名を
+    # 拾い、同じ穴が再発する。全経路が本定数を参照していることは
+    # `tests/test_allocatable_points_contract.py` が走査で縛っている。
+    ALLOCATABLE_POINTS_PER_LEVEL = 10
 
     # 【FEAT-465 (2026-06-24)】月次カテゴリチャレンジ: 1 ユーザー 1 日 1 回までの
     # 進捗加算ガード。将来 v1.1+ で緩和する場合はこの定数のみ変更すればよい (Q2)。
@@ -297,11 +307,20 @@ JOB_MASTERY_TIER_MULTIPLIER = {
 
 
 def calc_job_mastery_exp_to_next(level: int) -> int:
-    """Lv N → Lv N+1 に必要な EXP (指数曲線)。
+    """Lv N → Lv N+1 に必要な EXP (2 次曲線)。
 
-    Lv 1→2: 10 EXP (~2 戦勝利)
-    Lv 5→6: 50 EXP (~10 戦勝利)
-    Lv 9→10: 200 EXP (~40 戦勝利、Max 直前に達成感重み)
+    戦数は雑魚勝利 (JOB_MASTERY_EXP_PER_BATTLE_WIN = 5 EXP) 換算。
+
+    Lv 1→2:  10 EXP (~2 戦勝利)
+    Lv 5→6:  74 EXP (~15 戦勝利)
+    Lv 9→10: 202 EXP (~41 戦勝利、Max 直前に達成感重み)
+    Lv 1→10 通算: 786 EXP (~158 戦勝利)
+
+    【2026-08-09 訂正】旧記載は「指数曲線 / Lv 5→6: 50 EXP (~10 戦) /
+    Lv 9→10: 200 EXP」だったが、いずれも実装と不一致だった (コードは正しく
+    コメントのみ誤り)。Lv 5→6 は実際 74 EXP で **1.5 倍のズレ**があり、
+    このコメントだけを見て調整すると Max までの総戦数を 100 戦強と見積もる
+    (実際は 158 戦)。式は 2N²+4N+4 の 2 次で、指数 (k^N) ではない。
     """
     return level * level * 2 + level * 4 + 4
 

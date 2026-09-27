@@ -74,9 +74,11 @@ class HabitDetailPage extends ConsumerWidget {
           _ChecklistSection(
             habit: habit,
             onToggle: (itemId) async {
+              // 【BUG-150】await をまたぐので l10n は先に capture する。
+              final l10n = AppLocalizations.of(context)!;
               await ref
                   .read(habitsNotifierProvider.notifier)
-                  .toggleChecklistItem(habit.id, itemId);
+                  .toggleChecklistItem(habit.id, itemId, l10n: l10n);
               ref.invalidate(habitDetailProvider(habit.id));
             },
           ),
@@ -276,11 +278,19 @@ class HabitDetailPage extends ConsumerWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     final l10n = AppLocalizations.of(context)!;
-                    await ref
+                    // 【FEAT-533 §8-3 (2026-08-25)】**送れなかった回は祝わない。**
+                    // `incrementCount` は `_inFlight` guard で早期 return したとき
+                    // `false` を返す (throw しない)。以前はここで戻り値を見ずに
+                    // SnackBar を出していたため、**何も記録されていないのにサビが
+                    // 「今日の積み重ねが、世界のどこかで幸運の種になりました。」と
+                    // 言う**状態になっていた。触覚の嘘 (FEAT-532) より質が悪い
+                    // ——「静かな聖域」であるはずのサビの口を借りた嘘だからである。
+                    final sent = await ref
                         .read(habitsNotifierProvider.notifier)
                         .incrementCount(habit.id, l10n: l10n);
                     if (!context.mounted) return;
                     ref.invalidate(habitDetailProvider(habit.id));
+                    if (!sent) return;
                     final msgs = [
                       l10n.habitDetailPageRecordSabi_message1,
                       l10n.habitDetailPageRecordSabi_message2,

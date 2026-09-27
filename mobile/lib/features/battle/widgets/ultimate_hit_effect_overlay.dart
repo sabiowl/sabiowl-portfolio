@@ -20,6 +20,9 @@ import 'package:flutter/material.dart';
 /// 本 overlay の `controller.fire()` 呼び出しと同フレームで
 /// `BattleHapticsService.instance.playUltimateHit()` を呼ぶことで、視覚演出と
 /// 振動が同時開始される (caller 側で fire-and-forget)。
+/// ホワイトフラッシュ layer の識別子 (テスト用)。
+const Key ultimateHitFlashKey = ValueKey('ultimate_hit_flash');
+
 class UltimateHitEffectController {
   UltimateHitEffectController();
 
@@ -30,6 +33,12 @@ class UltimateHitEffectController {
   void fire() {
     _state?._fire();
   }
+
+  /// 再生中かどうか (テスト / デバッグ用)。
+  ///
+  /// 🔴 とどめが必殺技だったときに**これが true になってはいけない** ——
+  /// 白フラッシュが KO 演出を覆い隠す (battle_page の発火ガード参照)。
+  bool get isPlaying => _state?._isPlaying ?? false;
 
   void _attach(_UltimateHitEffectOverlayState state) {
     _state = state;
@@ -95,6 +104,11 @@ class _UltimateHitEffectOverlayState extends State<UltimateHitEffectOverlay>
     _ctrl.forward(from: 0.0);
   }
 
+  /// 再生中か。`_ctrl` の進行状態がそのまま真実値。
+  bool get _isPlaying =>
+      _ctrl.status == AnimationStatus.forward ||
+      (_ctrl.value > 0 && _ctrl.value < 1);
+
   /// 画面シェイク offset (横振 ±10px、減衰 sin)。
   Offset _shakeOffset(double progress) {
     if (progress <= 0 || progress >= 1) return Offset.zero;
@@ -156,9 +170,15 @@ class _UltimateHitEffectOverlayState extends State<UltimateHitEffectOverlay>
               child: child,
             ),
             // L2: ホワイトフラッシュ overlay
+            //
+            // 🔴 key は**テストの識別子**。画面には他にも白い Container が居る
+            // (ゲージ背景など) ので、色で探すと誤検出する。
+            // `ko_gate_battle_page_test.dart` が「とどめが必殺のときは出ない」
+            // を縛っている。
             if (flash > 0)
               IgnorePointer(
                 child: Container(
+                  key: ultimateHitFlashKey,
                   color: Colors.white.withValues(alpha: flash),
                 ),
               ),
@@ -172,7 +192,7 @@ class _UltimateHitEffectOverlayState extends State<UltimateHitEffectOverlay>
                       opacity: ring.opacity,
                       child: CustomPaint(
                         size: const Size(240, 240),
-                        painter: _ExplosionRingPainter(),
+                        painter: ExplosionRingPainter(),
                       ),
                     ),
                   ),
@@ -186,7 +206,10 @@ class _UltimateHitEffectOverlayState extends State<UltimateHitEffectOverlay>
 }
 
 /// 爆発リング描画 (オレンジ → 黄 → 透明 のグラデーション + 外周ライン)。
-class _ExplosionRingPainter extends CustomPainter {
+///
+/// 【FEAT-526 (2026-08-21)】KO 演出でも同じ絵を使うため public に変更した
+/// (旧 `_ExplosionRingPainter`)。**インパクトの見た目を 2 箇所で二重管理しない。**
+class ExplosionRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);

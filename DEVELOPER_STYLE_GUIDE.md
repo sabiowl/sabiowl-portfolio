@@ -82,7 +82,7 @@
 | ナビゲーション | **go_router** | declarative、ShellRoute 対応、deep link 対応 |
 | HTTP | **Dio** | interceptor で認証ヘッダー自動付与、タイムアウト柔軟 |
 | ローカル DB | `shared_preferences` (軽量) + `flutter_secure_storage` (トークン) | 重い DB は不要、トークンだけ secure |
-| Backend | **Django 4.2 + DRF** | Python の可読性、ORM の表現力、認証ライブラリ豊富 |
+| Backend | **Django 6.0 + DRF** | Python の可読性、ORM の表現力、認証ライブラリ豊富 |
 | 認証 | **DRF TokenAuthentication + Google / Apple サインイン** | サーバーサイドセッション不要、ステートレス、ゲストモード経路含む |
 | DB | **PostgreSQL (本番、Render Singapore) + SQLite (ローカル)** | DATABASE_URL 未設定時に自動切替、開発簡素化 |
 | Push 通知 | Firebase FCM (Backend は `firebase-admin` SDK) | Apple/Google 両対応、無料枠で開始可能 |

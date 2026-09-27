@@ -129,10 +129,27 @@ class PosthogService {
   ///
   /// `properties` には PII を含めない（メール・名前・トークン等）。
   /// 値が null のキーは含めない（PostHog の集計から外れるため）。
+  /// 【FEAT-531 (2026-08-29)】テストから計測を観測するための差し替え口。
+  ///
+  /// non-null のとき、実送信の代わりにここへ流す (`_initialized` に関係なく必ず届く)。
+  /// **計測テストは「呼ばれなくても緑」になりやすい** —— FEAT-524 Phase 1 で
+  /// 3 件が黙って緑だった前例があるので、ソース走査ではなく
+  /// **実際に capture が走ったこと**を見られる形にしてある。
+  ///
+  /// 🔴 テストでは必ず `addTearDown` で null に戻すこと (グローバル状態)。
+  @visibleForTesting
+  static void Function(String event, Map<String, Object>? properties)?
+      debugCaptureSink;
+
   Future<void> capture(
     String event, {
     Map<String, Object>? properties,
   }) async {
+    final sink = debugCaptureSink;
+    if (sink != null) {
+      sink(event, properties);
+      return;
+    }
     if (!_initialized) return;
     try {
       await Posthog().capture(

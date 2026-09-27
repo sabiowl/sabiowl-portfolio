@@ -6,16 +6,23 @@ from .player import (
 from .player_state import (
     PlayerEconomyState, PlayerBattleState, PlayerStreakState, PlayerSettings,
 )
-from .habits import Habit, HabitLog, HabitRewardLog, ChecklistItem, Achievement, PlayerAchievement, RestDay
+from .habits import (
+    Habit, HabitLog, HabitRewardLog, ChecklistItem, Achievement, PlayerAchievement, RestDay,
+    DailyAchievement,  # 【FEAT-539 (2026-09-05)】連続 / 累計達成日数の真実値
+)
 from .gamification import Character, OwnedCharacter, PlayerItem
 from .gacha import GachaReward, PlayerGachaStatus, GachaHistory, PendingDuplicateReward
 from .social import Friendship, Message, Notification, Gift
-from .auth import SocialAccount, GuestSession, GuestPromotePending
+from .auth import (
+    SocialAccount, GuestSession, GuestPromotePending,
+    AccountSuspensionLog,  # 【FEAT-541 (2026-09-06)】停止履歴 (状態の真実値は User.is_active)
+)
 from .timeline import TimelineEvent, GoogleEventCompletion
 from .battle import Job, Enemy, WeaponMaster, PlayerWeapon, Battle, BattleLog
 from .iap import IAPReceipt  # FEAT-436 Phase 2
 from .announcement import Announcement, PlayerAnnouncementRead  # FEAT-458
 from .maintenance import MaintenanceConfig  # FEAT-463
+from .app_update import AppUpdateConfig  # FEAT-543
 from .challenge import Challenge, ChallengeParticipation  # FEAT-465
 from .sabi import SabiMessage  # 【新規 (2026-06-26)】サビセリフ admin 編集対応
 from .admin_mfa import AdminMFAChallenge  # 【2026-06-29】admin メール OTP MFA
@@ -35,6 +42,7 @@ __all__ = [
     # habits
     'Habit', 'HabitLog', 'HabitRewardLog', 'ChecklistItem',
     'Achievement', 'PlayerAchievement', 'RestDay',
+    'DailyAchievement',  # 【FEAT-539 (2026-09-05)】
     # gamification
     'Character', 'OwnedCharacter', 'PlayerItem',
     # gacha
@@ -43,6 +51,7 @@ __all__ = [
     'Friendship', 'Message', 'Notification', 'Gift',
     # auth
     'SocialAccount', 'GuestSession', 'GuestPromotePending',
+    'AccountSuspensionLog',  # 【FEAT-541 (2026-09-06)】
     # timeline
     'TimelineEvent', 'GoogleEventCompletion',
     # battle (FEAT-295) + Job (FEAT-299)
@@ -53,6 +62,8 @@ __all__ = [
     'Announcement', 'PlayerAnnouncementRead',
     # maintenance (FEAT-463)
     'MaintenanceConfig',
+    # app update notice (FEAT-543)
+    'AppUpdateConfig',
     # challenge (FEAT-465)
     'Challenge', 'ChallengeParticipation',
     # sabi (新規 2026-06-26、サビセリフ admin 編集対応)

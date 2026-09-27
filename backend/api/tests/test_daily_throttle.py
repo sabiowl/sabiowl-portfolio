@@ -72,9 +72,8 @@ class DailyExpThrottleServiceTest(TestCase):
         """daily_exp_count=0 → +1 → exp_gain=20、throttled=False。"""
         today = timezone.localdate()
         p = self._make_player(count=0, date=today)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 20, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 20)
         self.assertEqual(exp_out, 20)
-        self.assertEqual(pts_out, 10)
         self.assertFalse(triggered)
         self.assertEqual(p.battle.daily_exp_count, 1)
 
@@ -83,7 +82,7 @@ class DailyExpThrottleServiceTest(TestCase):
         """daily_exp_count=24 → +1 → exp_gain=20、count=25、throttled=False。"""
         today = timezone.localdate()
         p = self._make_player(count=24, date=today)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 20, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 20)
         self.assertEqual(exp_out, 20)
         self.assertFalse(triggered)
         self.assertEqual(p.battle.daily_exp_count, 25)
@@ -93,9 +92,8 @@ class DailyExpThrottleServiceTest(TestCase):
         """daily_exp_count=25 → +1 → exp_gain=1、throttled_now=True。"""
         today = timezone.localdate()
         p = self._make_player(count=DAILY_EXP_THROTTLE_LIMIT, date=today)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 100, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 100)
         self.assertEqual(exp_out, DAILY_EXP_THROTTLED_VALUE)
-        self.assertEqual(pts_out, DAILY_EXP_THROTTLED_VALUE)
         self.assertTrue(triggered)
         self.assertEqual(p.battle.daily_exp_count, DAILY_EXP_THROTTLE_LIMIT + 1)
 
@@ -104,7 +102,7 @@ class DailyExpThrottleServiceTest(TestCase):
         """daily_exp_count=26 → +1 → exp_gain=1、throttled_now=False。"""
         today = timezone.localdate()
         p = self._make_player(count=DAILY_EXP_THROTTLE_LIMIT + 1, date=today)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 40, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 40)
         self.assertEqual(exp_out, DAILY_EXP_THROTTLED_VALUE)
         self.assertFalse(triggered)
 
@@ -113,7 +111,7 @@ class DailyExpThrottleServiceTest(TestCase):
         """daily_exp_count=30, date=昨日 → +1 → count=1、exp_gain=20。"""
         yesterday = timezone.localdate() - datetime.timedelta(days=1)
         p = self._make_player(count=30, date=yesterday)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 20, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 20)
         self.assertEqual(exp_out, 20)
         self.assertFalse(triggered)
         self.assertEqual(p.battle.daily_exp_count, 1)
@@ -123,7 +121,7 @@ class DailyExpThrottleServiceTest(TestCase):
     def test_F_none_date_treated_as_new_day(self):
         """date=None → リセットして count=1。"""
         p = self._make_player(count=30, date=None)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 20, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 20)
         self.assertEqual(exp_out, 20)
         self.assertFalse(triggered)
         self.assertEqual(p.battle.daily_exp_count, 1)
@@ -133,7 +131,7 @@ class DailyExpThrottleServiceTest(TestCase):
         """daily_exp_count=25 で Legendary +1 → exp_gain=1。"""
         today = timezone.localdate()
         p = self._make_player(count=DAILY_EXP_THROTTLE_LIMIT, date=today)
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 100, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 100)
         self.assertEqual(exp_out, DAILY_EXP_THROTTLED_VALUE)
         self.assertTrue(triggered)
 
@@ -145,7 +143,7 @@ class DailyExpThrottleServiceTest(TestCase):
         p.daily_battle_count = DAILY_BATTLE_LIMIT
         p.daily_battle_count_date = today
         # EXP スロットルはバトルカウントと無関係
-        exp_out, pts_out, triggered = apply_daily_exp_throttle(p, 20, 10)
+        exp_out, triggered = apply_daily_exp_throttle(p, 20)
         self.assertEqual(exp_out, 20)
         self.assertFalse(triggered)
 

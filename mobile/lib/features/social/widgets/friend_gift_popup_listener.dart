@@ -60,6 +60,8 @@ class _FriendGiftPopupListenerState
     // 同日 3 回目のタスク達成 ∩ レベルアップが同時発火しても順次表示される。
     final accepted = await PopupSerializer.enqueueShowDialog<bool>(
       context: context,
+      // 【FEAT-534】5: 他者が絡み、かつ**確認を求める**ので祝祭の直後に置かない。
+      priority: PopupPriority.friendGift,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.surface,
         title: Text(

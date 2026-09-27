@@ -8,6 +8,7 @@ import '../../task_suggestion/models/task_suggestion.dart';  // 【2026-07-07】
 import '../../task_suggestion/providers/task_suggestion_provider.dart';  // 【2026-07-07】master 判定
 import '../../task_suggestion/services/custom_suggestion_store.dart';  // 【2026-07-07】upsert
 import '../../task_suggestion/widgets/task_title_search_sheet.dart'; // 【FEAT-467】
+import '../models/checklist_draft.dart';
 import '../providers/habits_provider.dart';
 import '../../../shared/widgets/add_task_modal.dart';
 import '../../../l10n/app_localizations.dart';
@@ -49,7 +50,10 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
   bool _isLoading = false;
   String? _error;
 
-  final List<String> _checklistItems = [];
+  // 【FEAT-525】並び替えのため `List<String>` → draft リストに変更。
+  // text は重複しうる (「牛乳」を 2 行書く買い物メモ) ので、
+  // `ReorderableListView` の Key には draft の `localKey` を使う。
+  List<ChecklistDraft> _checklistDrafts = [];
 
   // 【FEAT-210】カテゴリ定数は `kSabiHabitCategories` に統一（旧 `_categories` 削除）。
   // _frequencies / _resetCycles は l10n 化のため build メソッド内でインライン定義。
@@ -117,7 +121,7 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
             builder: (_, value, __) {
               final hasName = value.text.trim().isNotEmpty;
               final hasChecklist = _habitType != 'checklist' ||
-                  _checklistItems.isNotEmpty;
+                  _checklistDrafts.isNotEmpty;
               final canSubmit = hasName && hasChecklist && !_isLoading;
               // 【2026-07-02】ボタンスタイルを add_event/add_todo と統一。
               // width full + AnimatedOpacity + styleFrom (primary bg + rounded 14 +
@@ -392,25 +396,53 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
     );
   }
 
+  /// 【FEAT-525】新規作成時点でも並び替えられるようにする。
+  ///
+  /// ここで並べた順序は `checklist_items` の配列順としてそのまま POST され、
+  /// backend が `order=idx` で採番する (`views/habits.py`)。**backend 変更は不要。**
+  ///
+  /// `edit_habit_page` と同じ理由で `shrinkWrap` + `NeverScrollableScrollPhysics`
+  /// (外側がフォーム全体の `ListView`) と、ハンドルのみを掴む
+  /// `buildDefaultDragHandles: false` + `ReorderableDragStartListener` を使う。
   Widget _buildChecklistEditor() {
     return Column(
       children: [
-        ..._checklistItems.asMap().entries.map((entry) {
-          return ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            // 【FEAT-441 (2026-06-17)】Icons.drag_handle → Icons.drag_indicator
-            // (6 点 2×3 グリッド) に変更、home_page と統一。
-            leading: const Icon(Icons.drag_indicator, color: Colors.white38),
-            title: Text(entry.value,
-                style: const TextStyle(color: Colors.white, fontSize: 14)),
-            trailing: IconButton(
-              icon: const Icon(Icons.close, color: Colors.red, size: 18),
-              onPressed: () =>
-                  setState(() => _checklistItems.removeAt(entry.key)),
-            ),
-          );
-        }),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: _checklistDrafts.length,
+          onReorder: (oldIndex, newIndex) => setState(() {
+            _checklistDrafts =
+                reorderDrafts(_checklistDrafts, oldIndex, newIndex);
+          }),
+          itemBuilder: (context, index) {
+            final draft = _checklistDrafts[index];
+            return ListTile(
+              key: ValueKey(draft.localKey),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              // 【FEAT-441 (2026-06-17)】Icons.drag_handle → Icons.drag_indicator
+              // (6 点 2×3 グリッド) に変更、home_page と統一。
+              // 【FEAT-525】そのハンドルに **実際の掴み先** を付けた。
+              leading: ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(Icons.drag_indicator, color: Colors.white38),
+                ),
+              ),
+              title: Text(draft.text,
+                  style: const TextStyle(color: Colors.white, fontSize: 14)),
+              trailing: IconButton(
+                icon: const Icon(Icons.close, color: Colors.red, size: 18),
+                onPressed: () => setState(() {
+                  _checklistDrafts = [..._checklistDrafts]..removeAt(index);
+                }),
+              ),
+            );
+          },
+        ),
         Row(
           children: [
             Expanded(
@@ -439,7 +471,8 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
     final text = _checklistController.text.trim();
     if (text.isNotEmpty) {
       setState(() {
-        _checklistItems.add(text);
+        // 末尾に追加。差し込みたい位置へはドラッグで動かす。
+        _checklistDrafts = [..._checklistDrafts, ChecklistDraft(text: text)];
         _checklistController.clear();
       });
     }
@@ -576,7 +609,7 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_habitType == 'checklist' && _checklistItems.isEmpty) {
+    if (_habitType == 'checklist' && _checklistDrafts.isEmpty) {
       setState(() => _error = AppLocalizations.of(context)!.habitAddHabitChecklistErrorSabi_message);
       return;
     }
@@ -593,7 +626,12 @@ class _AddHabitPageState extends ConsumerState<AddHabitPage> {
             habitType:  _habitType,
             difficulty: _difficulty,
             memo:       _memoController.text.trim(),
-            checklistItems: _habitType == 'checklist' ? _checklistItems : [],
+            // 【FEAT-525】`checklist_items` は配列順がそのまま `order` になる
+            // (`views/habits.py` の `order=idx`)。並び替えた表示順で写すだけでよく、
+            // **backend 変更は要らない**。
+            checklistItems: _habitType == 'checklist'
+                ? _checklistDrafts.map((d) => d.text).toList()
+                : [],
           );
 
       // 【2026-07-07】新規追加した title を端末ローカルカスタム候補として upsert。

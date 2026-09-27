@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';  // 【BUG-121】リリース�
 import '../../../core/analytics/posthog_service.dart';  // 【FEAT-493】
 import '../../../core/constants/app_urls.dart';  // 【FEAT-463】URL 定数集約
 import '../../../core/l10n/app_locale.dart';  // 【FEAT-489 Phase 2G-a】表示言語切替
+import '../../../core/providers/app_version_provider.dart';  // 【BUG-151】バージョンは pubspec が真実値
 import '../../../core/router/app_router.dart';
 import '../../../core/services/toast_center.dart';  // 【BUG-121】サビ口調エラー表示
 import '../../../core/theme/app_theme.dart';
@@ -19,6 +20,8 @@ import '../../auth/widgets/social_sign_in_button.dart';
 import '../../habits/providers/habits_provider.dart';   // FEAT-181/183: playerNotifierProvider / habitsNotifierProvider
 import '../../habits/providers/home_bootstrap_provider.dart';  // FEAT-183: homeBootstrapRawProvider
 import '../providers/settings_provider.dart';
+import '../../../core/api/api_client.dart';  // 【BUG-154】isGuestMode fallback
+import '../logout_guard.dart';  // 【BUG-154】
 import '../services/settings_service.dart';
 import '../../challenge/services/challenge_notification_service.dart';  // 【FEAT-509】
 
@@ -283,13 +286,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             icon: Icons.info_outline,
             label: l10n.settingsPageTileVersion,
             onTap: _openReleaseNotes,
-            trailing: const Row(
+            // 【BUG-151 (2026-09-02)】旧実装は `Text('1.0.0')` のリテラルで、
+            // v1.1.0 / v1.1.1 を出しても**ここだけ 1.0.0 のまま**だった。
+            // 🔴 真実値は `pubspec.yaml` の `version:`。リテラルで書かないこと。
+            // 取得できるまでは何も出さない (「取得中…」は trailing には長すぎる。
+            // ドロワーは行全体がバージョン表示なので loading 文言を出している)。
+            trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('1.0.0',
-                    style: TextStyle(color: Colors.white38, fontSize: 13)),
-                SizedBox(width: 6),
-                Icon(Icons.open_in_new, size: 14, color: Colors.white38),
+                Text(
+                  ref.watch(appVersionProvider).valueOrNull ?? '',
+                  style: const TextStyle(color: Colors.white38, fontSize: 13),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.open_in_new, size: 14, color: Colors.white38),
               ],
             ),
           ),
@@ -728,23 +738,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final l10n = AppLocalizations.of(context)!;
     HapticFeedback.lightImpact();
 
-    final LinkedAccounts accounts;
-    try {
-      accounts = await ref.read(linkedAccountsProvider.future);
-    } catch (e, st) {
-      debugPrint('linkedAccounts fetch failed in _confirmLogout: $e\n$st');
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.settingsLogoutCheckErrorSnackbarSabi_message),
-        ),
-      );
-      return;
-    }
+    // 🔴 【BUG-154 (2026-09-11)】サーバに聞けなくてもここで止まらない。
+    //
+    // 旧実装は `/auth/social/accounts/` の取得に失敗すると SnackBar を出して
+    // return していた —— **確認ダイアログすら開かず、通信できないと
+    // ログアウトできない**状態だった。ログアウト処理そのものは通信を捨てる
+    // 前提で書かれている (`auth_service` が `/auth/logout/` の失敗を握って
+    // ローカル削除を続行する) のに、**入口の事前チェックだけが閉じていた**。
+    //
+    // ⚠️ ガードは消していない。判定材料をローカル (`guest_mode`) に
+    //    切り替えただけである。詳細は `logout_guard.dart`。
+    final blocked = await shouldBlockLogoutAsUnlinked(
+      fetchLinkedAccounts: () => ref.read(linkedAccountsProvider.future),
+      isGuestMode: () => ref.read(apiClientProvider).isGuestMode(),
+    );
 
     if (!context.mounted) return;
 
-    if (!accounts.hasAnyLink) {
+    if (blocked) {
       await _showUnlinkedLogoutWarning(context);
       return;
     }

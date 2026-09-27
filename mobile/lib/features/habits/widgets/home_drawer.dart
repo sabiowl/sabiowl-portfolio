@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/providers/app_version_provider.dart';  // 【BUG-151】
 import '../../../l10n/app_localizations.dart';
 import '../../../core/utils/friend_id_formatter.dart';  // 【2026-07-02】12 桁化 + 4-4-4 表示
 import '../../social/providers/social_provider.dart';  // unreadNotifCountProvider
@@ -43,10 +43,6 @@ class HomeDrawer extends ConsumerStatefulWidget {
 }
 
 class _HomeDrawerState extends ConsumerState<HomeDrawer> {
-  // 【FEAT-464 Pre-mortem #3】PackageInfo 取得は 1 回限りキャッシュ。
-  // Drawer 開閉のたびに再取得すると体感遅延が出るため State に保持。
-  Future<PackageInfo>? _packageInfoFuture;
-
   // 【FEAT-479 hotfix (2026-07-06)】スクロール直感 UI 用: Scrollbar と
   // ListView + 下端 chevron overlay で controller を共有し、scroll 位置に
   // 応じて chevron opacity をアニメーション。
@@ -55,7 +51,6 @@ class _HomeDrawerState extends ConsumerState<HomeDrawer> {
   @override
   void initState() {
     super.initState();
-    _packageInfoFuture = PackageInfo.fromPlatform();
   }
 
   @override
@@ -385,22 +380,27 @@ class _HomeDrawerState extends ConsumerState<HomeDrawer> {
             const Divider(color: Colors.white12, height: 1),
 
             // ── バージョン情報 (非同期取得、Pre-mortem S3) ───────────
-            FutureBuilder<PackageInfo>(
-              future: _packageInfoFuture,
-              builder: (context, snapshot) {
-                final l10n = AppLocalizations.of(context)!;
-                final versionText = snapshot.hasData
-                    ? l10n.habitDrawerVersion(snapshot.data!.version)
-                    : l10n.habitDrawerVersionLoading;
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  child: Text(
-                    versionText,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
-                  ),
-                );
-              },
-            ),
+            // 【BUG-151 (2026-09-02)】`appVersionProvider` へ集約。
+            // 旧実装は State で `PackageInfo.fromPlatform()` を手動キャッシュ
+            // していた (FEAT-464 Pre-mortem #3「Drawer 開閉のたびに再取得すると
+            // 体感遅延が出る」)。`FutureProvider` は解決済みの値を保持するので、
+            // その要件は provider に寄せるだけで満たされる。
+            //
+            // 🔴 設定画面が `Text('1.0.0')` のリテラルで、こちらだけが本物を
+            // 読んでいた。取得を 1 本に絞ることで、片方だけ古い状態を構造的に潰す。
+            Builder(builder: (context) {
+              final l10n = AppLocalizations.of(context)!;
+              final version = ref.watch(appVersionProvider).valueOrNull;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Text(
+                  version != null
+                      ? l10n.habitDrawerVersion(version)
+                      : l10n.habitDrawerVersionLoading,
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                ),
+              );
+            }),
           ],
         ),
       ),

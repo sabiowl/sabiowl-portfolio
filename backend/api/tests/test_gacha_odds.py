@@ -20,7 +20,10 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from api.models import GachaReward, PlayerProfile
-from api.views.gacha import _active_reward_pool, _ensure_gacha_rewards
+from api.views.gacha import (
+    _DAILY_REWARDS, _MONTHLY_REWARDS, _WEEKLY_REWARDS,
+    _active_reward_pool, _ensure_gacha_rewards,
+)
 
 User = get_user_model()
 
@@ -234,3 +237,130 @@ class GachaOddsDisclosureTest(APITestCase):
         self.client.credentials()
         res = self.client.get(self.url)
         self.assertIn(res.status_code, (401, 403))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 【2026-08-09】weight 合計の「母数」を縛る
+# ──────────────────────────────────────────────────────────────────────────────
+
+class GachaWeightTotalContractTest(APITestCase):
+    """ticket_type ごとの active weight 合計が設計値であることを固定する。
+
+    ## なぜ既存テストでは足りなかったか (実際に起きたこと)
+
+    dev DB で `daily` の weight 合計が **102** になっていた。原因は
+    `大量経験値 EXP +250` / `特大経験値 EXP +500` という**旧世代の行が
+    is_active=True のまま残っていた**こと。`_ensure_gacha_rewards` は
+    `(ticket_type, name, detail)` で `get_or_create` するため、報酬額を
+    +250 -> +350 に変えた時点で「旧行を残したまま新行を作る」動きになる
+    (gacha.py:117「既存 entry は触らず、欠落分のみ作成」)。
+
+    結果、daily SSR の排出率が設計 1.00% に対し **1.96% (約 2 倍)** になり、
+    SSR を引いても半分は +500 (期待 EXP 1000 -> 750) という状態だった。
+
+    既存の `test_probabilities_sum_to_100` はこれを検出できない。
+    **`weight / total * 100` の合計**を見ているので、行が何行増えても
+    常に 100% になる。「合計が 100 になる」は縛れていても
+    **「母数が 100 である」は縛れていなかった**。
+
+    gacha.py:41-43 のコメントは「Pre-mortem #3 weight 合計の不変式 (Daily 100)
+    を契約テストで縛る」と書いていたが、縛れていたのは別のものだった。
+
+    ## 本テストの守備範囲と、その外側
+
+    本テストが守るのは **コード側の spec** と **seed 直後の DB**。
+    デプロイ済み環境で起きた drift (今回の実例) は、テスト DB に旧行が
+    存在しないため構造的に検出できない。**環境の drift は SQL による
+    運用チェックで見る** —— doc/release_checklist/v1.1.md の G7 参照。
+    """
+
+    # 設計値。変更するときは gacha.py の spec と本表を **同時に** 動かすこと。
+    EXPECTED_TOTALS = {'daily': 100, 'weekly': 200, 'monthly': 100}
+
+    def test_code_spec_weight_totals(self):
+        """コード側 spec の weight 合計が設計値。
+
+        報酬を足すとき「weight を再配分し忘れる」のを止める層。
+        """
+        specs = {
+            'daily':   _DAILY_REWARDS,
+            'weekly':  _WEEKLY_REWARDS,
+            'monthly': _MONTHLY_REWARDS,
+        }
+        for ticket_type, expected in self.EXPECTED_TOTALS.items():
+            total = sum(s['weight'] for s in specs[ticket_type])
+            self.assertEqual(
+                total, expected,
+                f'{ticket_type} の spec weight 合計が {total} (設計値 {expected})。'
+                '報酬を足したなら他の weight を減らして合計を保つこと',
+            )
+
+    def test_seeded_db_weight_totals(self):
+        """seed 直後の DB でも合計が設計値。
+
+        spec が正しくても `_ensure_gacha_rewards` が重複行を作れば崩れる層。
+        """
+        _ensure_gacha_rewards()
+        for ticket_type, expected in self.EXPECTED_TOTALS.items():
+            total = sum(r.weight for r in _active_reward_pool(ticket_type))
+            self.assertEqual(
+                total, expected,
+                f'{ticket_type} の DB weight 合計が {total} (設計値 {expected})',
+            )
+
+    def test_no_active_reward_outside_code_spec(self):
+        """active な行はすべてコード spec に存在する。
+
+        dev で起きた drift そのものの形。テスト DB には旧行が無いので
+        ここは通るが、**同じ判定を SQL に写して環境に対して流す**ための
+        基準として置いておく (docstring 参照)。
+        """
+        _ensure_gacha_rewards()
+        spec_keys = {
+            (s['ticket_type'], s['name'], s['detail'])
+            for s in (*_DAILY_REWARDS, *_WEEKLY_REWARDS, *_MONTHLY_REWARDS)
+        }
+        for ticket_type in self.EXPECTED_TOTALS:
+            for r in _active_reward_pool(ticket_type):
+                # weapon / character 等 migration 由来の行は spec に無くてよい。
+                # exp / xp_boost は spec が唯一の真実値。
+                if r.reward_type not in ('exp', 'xp_boost'):
+                    continue
+                self.assertIn(
+                    (r.ticket_type, r.name, r.detail), spec_keys,
+                    f'コード spec に無い active 報酬: {r.ticket_type} / '
+                    f'{r.name} / {r.detail} (旧世代の行が残っていないか)',
+                )
+
+    def test_detail_change_leaves_stale_row(self):
+        """`detail` を変えると旧行が残る —— という既知の挙動を明文化する。
+
+        これは「直すべきバグ」ではなく **`get_or_create` の帰結**であり、
+        dev で 102 になった機構そのもの。将来この挙動を変えるなら本テストが
+        赤くなるので、そのとき初めて意図的な変更として扱える。
+
+        同時に「**なぜ環境側の運用チェックが要るのか**」の実行可能な説明でもある。
+        """
+        _ensure_gacha_rewards()
+        before = sum(r.weight for r in _active_reward_pool('daily'))
+        self.assertEqual(before, 100, '前提: seed 直後は 100')
+
+        # 報酬額を過去世代に巻き戻した状態を作る (dev で起きていた形)
+        GachaReward.objects.filter(
+            ticket_type='daily', name='特大経験値', detail='EXP +1000',
+        ).update(detail='EXP +500', value=500)
+
+        _ensure_gacha_rewards()  # 再 seed = +1000 の行が新規作成される
+
+        after = sum(r.weight for r in _active_reward_pool('daily'))
+        self.assertEqual(
+            after, 101,
+            '旧行が残ったまま新行が増える挙動が変わった。'
+            '意図した変更なら本テストと運用チェックを見直すこと',
+        )
+        self.assertEqual(
+            GachaReward.objects.filter(
+                ticket_type='daily', name='特大経験値', is_active=True,
+            ).count(), 2,
+            '同名で detail 違いの行が 2 本 active になる',
+        )
